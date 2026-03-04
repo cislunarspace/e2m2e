@@ -41,7 +41,7 @@ const globalSidebar = [
         title: "资源与工具",
         collapsable: true,
         children: [
-            ["/资源与工具/", "概述"],
+            ["/资源与工具/", "引言"],
             ["/资源与工具/数据集下载", "数据集下载"],
         ]
     },
@@ -49,7 +49,7 @@ const globalSidebar = [
         title: "关于本站",
         collapsable: true,
         children: [
-            ["/关于本站/", "概述"],
+            ["/关于本站/", "引言"],
         ]
     }
 ];
