@@ -2,23 +2,15 @@ import { NavItem } from "vuepress/config";
 
 export default [
     {
-        text: "知识体系",
-        link: '/知识体系/'
+        text: "地月空间术语词典",
+        link: '/地月空间术语词典/'
     },
     {
-        text: "案例实践",
-        link: '/案例实践/'
+        text: "资源与工具",
+        link: '/资源与工具/'
     },
     {
-        text: "技术词典",
-        link: '/技术词典/'
-    },
-    {
-        text: "资源工具",
-        link: '/资源工具/'
-    },
-    {
-        text: "关于",
-        link: '/关于/'
+        text: "关于本站",
+        link: '/关于本站/'
     },
 ] as NavItem[];
