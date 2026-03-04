@@ -38,8 +38,6 @@ export default defineConfig({
       `,
     ],
   ],
-  permalink: "/:slug",
-
   // 监听文件变化，热更新
   extraWatchFiles: [".vuepress/*.ts", ".vuepress/sidebars/*.ts"],
   markdown: {
