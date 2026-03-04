@@ -6,6 +6,11 @@ export default [
         link: '/地月空间术语词典/'
     },
     {
+        text: "卫星轨道仿真",
+        link: '/satellite-simulation.html',
+        target: '_blank'
+    },
+    {
         text: "资源与工具",
         link: '/资源与工具/'
     },

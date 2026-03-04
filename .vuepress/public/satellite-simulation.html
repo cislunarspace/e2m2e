@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>卫星轨道仿真教学系统</title>
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <!-- <script src="Cesium/Cesium.js"></script>
+  <link href="Cesium/Widgets/widgets.css" rel="stylesheet"> -->
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --bg-dark:#050c1a;--bg-panel:#081428;--bg-card:#0a1930;
+      --bg-card-hover:#0d2040;--border:#1a3a6a;
+      --blue:#00d4ff;--cyan:#00ffcc;--gold:#ffcc44;
+      --txt:#e8f4ff;--txt2:#7aa8cc;--txt3:#3a6080;
+      --glow-b:0 0 12px rgba(0,212,255,.5);
+      --glow-c:0 0 12px rgba(0,255,204,.5);
+      --pw:380px;
+    }
+    html,body{width:100%;height:100%;background:var(--bg-dark);
+      color:var(--txt);font-family:'Segoe UI','Microsoft YaHei',Arial,sans-serif;overflow:hidden}
+
+    /* ── 顶栏 ── */
+    #topbar{position:fixed;top:0;left:0;right:0;height:48px;z-index:100;
+      background:linear-gradient(90deg,#030810,#050c1a,#030810);
+      border-bottom:1px solid var(--border);
+      display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+    .logo{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:700;
+      letter-spacing:2px;color:var(--blue);text-shadow:var(--glow-b)}
+    .logo svg{width:24px;height:24px}
+    .statusbar{display:flex;align-items:center;gap:20px;font-size:12px;color:var(--txt2)}
+    .sdot{width:6px;height:6px;border-radius:50%;background:var(--cyan);
+      box-shadow:var(--glow-c);animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+    #time-display{font-family:'Courier New',monospace;font-size:13px;
+      color:var(--gold);letter-spacing:1px}
+
+    /* ── 主布局 ── */
+    #layout{position:fixed;top:48px;bottom:0;left:0;right:0;display:flex}
+
+    /* ── 左侧面板 ── */
+    #left{width:var(--pw);min-width:var(--pw);background:var(--bg-panel);
+      border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;z-index:10}
+
+    .sec{padding:14px 16px;border-bottom:1px solid var(--border)}
+    .sec-title{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+      color:var(--blue);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+    .sec-title::before{content:'';display:block;width:3px;height:14px;
+      background:var(--blue);box-shadow:var(--glow-b);border-radius:2px}
+
+    /* ── 轨道卡片 ── */
+    #cards{display:flex;flex-wrap:nowrap;gap:6px;justify-content:space-between}
+    .card{background:var(--bg-card);border:1px solid var(--border);border-radius:6px;
+      padding:8px 6px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden;
+      flex:1;min-width:0;text-align:center}
+    .card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+      background:var(--blue);opacity:0;transition:opacity .25s}
+    .card:hover{background:var(--bg-card-hover);border-color:var(--blue);
+      box-shadow:var(--glow-b);transform:translateY(-1px)}
+    .card:hover::before{opacity:1}
+    .card.active{background:#0c1e40;border-color:var(--cyan);box-shadow:var(--glow-c)}
+    .card.active::before{opacity:1;background:var(--cyan)}
+    .ci{font-size:18px;margin-bottom:2px}
+    .cn{font-size:11px;font-weight:700;margin-bottom:1px;white-space:nowrap}
+    .cs{font-size:9px;color:var(--txt2);display:none}
+    .ca{font-size:9px;color:var(--cyan);margin-top:2px;font-family:'Courier New',monospace;white-space:nowrap}
+
+    /* ── 参数滑块 ── */
+    #pscroll{flex:1;overflow-y:auto;padding:14px 16px}
+    #pscroll::-webkit-scrollbar{width:4px}
+    #pscroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+    .pg{margin-bottom:16px}
+    .ph{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+    .plabel{font-size:12px;color:var(--txt2);display:flex;align-items:center;gap:6px}
+    .psym{font-family:'Times New Roman',serif;font-style:italic;font-size:14px;color:var(--gold)}
+    .pval{font-family:'Courier New',monospace;font-size:13px;font-weight:700;
+      color:var(--cyan);min-width:90px;text-align:right}
+    .pslider{-webkit-appearance:none;width:100%;height:4px;border-radius:2px;
+      outline:none;cursor:pointer}
+    .pslider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+      border-radius:50%;background:var(--cyan);box-shadow:0 0 8px rgba(0,255,204,.8);
+      cursor:pointer;transition:transform .1s}
+    .pslider::-webkit-slider-thumb:hover{transform:scale(1.3)}
+    .pdesc{font-size:10px;color:var(--txt3);margin-top:4px;font-style:italic}
+
+    /* ── 统计区 ── */
+    #stats{padding:12px 16px;border-top:1px solid var(--border);background:#04080f}
+    .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .si{background:var(--bg-card);border:1px solid var(--border);
+      border-radius:6px;padding:8px 10px}
+    .sl{font-size:10px;color:var(--txt3);margin-bottom:2px;letter-spacing:1px}
+    .sv{font-size:13px;font-weight:700;font-family:'Courier New',monospace;color:var(--gold)}
+
+    /* ── 时间控制 ── */
+    #tctl{padding:10px 16px;background:#04080f;border-top:1px solid var(--border);
+      display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .tbtn{background:var(--bg-card);border:1px solid var(--border);border-radius:6px;
+      color:var(--txt);padding:6px 10px;cursor:pointer;font-size:12px;
+      transition:all .2s;white-space:nowrap}
+    .tbtn:hover{background:var(--bg-card-hover);border-color:var(--blue);color:var(--cyan)}
+    .tbtn.active{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-c)}
+    #spd{font-family:'Courier New',monospace;font-size:12px;color:var(--gold);
+      min-width:52px;text-align:center}
+
+    /* ── Cesium 区 ── */
+    #right{flex:1;position:relative;overflow:hidden}
+    #cesiumViewer{width:100%;height:100%}
+
+    /* ── HUD ── */
+    #hud{position:absolute;top:16px;right:16px;display:flex;flex-direction:column;
+      gap:8px;pointer-events:none;z-index:50}
+    .hcard{background:rgba(5,12,26,.88);border:1px solid var(--border);
+      border-radius:8px;padding:10px 14px;min-width:210px;backdrop-filter:blur(8px)}
+    .htitle{font-size:10px;letter-spacing:2px;color:var(--blue);
+      margin-bottom:8px;text-transform:uppercase}
+    .hrow{display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px}
+    .hk{color:var(--txt2)}
+    .hv{font-family:'Courier New',monospace;color:var(--cyan);font-size:11px}
+
+    /* ── 图例 ── */
+    #legend{position:absolute;bottom:16px;right:16px;
+      background:rgba(5,12,26,.88);border:1px solid var(--border);
+      border-radius:8px;padding:10px 14px;pointer-events:none;z-index:50;
+      backdrop-filter:blur(8px)}
+    .ltitle{font-size:10px;letter-spacing:2px;color:var(--blue);
+      margin-bottom:8px;text-transform:uppercase}
+    .li{display:flex;align-items:center;gap:8px;font-size:11px;
+      color:var(--txt2);margin-bottom:5px}
+    .ll{width:22px;height:3px;border-radius:2px}
+    .ld{width:8px;height:8px;border-radius:50%}
+
+    /* ── 快捷键提示 ── */
+    #kbhint{position:absolute;bottom:16px;left:16px;
+      background:rgba(5,12,26,.75);border:1px solid var(--border);
+      border-radius:8px;padding:10px 14px;pointer-events:none;z-index:50;
+      font-size:10px;color:var(--txt3);line-height:1.8}
+    #kbhint span{color:var(--txt2)}
+
+    /* ── 加载遮罩 ── */
+    #mask{position:fixed;inset:0;z-index:999;background:var(--bg-dark);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+    .spin{width:60px;height:60px;border:3px solid var(--border);
+      border-top-color:var(--blue);border-radius:50%;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .ltxt{font-size:14px;color:var(--txt2);letter-spacing:3px}
+    .lprog{width:200px;height:2px;background:var(--border);border-radius:1px;overflow:hidden}
+    .lbar{height:100%;background:var(--blue);box-shadow:var(--glow-b);
+      animation:lbar 2.5s ease-out forwards}
+    @keyframes lbar{from{width:0}to{width:100%}}
+
+    /* ── 覆盖 Cesium UI ── */
+    .cesium-viewer-toolbar,.cesium-viewer-animationContainer,
+    .cesium-viewer-timelineContainer,.cesium-viewer-bottom,
+    .cesium-credit-container{display:none!important}
+  </style>
+</head>
+<body>
+
+<!-- 加载遮罩 -->
+<div id="mask">
+  <div class="spin"></div>
+  <div class="ltxt">SATELLITE SIM LOADING</div>
+  <div class="lprog"><div class="lbar"></div></div>
+</div>
+
+<!-- 顶栏 -->
+<div id="topbar">
+  <div class="logo">
+    <a href="/" style="color:inherit;text-decoration:none;display:flex;align-items:center;gap:10px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="12" cy="12" r="3"/>
+        <ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(-30 12 12)" stroke-dasharray="3 2"/>
+        <ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(30 12 12)"  stroke-dasharray="3 2"/>
+        <line x1="12" y1="2" x2="12" y2="22"/>
+      </svg>
+      卫星轨道仿真教学系统 &nbsp;|&nbsp; Satellite Orbit Simulation
+    </a>
+  </div>
+  <div class="statusbar">
+    <div style="display:flex;align-items:center;gap:6px"><div class="sdot"></div><span>实时解算</span></div>
+    <span>坐标系: J2000 ECI</span>
+    <span>摄动: J2</span>
+    <div id="time-display">--</div>
+    <a href="/" style="color:var(--txt2);text-decoration:none;font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;transition:all 0.2s" onmouseover="this.style.color='var(--cyan)';this.style.borderColor='var(--cyan)'" onmouseout="this.style.color='var(--txt2)';this.style.borderColor='var(--border)'">返回主页</a>
+  </div>
+</div>
+
+<!-- 主布局 -->
+<div id="layout">
+
+  <!-- 左侧 -->
+  <div id="left">
+    <!-- 轨道卡片 -->
+    <div class="sec">
+      <div class="sec-title">快速轨道切换</div>
+      <div id="cards">
+        <div class="card" data-k="frozen"    onclick="loadPreset('frozen')">
+          <div class="ci">🧊</div><div class="cn">冻结轨道</div>
+          <div class="cs">Frozen Orbit</div><div class="ca">h≈800km i≈98°</div>
+        </div>
+        <div class="card" data-k="sso"       onclick="loadPreset('sso')">
+          <div class="ci">☀️</div><div class="cn">太阳同步</div>
+          <div class="cs">SSO</div><div class="ca">h≈550km i≈97.4°</div>
+        </div>
+        <div class="card" data-k="repeating" onclick="loadPreset('repeating')">
+          <div class="ci">🔄</div><div class="cn">回归轨道</div>
+          <div class="cs">Repeating GT</div><div class="ca">h≈600km i≈45°</div>
+        </div>
+        <div class="card" data-k="leo"       onclick="loadPreset('leo')">
+          <div class="ci">🛰️</div><div class="cn">近地圆轨</div>
+          <div class="cs">LEO Circular</div><div class="ca">h≈400km i≈51.6°</div>
+        </div>
+        <div class="card" data-k="geo" onclick="loadPreset('geo')">
+          <div class="ci">🌐</div><div class="cn">地球同步</div>
+          <div class="cs">Geostationary Orbit</div><div class="ca">h≈35786km</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 参数滑块 -->
+    <div id="pscroll">
+      <div class="sec-title">轨道六要素控制</div>
+
+      <div class="pg">
+        <div class="ph">
+          <div class="plabel">轨道高度 <span class="psym">h</span></div>
+          <div class="pval" id="v-h">400 km</div>
+        </div>
+        <input class="pslider" id="s-h" type="range" min="200" max="36000" value="400" step="10"
+          oninput="onParam('h',this.value)">
+        <div class="pdesc">近地点高度，影响轨道周期与速度</div>
+      </div>
+
+      <div class="pg">
+        <div class="ph">
+          <div class="plabel">半长轴 <span class="psym">a</span></div>
+          <div class="pval" id="v-a">6778 km</div>
+        </div>
+        <input class="pslider" id="s-a" type="range" min="6578" max="42378" value="6778" step="10"
+          oninput="onParam('a',this.value)">
+        <div class="pdesc">椭圆轨道长轴半径 a = R⊕ + h</div>
+      </div>
+
+      <div class="pg">
+        <div class="ph">
+          <div class="plabel">离心率 <span class="psym">e</span></div>
+          <div class="pval" id="v-e">0.000</div>
+        </div>
+        <input class="pslider" id="s-e" type="range" min="0" max="0.85" value="0" step="0.001"
+          oninput="onParam('e',this.value)">
+        <div class="pdesc">轨道椭圆度，e=0圆轨道，e→1抛物线</div>
+      </div>
+
+      <div class="pg">
+        <div class="ph">
+          <div class="plabel">轨道倾角 <span class="psym">i</span></div>
+          <div class="pval" id="v-i">51.6°</div>
+        </div>
+        <input class="pslider" id="s-i" type="range" min="0" max="180" value="51.6" step="0.1"
+          oninput="onParam('i',this.value)">
+        <div class="pdesc">轨道面与赤道面夹角，决定覆盖纬度</div>
+      </div>
+
+      <div class="pg">
+        <div class="ph">
+          <div class="plabel">升交点赤经 <span class="psym">Ω</span></div>
+          <div class="pval" id="v-raan">0.0°</div>
+        </div>
+        <input class="pslider" id="s-raan" type="range" min="0" max="360" value="0" step="0.5"
+          oninput="onParam('raan',this.value)">
+        <div class="pdesc">升交点在赤道面上的位置，定义轨道面朝向</div>
+      </div>
+
+      <div class="pg">
+        <div class="ph">
+          <div class="plabel">近地点幅角 <span class="psym">ω</span></div>
+          <div class="pval" id="v-argp">0.0°</div>
+        </div>
+        <input class="pslider" id="s-argp" type="range" min="0" max="360" value="0" step="0.5"
+          oninput="onParam('argp',this.value)">
+        <div class="pdesc">从升交点到近地点的角度，定义椭圆方向</div>
+      </div>
+
+      <div class="pg">
+        <div class="ph">
+          <div class="plabel">真近点角 <span class="psym">f</span></div>
+          <div class="pval" id="v-nu">0.0°</div>
+        </div>
+        <input class="pslider" id="s-nu" type="range" min="0" max="360" value="0" step="0.5"
+          oninput="onParam('nu',this.value)">
+        <div class="pdesc">卫星在轨道上的当前位置，初始相位</div>
+      </div>
+    </div>
+
+    <!-- 统计 -->
+    <div id="stats">
+      <div class="sec-title" style="margin-bottom:10px">轨道参数推算</div>
+      <div class="sgrid">
+        <div class="si"><div class="sl">周期 T</div><div class="sv" id="st-T">--</div></div>
+        <div class="si"><div class="sl">速度 v</div><div class="sv" id="st-v">--</div></div>
+        <div class="si"><div class="sl">近地点 rp</div><div class="sv" id="st-rp">--</div></div>
+        <div class="si"><div class="sl">远地点 ra</div><div class="sv" id="st-ra">--</div></div>
+        <div class="si"><div class="sl">半短轴 b</div><div class="sv" id="st-b">--</div></div>
+        <div class="si"><div class="sl">平均高度</div><div class="sv" id="st-h">--</div></div>
+      </div>
+    </div>
+
+    <!-- 时间控制 -->
+    <div id="tctl">
+      <button class="tbtn" id="btn-pause" onclick="togglePause()">⏸ 暂停</button>
+      <button class="tbtn" onclick="setSpeed(0.5)">½×</button>
+      <button class="tbtn" onclick="setSpeed(1)">1×</button>
+      <button class="tbtn" onclick="setSpeed(10)">10×</button>
+      <button class="tbtn" onclick="setSpeed(60)">60×</button>
+      <button class="tbtn" onclick="setSpeed(300)">300×</button>
+      <div id="spd">1×</div>
+    </div>
+  </div>
+
+  <!-- 右侧 Cesium -->
+  <div id="right">
+    <div id="cesiumViewer"></div>
+
+    <!-- HUD -->
+    <div id="hud">
+      <div class="hcard">
+        <div class="htitle">📡 卫星实时状态</div>
+        <div class="hrow"><span class="hk">经度 λ</span><span class="hv" id="h-lon">--</span></div>
+        <div class="hrow"><span class="hk">纬度 φ</span><span class="hv" id="h-lat">--</span></div>
+        <div class="hrow"><span class="hk">高度 h</span><span class="hv" id="h-alt">--</span></div>
+        <div class="hrow"><span class="hk">速度 |v|</span><span class="hv" id="h-spd">--</span></div>
+      </div>
+      <div class="hcard">
+        <div class="htitle">📐 ECI 坐标 (km)</div>
+        <div class="hrow"><span class="hk">X</span><span class="hv" id="h-x">--</span></div>
+        <div class="hrow"><span class="hk">Y</span><span class="hv" id="h-y">--</span></div>
+        <div class="hrow"><span class="hk">Z</span><span class="hv" id="h-z">--</span></div>
+      </div>
+      <div class="hcard">
+        <div class="htitle">🔭 轨道状态</div>
+        <div class="hrow"><span class="hk">类型</span><span class="hv" id="h-type">LEO</span></div>
+        <div class="hrow"><span class="hk">倾角 i</span><span class="hv" id="h-inc">--</span></div>
+        <div class="hrow"><span class="hk">真近点角</span><span class="hv" id="h-nu">--</span></div>
+        <div class="hrow"><span class="hk">仿真时刻</span><span class="hv" id="h-ep">--</span></div>
+      </div>
+    </div>
+
+    <!-- 图例 -->
+    <div id="legend">
+      <div class="ltitle">图例 Legend</div>
+      <div class="li"><div class="ll" style="background:#00d4ff"></div>卫星轨道</div>
+      <div class="li"><div class="ll" style="background:#ffcc44"></div>地心-卫星连线</div>
+      <div class="li"><div class="ll" style="background:#ff6633;border-top:2px dashed #ff6633;background:none;height:0"></div>地心-太阳方向</div>
+      <div class="li"><div class="ll" style="background:rgba(0,200,255,.4)"></div>赤道面</div>
+      <div class="li"><div class="ll" style="background:rgba(255,200,50,.4)"></div>黄道面</div>
+      <div class="li"><div class="ld" style="background:#ff3366"></div>X轴 春分点方向</div>
+      <div class="li"><div class="ld" style="background:#33ff66"></div>Y轴</div>
+      <div class="li"><div class="ld" style="background:#3399ff"></div>Z轴 北极方向</div>
+    </div>
+
+    <!-- 快捷键 -->
+    <div id="kbhint">
+      <span>空格</span> 暂停/继续 &nbsp;|&nbsp;
+      <span>1-5</span> 切换轨道 &nbsp;|&nbsp;
+      <span>+/-</span> 调整速率
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+// ═══════════════════════════════════════════════
+//  物理常数
+// ═══════════════════════════════════════════════
+const GM      = 3.986004418e14;   // m³/s²
+const RE      = 6378137.0;        // m
+const J2      = 1.08263e-3;
+const D2R     = Math.PI / 180;
+const R2D     = 180 / Math.PI;
+
+// ═══════════════════════════════════════════════
+//  轨道状态（SI 单位：m, rad）
+// ═══════════════════════════════════════════════
+const orb = { a:6778000, e:0, i:51.6*D2R, raan:0, argp:0, nu:0 };
+
+// ═══════════════════════════════════════════════
+//  仿真时间状态
+// ═══════════════════════════════════════════════
+let simTime    = new Date();
+let simSpeed   = 1;
+let isPaused   = false;
+let lastWall   = performance.now();
+let simEpoch0  = new Date();   // 仿真起始时刻（用于累积 dt）
+let simElapsed = 0;            // 仿真已过去的秒数
+
+// ═══════════════════════════════════════════════
+//  预设轨道参数
+// ═══════════════════════════════════════════════
+const PRESETS = {
+  frozen:    { h:800000,   e:0.001, i:98.0*D2R,  raan:45*D2R,  argp:270*D2R, nu:0,
+               desc:'冻结轨道 | ω=270°阻止J2摄动拱线漂移' },
+  sso:       { h:550000,   e:0.0,   i:97.4*D2R,  raan:90*D2R,  argp:0,       nu:0,
+               desc:'太阳同步 | 升交点进动=0.9856°/天' },
+  repeating: { h:600000,   e:0.01,  i:45.0*D2R,  raan:120*D2R, argp:30*D2R,  nu:0,
+               desc:'回归轨道 | 地面轨迹整天重复' },
+  leo:       { h:400000,   e:0.0,   i:51.6*D2R,  raan:0,       argp:0,       nu:0,
+               desc:'近地圆轨 | 国际空间站典型轨道' },
+  geo:       { h:35786000, e:0.0,   i:0.0,        raan:0,       argp:0,       nu:0,
+               desc:'地球同步 | T=23h56m04s，星下点静止' }
+};
+
+// ═══════════════════════════════════════════════
+//  轨道力学核心
+// ═══════════════════════════════════════════════
+function nu2E(nu,e){
+  return Math.atan2(Math.sqrt(1-e*e)*Math.sin(nu), e+Math.cos(nu));
+}
+function E2M(E,e){ return E - e*Math.sin(E); }
+function M2E(M,e){
+  let E=M;
+  for(let k=0;k<60;k++){
+    const d=(M-E+e*Math.sin(E))/(1-e*Math.cos(E));
+    E+=d; if(Math.abs(d)<1e-12) break;
+  }
+  return E;
+}
+function E2nu(E,e){
+  return Math.atan2(Math.sqrt(1-e*e)*Math.sin(E), Math.cos(E)-e);
+}
+
+/**
+ * 轨道六要素 → ECI 位置速度
+ * @returns {{pos:number[], vel:number[]}}  m, m/s
+ */
+function kep2eci(a,e,i,raan,argp,nu){
+  const p  = a*(1-e*e);
+  const r  = p/(1+e*Math.cos(nu));
+  const h  = Math.sqrt(GM*p);
+
+  // 轨道面内位置与速度
+  const rx = r*Math.cos(nu),  ry = r*Math.sin(nu);
+  const vx = -(GM/h)*Math.sin(nu), vy = (GM/h)*(e+Math.cos(nu));
+
+  // 旋转矩阵 Rz(-Ω)·Rx(-i)·Rz(-ω)
+  const cO=Math.cos(raan), sO=Math.sin(raan);
+  const cI=Math.cos(i),    sI=Math.sin(i);
+  const cW=Math.cos(argp), sW=Math.sin(argp);
+
+  const Rxx= cO*cW-sO*sW*cI,  Rxy=-cO*sW-sO*cW*cI,  Rxz= sO*sI;
+  const Ryx= sO*cW+cO*sW*cI,  Ryy=-sO*sW+cO*cW*cI,  Ryz=-cO*sI;
+  const Rzx= sW*sI,            Rzy= cW*sI,            Rzz= cI;
+
+  return {
+    pos:[Rxx*rx+Rxy*ry, Ryx*rx+Ryy*ry, Rzx*rx+Rzy*ry],
+    vel:[Rxx*vx+Rxy*vy, Ryx*vx+Ryy*vy, Rzx*vx+Rzy*vy]
+  };
+}
+
+/**
+ * J2 摄动传播：给定经过 dt 秒后的轨道要素
+ */
+function propagate(a,e,i,raan0,argp0,nu0, dt){
+  const n    = Math.sqrt(GM/(a*a*a));
+  const p    = a*(1-e*e);
+  const j2f  = -1.5*J2*(RE/p)*(RE/p)*n;
+  const dO   = j2f*Math.cos(i);
+  const dW   = j2f*(2.5*Math.sin(i)*Math.sin(i)-2.0);
+
+  const E0   = nu2E(nu0,e);
+  const M1   = E2M(E0,e) + n*dt;
+  const nu1  = E2nu(M2E(M1,e),e);
+
+  return { nu:nu1, raan:raan0+dO*dt, argp:argp0+dW*dt };
+}
+
+// ═══════════════════════════════════════════════
+//  ECI → Cesium Cartesian3（ECEF）
+//  Cesium 内部已处理地球自转，只需传入 simTime
+// ═══════════════════════════════════════════════
+function eciToC3(eciPos, epoch){
+  const ecef = eci2ecef(eciPos, epoch);
+  return new Cesium.Cartesian3(ecef[0], ecef[1], ecef[2]);
+}
+
+// 把 ECI 方向向量也转到 ECEF（不加平移，只旋转）
+function eciDirToC3(eciPos, epoch){
+  return eciToC3(eciPos, epoch); // 方向向量与位置向量旋转相同
+}
+
+/**
+ * ECI → ECEF（简化格林尼治恒星时）
+ */
+function eci2ecef(pos, epoch){
+  const jd  = epoch.getTime()/86400000 + 2440587.5;
+  let   gst = (280.46061837 + 360.98564736629*(jd-2451545.0)) * D2R;
+  const cG=Math.cos(gst), sG=Math.sin(gst);
+  return [
+     cG*pos[0]+sG*pos[1],
+    -sG*pos[0]+cG*pos[1],
+     pos[2]
+  ];
+}
+
+// ═══════════════════════════════════════════════
+//  计算格林尼治恒星时角 GAST（弧度）
+// ═══════════════════════════════════════════════
+function getGAST(epoch){
+  const jd  = epoch.getTime()/86400000 + 2440587.5;
+  let   gst = (280.46061837 + 360.98564736629*(jd - 2451545.0)) * D2R;
+  // 归一化到 [0, 2π)
+  return ((gst % (2*Math.PI)) + 2*Math.PI) % (2*Math.PI);
+}
+
+/**
+ * 低精度太阳方向 ECI（教学用，精度 ±1°）
+ */
+function sunECI(epoch){
+  const jd  = epoch.getTime()/86400000 + 2440587.5;
+  const n   = jd - 2451545.0;
+  const L   = (280.460 + 0.9856474*n)*D2R;
+  const g   = (357.528 + 0.9856003*n)*D2R;
+  const lam = L + (1.915*Math.sin(g) + 0.020*Math.sin(2*g))*D2R;
+  const eps = 23.439*D2R;
+  const AU  = 1.496e11;
+  return [AU*Math.cos(lam), AU*Math.cos(eps)*Math.sin(lam), AU*Math.sin(eps)*Math.sin(lam)];
+}
+
+// ═══════════════════════════════════════════════
+//  获取当前 ECI 状态（基于仿真累积时间）
+// ═══════════════════════════════════════════════
+function currentECI(){
+  const { nu, raan, argp } = propagate(
+    orb.a, orb.e, orb.i, orb.raan, orb.argp, orb.nu, simElapsed
+  );
+  return kep2eci(orb.a, orb.e, orb.i, raan, argp, nu);
+}
+
+// ═══════════════════════════════════════════════
+//  当前传播后的真近点角（用于HUD）
+// ═══════════════════════════════════════════════
+function currentElements(){
+  return propagate(orb.a, orb.e, orb.i, orb.raan, orb.argp, orb.nu, simElapsed);
+}
+
+// ═══════════════════════════════════════════════
+//  Cesium 初始化
+// ═══════════════════════════════════════════════
+Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI3MjBhMDI3My1lMjRmLTRhN2QtODc5Yi02MGVhZmUzNDdjMzAiLCJpZCI6Mzk1NDEzLCJpYXQiOjE3NzIxOTg2NDN9.5aOJb2oLS3xJ-bbcRdTzznV5j9jDGvD_Ev-GF4eNc3A';
+            
+
+let viewer = null;
+
+function initCesium(){
+  viewer = new Cesium.Viewer('cesiumViewer',{
+    terrainProvider:      new Cesium.EllipsoidTerrainProvider(),
+    imageryProvider:      new Cesium.TileMapServiceImageryProvider({
+      url: Cesium.buildModuleUrl('Assets/Textures/NaturalEarthII'),
+      fileExtension:'jpg', maximumLevel:5,
+      credit: new Cesium.Credit('Natural Earth II')
+    }),
+    baseLayerPicker:true, geocoder:false, homeButton:true,
+    infoBox:false, sceneModePicker:false, selectionIndicator:false,
+    timeline:false, animation:false, navigationHelpButton:false,
+    fullscreenButton:false,
+    skyAtmosphere: new Cesium.SkyAtmosphere(),
+    scene3DOnly:true
+  });
+
+  viewer.cesiumWidget.creditContainer.style.display='none';
+  viewer.scene.globe.enableLighting = true;
+  viewer.scene.sun  = new Cesium.Sun();
+  viewer.scene.moon = new Cesium.Moon();
+  viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#00010a');
+
+  // ★ 关键：关闭深度测试裁剪，确保地球始终可见
+  viewer.scene.globe.depthTestAgainstTerrain = false;
+
+  // ★ 以地球为中心，向外拉远相机
+  viewer.camera.setView({
+    destination: new Cesium.Cartesian3(0, -2.8e7, 1.2e7),
+    orientation:{
+      heading: 0,
+      pitch:   Cesium.Math.toRadians(-25),
+      roll:    0
+    }
+  });
+
+  buildScene();
+}
+// ═══════════════════════════════════════════════
+//  场景构建——所有静态 + 动态实体
+// ═══════════════════════════════════════════════
+function buildScene(){
+  viewer.entities.removeAll();
+  addEquatorRing();
+  addEclipticRing();
+  addCoordAxes();
+  addSunLine();
+  addNadirLine();
+  addOrbitPath();
+  addSatellite();
+  addPeriapsisMarker();   // ★ 新增：近地点标注
+  addGraticule();         // ★ 新增：地球经纬网格
+}
+
+// ── 赤道环（纯折线，避免 polygon 的 hierarchy 问题）──
+function addEquatorRing(){
+  // 网格半径 = 轨道半长轴 * 1.5（动态读取 orb.a）
+  const R = Math.max(orb.a * 1.5, 1.8e7);
+  const N = 24;   // 扇形分段数（经线数）
+  const M = 8;    // 径向圈数（纬线数）
+
+  // —— 同心圆（径向网格线）——
+  for(let ring = 1; ring <= M; ring++){
+    const r = R * ring / M;
+    const pts = [];
+    for(let d = 0; d <= 360; d += 3){
+      pts.push(new Cesium.Cartesian3(
+        r*Math.cos(d*D2R), r*Math.sin(d*D2R), 0));
+    }
+    viewer.entities.add({
+      polyline:{
+        positions: pts, width: ring===M ? 1.5 : 0.8,
+        material: new Cesium.PolylineDashMaterialProperty({
+          color: Cesium.Color.fromCssColorString('#00c8ff')
+                   .withAlpha(ring===M ? 0.55 : 0.18),
+          dashLength: ring===M ? 12 : 20
+        }),
+        arcType: Cesium.ArcType.NONE
+      }
+    });
+  }
+
+  // —— 辐射线（经向网格线）——
+  for(let k = 0; k < N; k++){
+    const ang = (k / N) * 2 * Math.PI;
+    const ex  = R * Math.cos(ang), ey = R * Math.sin(ang);
+    viewer.entities.add({
+      polyline:{
+        positions:[
+          new Cesium.Cartesian3(0, 0, 0),
+          new Cesium.Cartesian3(ex, ey, 0)
+        ],
+        width: 0.8,
+        material: new Cesium.PolylineDashMaterialProperty({
+          color: Cesium.Color.fromCssColorString('#00c8ff').withAlpha(0.18),
+          dashLength: 20
+        }),
+        arcType: Cesium.ArcType.NONE
+      }
+    });
+  }
+
+  // —— 填充面（手动三角剖分）——
+  const NSEG = 120;
+  const verts=[], idxs=[];
+  verts.push(0, 0, 0);
+  for(let k=0; k<=NSEG; k++){
+    const ang=(k/NSEG)*2*Math.PI;
+    verts.push(R*Math.cos(ang), R*Math.sin(ang), 0);
+  }
+  for(let k=1; k<=NSEG; k++) idxs.push(0, k, k+1);
+
+  viewer.scene.primitives.add(new Cesium.Primitive({
+    geometryInstances: new Cesium.GeometryInstance({
+      geometry: new Cesium.Geometry({
+        attributes:{ position: new Cesium.GeometryAttribute({
+          componentDatatype: Cesium.ComponentDatatype.DOUBLE,
+          componentsPerAttribute:3,
+          values: new Float64Array(verts)
+        })},
+        indices: new Uint16Array(idxs),
+        primitiveType: Cesium.PrimitiveType.TRIANGLES,
+        boundingSphere: Cesium.BoundingSphere.fromVertices(verts)
+      }),
+      attributes:{
+        color: Cesium.ColorGeometryInstanceAttribute.fromColor(
+          Cesium.Color.fromCssColorString('#00c8ff').withAlpha(0.04))
+      }
+    }),
+    appearance: new Cesium.PerInstanceColorAppearance({flat:true,translucent:true}),
+    asynchronous:false
+  }));
+
+  // 标注
+  viewer.entities.add({
+    position: new Cesium.Cartesian3(R+4e5, 0, 0),
+    label:{
+      text:'赤道面 Equatorial Plane',
+      font:'11px sans-serif',
+      fillColor: Cesium.Color.fromCssColorString('#00c8ff').withAlpha(0.85),
+      outlineColor:Cesium.Color.BLACK, outlineWidth:2,
+      style:Cesium.LabelStyle.FILL_AND_OUTLINE,
+      disableDepthTestDistance:Infinity
+    }
+  });
+}// ── 黄道环（倾斜 23.439°）──
+function addEclipticRing(){
+  const R   = Math.max(orb.a * 1.7, 2.2e7);
+  const eps = 23.439 * D2R;
+  const N   = 24, M = 8;
+
+  // 旋转辅助：将平面内 (x,y,0) 绕 X 轴旋转 eps
+  function rot(x, y){
+    return new Cesium.Cartesian3(x, y*Math.cos(eps), y*Math.sin(eps));
+  }
+
+  // —— 同心圆 ——
+  for(let ring=1; ring<=M; ring++){
+    const r = R*ring/M;
+    const pts=[];
+    for(let d=0; d<=360; d+=3) pts.push(rot(r*Math.cos(d*D2R), r*Math.sin(d*D2R)));
+    viewer.entities.add({
+      polyline:{
+        positions:pts, width: ring===M ? 1.5 : 0.8,
+        material: new Cesium.PolylineDashMaterialProperty({
+          color: Cesium.Color.fromCssColorString('#ffc832')
+                   .withAlpha(ring===M ? 0.55 : 0.18),
+          dashLength: ring===M ? 12 : 20
+        }),
+        arcType:Cesium.ArcType.NONE
+      }
+    });
+  }
+
+  // —— 辐射线 ——
+  for(let k=0; k<N; k++){
+    const ang=(k/N)*2*Math.PI;
+    viewer.entities.add({
+      polyline:{
+        positions:[ rot(0,0), rot(R*Math.cos(ang), R*Math.sin(ang)) ],
+        width:0.8,
+        material: new Cesium.PolylineDashMaterialProperty({
+          color: Cesium.Color.fromCssColorString('#ffc832').withAlpha(0.18),
+          dashLength:20
+        }),
+        arcType:Cesium.ArcType.NONE
+      }
+    });
+  }
+
+  // —— 填充面 ——
+  const NSEG=120;
+  const verts=[], idxs=[];
+  verts.push(0,0,0);
+  for(let k=0; k<=NSEG; k++){
+    const ang=(k/NSEG)*2*Math.PI;
+    const p=rot(R*Math.cos(ang), R*Math.sin(ang));
+    verts.push(p.x, p.y, p.z);
+  }
+  for(let k=1; k<=NSEG; k++) idxs.push(0,k,k+1);
+
+  viewer.scene.primitives.add(new Cesium.Primitive({
+    geometryInstances: new Cesium.GeometryInstance({
+      geometry: new Cesium.Geometry({
+        attributes:{ position: new Cesium.GeometryAttribute({
+          componentDatatype: Cesium.ComponentDatatype.DOUBLE,
+          componentsPerAttribute:3,
+          values: new Float64Array(verts)
+        })},
+        indices: new Uint16Array(idxs),
+        primitiveType: Cesium.PrimitiveType.TRIANGLES,
+        boundingSphere: Cesium.BoundingSphere.fromVertices(verts)
+      }),
+      attributes:{
+        color: Cesium.ColorGeometryInstanceAttribute.fromColor(
+          Cesium.Color.fromCssColorString('#ffc832').withAlpha(0.04))
+      }
+    }),
+    appearance: new Cesium.PerInstanceColorAppearance({flat:true,translucent:true}),
+    asynchronous:false
+  }));
+
+  viewer.entities.add({
+    position: rot(R+4e5, 0),
+    label:{
+      text:'黄道面 Ecliptic Plane',
+      font:'11px sans-serif',
+      fillColor: Cesium.Color.fromCssColorString('#ffc832').withAlpha(0.85),
+      outlineColor:Cesium.Color.BLACK, outlineWidth:2,
+      style:Cesium.LabelStyle.FILL_AND_OUTLINE,
+      disableDepthTestDistance:Infinity
+    }
+  });
+}
+// ── J2000 ECI 坐标轴 ──
+function addCoordAxes(){
+  const L=1.0e7;
+  const axes=[
+    {dir:[L,0,0], color:'#ff3366', label:'X  春分点 ♈'},
+    {dir:[0,L,0], color:'#33ff66', label:'Y'},
+    {dir:[0,0,L], color:'#4488ff', label:'Z  北极'}
+  ];
+  axes.forEach(ax=>{
+    const tip=new Cesium.Cartesian3(...ax.dir);
+    const col=Cesium.Color.fromCssColorString(ax.color);
+    viewer.entities.add({
+      polyline:{
+        positions:[Cesium.Cartesian3.ZERO, tip],
+        width:2.5,
+        material: new Cesium.PolylineArrowMaterialProperty(col),
+        arcType:Cesium.ArcType.NONE
+      }
+    });
+    viewer.entities.add({
+      position:tip,
+      label:{
+        text:ax.label, font:'bold 13px Consolas,monospace',
+        fillColor:col,
+        outlineColor:Cesium.Color.BLACK,outlineWidth:3,
+        style:Cesium.LabelStyle.FILL_AND_OUTLINE,
+        verticalOrigin:Cesium.VerticalOrigin.BOTTOM,
+        pixelOffset:new Cesium.Cartesian2(0,-8),
+        disableDepthTestDistance:Infinity
+      }
+    });
+  });
+}
+// ── 地球经纬网格（贴地绘制）──
+// ── 地球经纬网格（跟随地球旋转，ECI视角）──
+function addGraticule(){
+  const COLOR_MAJOR = Cesium.Color.fromCssColorString('#88bbff').withAlpha(0.50);
+  const COLOR_MINOR = Cesium.Color.fromCssColorString('#3366aa').withAlpha(0.22);
+  const W_MAJOR = 1.2, W_MINOR = 0.6;
+  const RE_SURF = RE + 10000; // 略高于地表，避免深度冲突
+
+  // 把地理坐标 (lon°, lat°) 转成 ECEF，再乘以 Rz(-GAST) 反转到 ECI
+  function geoToECI(lonDeg, latDeg, epoch){
+    const lon = lonDeg * D2R, lat = latDeg * D2R;
+    const gast= getGAST(epoch);
+    // ECEF 坐标
+    const x0 = RE_SURF * Math.cos(lat) * Math.cos(lon);
+    const y0 = RE_SURF * Math.cos(lat) * Math.sin(lon);
+    const z0 = RE_SURF * Math.sin(lat);
+    // 旋转到 ECI：Rz(-(-GAST)) = Rz(+GAST) ← 注意：globe 转了 -GAST，点也要转 -GAST 的逆
+    // 实际：ECI = Rz(+GAST) × ECEF
+    // 但我们把 globe 转了 Rz(-GAST)，所以点坐标保持 ECEF 即可与 globe 对齐
+    // 结论：直接返回 ECEF，globe.modelMatrix=Rz(-GAST) 会把 globe 转对位置
+    // ★ 经纬网跟 globe 同步：坐标用 ECEF，由 globe.modelMatrix 驱动视觉旋转
+    // ★ 但 entities 不受 globe.modelMatrix 影响，需手动转到 ECI
+    const cG = Math.cos(gast), sG = Math.sin(gast);
+    // ECI = Rz(GAST) × ECEF
+    return new Cesium.Cartesian3(
+      cG*x0 - sG*y0,
+      sG*x0 + cG*y0,
+      z0
+    );
+  }
+
+  // 经线
+  for(let lon = -180; lon < 180; lon += 10){
+    const isMajor = (lon % 30 === 0);
+    viewer.entities.add({
+      polyline:{
+        positions: new Cesium.CallbackProperty(()=>{
+          const pts=[];
+          for(let lat=-88; lat<=88; lat+=4)
+            pts.push(geoToECI(lon, lat, simTime));
+          return pts;
+        }, false),
+        width: isMajor ? W_MAJOR : W_MINOR,
+        material: isMajor ? COLOR_MAJOR : COLOR_MINOR,
+        arcType: Cesium.ArcType.NONE
+      }
+    });
+  }
+
+  // 纬线
+  for(let lat = -80; lat <= 80; lat += 10){
+    const isMajor = (lat % 30 === 0) || lat === 0;
+    viewer.entities.add({
+      polyline:{
+        positions: new Cesium.CallbackProperty(()=>{
+          const pts=[];
+          for(let lon=-180; lon<=180; lon+=5)
+            pts.push(geoToECI(lon, lat, simTime));
+          return pts;
+        }, false),
+        width: isMajor ? W_MAJOR : W_MINOR,
+        material: isMajor ? COLOR_MAJOR : COLOR_MINOR,
+        arcType: Cesium.ArcType.NONE
+      }
+    });
+  }
+
+  // 赤道高亮
+  viewer.entities.add({
+    polyline:{
+      positions: new Cesium.CallbackProperty(()=>{
+        const pts=[];
+        for(let lon=-180; lon<=180; lon+=3)
+          pts.push(geoToECI(lon, 0, simTime));
+        return pts;
+      }, false),
+      width:2.0,
+      material: Cesium.Color.fromCssColorString('#00d4ff').withAlpha(0.7),
+      arcType: Cesium.ArcType.NONE
+    }
+  });
+
+  // 本初子午线高亮
+  viewer.entities.add({
+    polyline:{
+      positions: new Cesium.CallbackProperty(()=>{
+        const pts=[];
+        for(let lat=-88; lat<=88; lat+=4)
+          pts.push(geoToECI(0, lat, simTime));
+        return pts;
+      }, false),
+      width:2.0,
+      material: Cesium.Color.fromCssColorString('#00d4ff').withAlpha(0.7),
+      arcType: Cesium.ArcType.NONE
+    }
+  });
+}
+// ── 轨道路径曲线（完整一圈，实时重算） ──
+function addOrbitPath(){
+  viewer.entities.add({
+    polyline:{
+      positions: new Cesium.CallbackProperty(()=> buildOrbitPts(), false),
+      width:2.5,
+      material: new Cesium.PolylineGlowMaterialProperty({
+        glowPower:0.18, taperPower:1.0,
+        color: Cesium.Color.fromCssColorString('#00d4ff').withAlpha(0.95)
+      }),
+      arcType: Cesium.ArcType.NONE
+    }
+  });
+}
+
+// ── 卫星实体 ──
+// 卫星位置——纯 ECI
+function addSatellite(){
+  viewer.entities.add({
+    position: new Cesium.CallbackProperty(()=>{
+      const { pos } = currentECI();
+      return new Cesium.Cartesian3(pos[0], pos[1], pos[2]); // ★ 纯 ECI，不转换
+    }, false),
+    point:{
+      pixelSize:14,
+      color: Cesium.Color.fromCssColorString('#00ffcc'),
+      outlineColor:Cesium.Color.WHITE, outlineWidth:2,
+      disableDepthTestDistance:Infinity
+    },
+    label:{
+      text:'🛰 SAT',
+      font:'bold 12px Consolas,monospace',
+      fillColor: Cesium.Color.fromCssColorString('#00ffcc'),
+      outlineColor:Cesium.Color.BLACK, outlineWidth:3,
+      style:Cesium.LabelStyle.FILL_AND_OUTLINE,
+      verticalOrigin:Cesium.VerticalOrigin.BOTTOM,
+      pixelOffset:new Cesium.Cartesian2(16,0),
+      disableDepthTestDistance:Infinity
+    }
+  });
+}
+
+// 地心连线——纯 ECI
+function addNadirLine(){
+  viewer.entities.add({
+    polyline:{
+      positions: new Cesium.CallbackProperty(()=>{
+        const { pos } = currentECI();
+        return [
+          Cesium.Cartesian3.ZERO,
+          new Cesium.Cartesian3(pos[0], pos[1], pos[2]) // ★ 纯 ECI
+        ];
+      }, false),
+      width:1.5,
+      material: new Cesium.PolylineDashMaterialProperty({
+        color:Cesium.Color.fromCssColorString('#ffcc44').withAlpha(0.8),
+        dashLength:12
+      }),
+      arcType: Cesium.ArcType.NONE
+    }
+  });
+}
+
+// 轨道线——纯 ECI
+function buildOrbitPts(){
+  const N = 360;
+  const { raan, argp } = currentElements();
+  const pts = [];
+  for(let k = 0; k <= N; k++){
+    const nu = (k / N) * 2 * Math.PI;
+    const { pos } = kep2eci(orb.a, orb.e, orb.i, raan, argp, nu);
+    pts.push(new Cesium.Cartesian3(pos[0], pos[1], pos[2])); // ★ 纯 ECI
+  }
+  return pts;
+}
+
+// 近地点——纯 ECI
+function addPeriapsisMarker(){
+  const periPos = new Cesium.CallbackProperty(()=>{
+    const { raan, argp } = currentElements();
+    const { pos } = kep2eci(orb.a, orb.e, orb.i, raan, argp, 0);
+    return new Cesium.Cartesian3(pos[0], pos[1], pos[2]); // ★ 纯 ECI
+  }, false);
+
+  viewer.entities.add({
+    position: periPos,
+    point:{
+      pixelSize:10,
+      color: Cesium.Color.fromCssColorString('#ff4466'),
+      outlineColor:Cesium.Color.WHITE, outlineWidth:2,
+      disableDepthTestDistance:Infinity
+    },
+    label:{
+      text:'近地点\nPeriapsis',
+      font:'bold 11px Consolas,monospace',
+      fillColor: Cesium.Color.fromCssColorString('#ff6688'),
+      outlineColor:Cesium.Color.BLACK, outlineWidth:3,
+      style:Cesium.LabelStyle.FILL_AND_OUTLINE,
+      verticalOrigin:Cesium.VerticalOrigin.BOTTOM,
+      pixelOffset:new Cesium.Cartesian2(14,-4),
+      disableDepthTestDistance:Infinity
+    }
+  });
+
+  const apoPos = new Cesium.CallbackProperty(()=>{
+    const { raan, argp } = currentElements();
+    const { pos } = kep2eci(orb.a, orb.e, orb.i, raan, argp, Math.PI);
+    return new Cesium.Cartesian3(pos[0], pos[1], pos[2]); // ★ 纯 ECI
+  }, false);
+
+  viewer.entities.add({
+    position: apoPos,
+    point:{
+      pixelSize:10,
+      color: Cesium.Color.fromCssColorString('#44aaff'),
+      outlineColor:Cesium.Color.WHITE, outlineWidth:2,
+      disableDepthTestDistance:Infinity
+    },
+    label:{
+      text:'远地点\nApoapsis',
+      font:'bold 11px Consolas,monospace',
+      fillColor: Cesium.Color.fromCssColorString('#66ccff'),
+      outlineColor:Cesium.Color.BLACK, outlineWidth:3,
+      style:Cesium.LabelStyle.FILL_AND_OUTLINE,
+      verticalOrigin:Cesium.VerticalOrigin.BOTTOM,
+      pixelOffset:new Cesium.Cartesian2(14,-4),
+      disableDepthTestDistance:Infinity
+    }
+  });
+
+  // viewer.entities.add({
+  //   polyline:{
+  //     positions: new Cesium.CallbackProperty(()=>{
+  //       const { raan, argp } = currentElements();
+  //       const { pos } = kep2eci(orb.a, orb.e, orb.i, raan, argp, 0);
+  //       return [
+  //         Cesium.Cartesian3.ZERO,
+  //         new Cesium.Cartesian3(pos[0], pos[1], pos[2]) // ★ 纯 ECI
+  //       ];
+  //     }, false),
+  //     width:1.2,
+  //     material: new Cesium.PolylineDashMaterialProperty({
+  //       color: Cesium.Color.fromCssColorString('#ff4466').withAlpha(0.6),
+  //       dashLength:10
+  //     }),
+  //     arcType: Cesium.ArcType.NONE
+  //   }
+  // });
+}
+
+// 太阳方向——纯 ECI
+function addSunLine(){
+  viewer.entities.add({
+    polyline:{
+      positions: new Cesium.CallbackProperty(()=>{
+        const s   = sunECI(simTime);
+        const len = Math.sqrt(s[0]**2+s[1]**2+s[2]**2);
+        const sc  = 1.8e7/len;
+        return [
+          Cesium.Cartesian3.ZERO,
+          new Cesium.Cartesian3(s[0]*sc, s[1]*sc, s[2]*sc) // ★ 纯 ECI
+        ];
+      }, false),
+      width:2,
+      material: new Cesium.PolylineDashMaterialProperty({
+        color:Cesium.Color.fromCssColorString('#ff7722').withAlpha(0.85),
+        dashLength:18
+      }),
+      arcType: Cesium.ArcType.NONE
+    }
+  });
+
+  viewer.entities.add({
+    position: new Cesium.CallbackProperty(()=>{
+      const s   = sunECI(simTime);
+      const len = Math.sqrt(s[0]**2+s[1]**2+s[2]**2);
+      const sc  = 1.9e7/len;
+      return new Cesium.Cartesian3(s[0]*sc, s[1]*sc, s[2]*sc); // ★ 纯 ECI
+    }, false),
+    label:{
+      text:'☀ 太阳',font:'bold 13px sans-serif',
+      fillColor: Cesium.Color.fromCssColorString('#ffaa44'),
+      outlineColor:Cesium.Color.BLACK, outlineWidth:3,
+      style:Cesium.LabelStyle.FILL_AND_OUTLINE,
+      disableDepthTestDistance:Infinity
+    }
+  });
+}
+// ═══════════════════════════════════════════════
+//  主动画循环
+// ═══════════════════════════════════════════════
+function startLoop(){
+  lastWall = performance.now();
+  (function loop(){
+    const now  = performance.now();
+    const wall = (now - lastWall) / 1000;
+    lastWall   = now;
+
+    if(!isPaused){
+      simElapsed += wall * simSpeed;
+      simTime     = new Date(simEpoch0.getTime() + simElapsed * 1000);
+    }
+
+    // ★ 核心：每帧把地球反转 GAST，实现 ECI 视角下地球自转
+    rotateGlobeToECI(simTime);
+
+    updateHUD();
+    updateTopbar();
+    updateSliders();
+    requestAnimationFrame(loop);
+  })();
+}
+
+// ── 旋转地球 Globe 到 ECI 视角 ──
+function rotateGlobeToECI(epoch){
+  const gast = getGAST(epoch);
+  // 绕 Z 轴旋转 -GAST，使地球在 ECI 系中呈现自转效果
+  const rotation = Cesium.Matrix3.fromRotationZ(-gast);
+  const mat4     = Cesium.Matrix4.fromRotationTranslation(rotation, Cesium.Cartesian3.ZERO);
+  // 设置地球的模型矩阵
+  viewer.scene.globe._surface._tileProvider._quadtree._occluders.ellipsoid.center =
+    Cesium.Cartesian3.ZERO; // 保持地心不变
+
+  // Cesium 1.114 正确方式：通过 postUpdate 事件修改 globe 的 modelMatrix
+  // 直接赋值给 viewer.scene.globe 的内部变换
+  viewer.scene.globe.modelMatrix = mat4;
+}
+// ═══════════════════════════════════════════════
+//  HUD 更新
+// ═══════════════════════════════════════════════
+function updateHUD(){
+  const { pos, vel } = currentECI();
+  const ecef = eci2ecef(pos, simTime);
+  const r    = Math.sqrt(ecef[0]**2+ecef[1]**2+ecef[2]**2);
+  const lat  = Math.asin(ecef[2]/r)*R2D;
+  const lon  = Math.atan2(ecef[1],ecef[0])*R2D;
+  const alt  = (r-RE)/1000;
+  const spd  = Math.sqrt(vel[0]**2+vel[1]**2+vel[2]**2)/1000;
+  const el   = currentElements();
+  const nuDeg= ((el.nu*R2D)%360+360)%360;
+
+  set('h-lon',  lon.toFixed(3)+'°');
+  set('h-lat',  lat.toFixed(3)+'°');
+  set('h-alt',  alt.toFixed(2)+' km');
+  set('h-spd',  spd.toFixed(4)+' km/s');
+  set('h-x',    (pos[0]/1000).toFixed(1)+' km');
+  set('h-y',    (pos[1]/1000).toFixed(1)+' km');
+  set('h-z',    (pos[2]/1000).toFixed(1)+' km');
+  set('h-inc',  (orb.i*R2D).toFixed(2)+'°');
+  set('h-nu',   nuDeg.toFixed(2)+'°');
+  set('h-ep',   fmtUTC(simTime));
+  set('h-type', orbType());
+}
+
+function updateTopbar(){
+  set('time-display','UTC  '+fmtUTC(simTime));
+}
+
+function orbType(){
+  const h=(orb.a-RE)/1000;
+  if(h>35000) return 'GEO';
+  if(h>2000)  return 'MEO';
+  if(orb.i*R2D>95) return 'SSO';
+  return 'LEO';
+}
+
+function fmtUTC(d){
+  return d.getUTCFullYear()+'-'+
+    pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate())+'  '+
+    pad(d.getUTCHours())+':'+pad(d.getUTCMinutes())+':'+
+    pad(d.getUTCSeconds())+' UTC';
+}
+function pad(n){ return String(n).padStart(2,'0'); }
+function set(id,v){ const e=document.getElementById(id); if(e) e.textContent=v; }
+
+// ═══════════════════════════════════════════════
+//  轨道统计参数
+// ═══════════════════════════════════════════════
+function updateStats(){
+  const a=orb.a, e=orb.e;
+  const T   = 2*Math.PI*Math.sqrt(a**3/GM);
+  const rp  = (a*(1-e)-RE)/1000;
+  const ra  = (a*(1+e)-RE)/1000;
+  const b   = a*Math.sqrt(1-e*e)/1000;
+  const vc  = Math.sqrt(GM/a)/1000;
+  const h   = (a-RE)/1000;
+  const tm  = Math.floor(T/60), ts=Math.floor(T%60);
+  set('st-T',  tm+'min '+ts+'s');
+  set('st-v',  vc.toFixed(3)+' km/s');
+  set('st-rp', rp.toFixed(1)+' km');
+  set('st-ra', ra.toFixed(1)+' km');
+  set('st-b',  b.toFixed(1)+' km');
+  set('st-h',  h.toFixed(1)+' km');
+}
+
+// ═══════════════════════════════════════════════
+//  滑块渐变色同步
+// ═══════════════════════════════════════════════
+function updateSliders(){
+  document.querySelectorAll('.pslider').forEach(sl=>{
+    const pct=((+sl.value - +sl.min)/(+sl.max - +sl.min)*100).toFixed(1);
+    sl.style.background=
+      `linear-gradient(90deg,#00d4ff ${pct}%,#1a3a6a ${pct}%)`;
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  参数滑块回调
+// ═══════════════════════════════════════════════
+function onParam(key, raw){
+  const v = parseFloat(raw);
+  simElapsed = 0; simEpoch0 = new Date(); // 重置仿真时钟，避免相位跳变
+
+  switch(key){
+    case 'h':
+      orb.a = RE + v*1000;
+      syncSlider('s-a', (orb.a/1000).toFixed(0));
+      set('v-h', v.toFixed(0)+' km');
+      set('v-a', (orb.a/1000).toFixed(1)+' km');
+      break;
+    case 'a':
+      orb.a = v*1000;
+      const hh=(orb.a-RE)/1000;
+      syncSlider('s-h', Math.min(36000,Math.max(200,hh)).toFixed(0));
+      set('v-a', v+' km');
+      set('v-h', hh.toFixed(1)+' km');
+      break;
+    case 'e':
+      orb.e=v; set('v-e', v.toFixed(3)); break;
+    case 'i':
+      orb.i=v*D2R; set('v-i', v.toFixed(1)+'°'); break;
+    case 'raan':
+      orb.raan=v*D2R; set('v-raan', v.toFixed(1)+'°'); break;
+    case 'argp':
+      orb.argp=v*D2R; set('v-argp', v.toFixed(1)+'°'); break;
+    case 'nu':
+      orb.nu=v*D2R; set('v-nu', v.toFixed(1)+'°'); break;
+  }
+  updateStats();
+  updateSliders();
+}
+
+function syncSlider(id, val){
+  const el=document.getElementById(id);
+  if(el) el.value=val;
+}
+
+// ═══════════════════════════════════════════════
+//  预设轨道加载
+// ═══════════════════════════════════════════════
+function loadPreset(name){
+  const p=PRESETS[name]; if(!p) return;
+
+  orb.a    = RE + p.h;
+  orb.e    = p.e;
+  orb.i    = p.i;
+  orb.raan = p.raan;
+  orb.argp = p.argp;
+  orb.nu   = p.nu;
+
+  // 重置仿真时钟
+  simElapsed=0; simEpoch0=new Date();
+
+  // 同步所有滑块
+  syncAll();
+
+  // 卡片高亮
+  document.querySelectorAll('.card').forEach(c=>{
+    c.classList.toggle('active', c.dataset.k===name);
+  });
+
+  updateStats();
+
+  // 相机自适应
+  const dist = Math.max(orb.a*3.5, 2e7);
+  viewer.camera.flyTo({
+        destination: new Cesium.Cartesian3.fromDegrees(
+            110.435314,
+            38.960521,
+            60000000.0
+        ),
+        duration: 1,
+        orientation: {
+            heading: 0,
+            pitch: Cesium.Math.toRadians(-90),
+            roll: 0,
+        },
+    });
+
+  toast('已加载：'+PRESETS[name].desc);
+}
+
+function syncAll(){
+  const h=(orb.a-RE)/1000;
+  syncSlider('s-h', Math.min(36000,Math.max(200,h)).toFixed(0));
+  syncSlider('s-a', (orb.a/1000).toFixed(0));
+  syncSlider('s-e', orb.e.toFixed(3));
+  syncSlider('s-i', (orb.i*R2D).toFixed(1));
+  syncSlider('s-raan',(orb.raan*R2D).toFixed(1));
+  syncSlider('s-argp',(orb.argp*R2D).toFixed(1));
+  syncSlider('s-nu',  (orb.nu*R2D).toFixed(1));
+  set('v-h', h.toFixed(0)+' km');
+  set('v-a', (orb.a/1000).toFixed(1)+' km');
+  set('v-e', orb.e.toFixed(3));
+  set('v-i', (orb.i*R2D).toFixed(1)+'°');
+  set('v-raan',(orb.raan*R2D).toFixed(1)+'°');
+  set('v-argp',(orb.argp*R2D).toFixed(1)+'°');
+  set('v-nu',  (orb.nu*R2D).toFixed(1)+'°');
+  updateSliders();
+}
+
+// ═══════════════════════════════════════════════
+//  时间控制
+// ═══════════════════════════════════════════════
+function togglePause(){
+  isPaused=!isPaused;
+  const btn=document.getElementById('btn-pause');
+  btn.textContent = isPaused ? '▶ 继续' : '⏸ 暂停';
+  btn.classList.toggle('active', isPaused
+  );
+  if(!isPaused) lastWall = performance.now();
+}
+
+function setSpeed(s){
+  simSpeed=s;
+  set('spd', s+'×');
+  if(isPaused){ isPaused=false; lastWall=performance.now();
+    const btn=document.getElementById('btn-pause');
+    btn.textContent='⏸ 暂停'; btn.classList.remove('active');
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  Toast 提示
+// ═══════════════════════════════════════════════
+let _toastTimer=null;
+function toast(msg){
+  let el=document.getElementById('_toast');
+  if(!el){
+    el=document.createElement('div'); el.id='_toast';
+    el.style.cssText=`
+      position:fixed;bottom:90px;left:50%;transform:translateX(-50%);
+      background:rgba(4,16,40,.96);border:1px solid #00d4ff;
+      color:#00ffcc;padding:10px 22px;border-radius:8px;
+      font-size:13px;z-index:600;pointer-events:none;
+      box-shadow:0 0 20px rgba(0,212,255,.45);
+      white-space:pre-line;text-align:center;
+      transition:opacity .4s;max-width:340px;line-height:1.6;
+    `;
+    document.body.appendChild(el);
+  }
+  el.textContent=msg; el.style.opacity='1';
+  clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(()=>{ el.style.opacity='0'; },3500);
+}
+
+// ═══════════════════════════════════════════════
+//  键盘快捷键
+// ═══════════════════════════════════════════════
+document.addEventListener('keydown', e=>{
+  if(e.target.tagName==='INPUT') return;
+  switch(e.key){
+    case ' ':       e.preventDefault(); togglePause();           break;
+    case '1':       loadPreset('leo');                           break;
+    case '2':       loadPreset('sso');                           break;
+    case '3':       loadPreset('frozen');                        break;
+    case '4':       loadPreset('repeating');                     break;
+    case '5':       loadPreset('geo');                           break;
+    case '+': case '=': setSpeed(simSpeed*2);      break;
+    case '-':           setSpeed(Math.max(simSpeed/2,0.25));     break;
+    case 'r': case 'R': simElapsed=0; simEpoch0=new Date(); toast('仿真时钟已重置'); break;
+  }
+});
+
+// ═══════════════════════════════════════════════
+//  页面入口
+// ═══════════════════════════════════════════════
+window.addEventListener('load',()=>{
+  setTimeout(()=>{
+    try{
+      initCesium();
+      setTimeout(()=>{
+        loadPreset('leo');
+        updateStats();
+        syncAll();
+        startLoop();
+
+        // 淡出遮罩
+        const mask=document.getElementById('mask');
+        mask.style.transition='opacity .8s';
+        mask.style.opacity='0';
+        setTimeout(()=>{ mask.style.display='none'; },800);
+
+        toast('系统就绪 ✓\n空格暂停 | 1-5切换轨道 | +/-调速 | R重置时钟');
+      },1200);
+    }catch(err){
+      console.error(err);
+      document.getElementById('mask').innerHTML=`
+        <div style="color:#ff4455;font-size:14px;text-align:center;padding:40px;max-width:400px">
+          ⚠ 初始化失败<br><br>
+          <span style="color:#7aa8cc;font-size:12px;line-height:1.8">
+            请确保在 HTTP 服务器环境下运行（非 file:// 协议）<br>
+            或检查网络连接是否正常<br><br>
+            Error: ${err.message}
+          </span>
+        </div>`;
+    }
+  },400);
+});
+
+window.addEventListener('resize',()=>{ if(viewer) viewer.resize(); });
+</script>
+</body>
+</html>
