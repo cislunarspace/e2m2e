@@ -1,5 +1,5 @@
 ---
-permalink: /what-is-cislunar-space/references/
+permalink: /what-is-cislunarspace/references/
 ---
 
 # 参考文献

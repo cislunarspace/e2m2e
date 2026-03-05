@@ -6,9 +6,9 @@ const globalSidebar = [
         title: "地月空间是什么？",
         collapsable: true,
         children: [
-            ["/what-is-cislunar-space/", "概述"],
-            ["/what-is-cislunar-space/environment", "空间环境特征"],
-            ["/what-is-cislunar-space/references", "参考文献"],
+            ["/what-is-cislunarspace/", "概述"],
+            ["/what-is-cislunarspace/environment", "空间环境特征"],
+            ["/what-is-cislunarspace/references", "参考文献"],
         ]
     },
     {
@@ -50,7 +50,7 @@ const globalSidebar = [
         title: "关于本站",
         collapsable: true,
         children: [
-            ["/about/", "引言"],
+            ["/", "首页"],
         ]
     }
 ];
@@ -59,9 +59,9 @@ const globalSidebar = [
 export default {
     // 所有页面都使用相同的全局侧边栏
     "/": globalSidebar,
-    "/what-is-cislunar-space/": globalSidebar,
-    "/what-is-cislunar-space/environment": globalSidebar,
-    "/what-is-cislunar-space/references": globalSidebar,
+    "/what-is-cislunarspace/": globalSidebar,
+    "/what-is-cislunarspace/environment": globalSidebar,
+    "/what-is-cislunarspace/references": globalSidebar,
     "/cislunar-orbits/": globalSidebar,
     "/research-frontiers/": globalSidebar,
     "/research-frontiers/journals-conferences": globalSidebar,
@@ -73,5 +73,4 @@ export default {
     "/glossary/xray-pulsar-navigation": globalSidebar,
     "/resources-tools/": globalSidebar,
     "/resources-tools/datasets": globalSidebar,
-    "/about/": globalSidebar,
 } as SidebarConfig4Multiple;

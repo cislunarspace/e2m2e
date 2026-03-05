@@ -16,6 +16,6 @@ export default [
     },
     {
         text: "关于本站",
-        link: '/about/'
+        link: '/'
     },
 ] as NavItem[];

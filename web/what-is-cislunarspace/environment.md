@@ -1,5 +1,5 @@
 ---
-permalink: /what-is-cislunar-space/environment/
+permalink: /what-is-cislunarspace/environment/
 ---
 
 # 空间环境特征
