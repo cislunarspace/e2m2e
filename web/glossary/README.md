@@ -1,6 +1,6 @@
 ---
 layout: Page
-sidebar: /
+sidebar: /glossary/
 permalink: /glossary/
 wechatShare:
   title: 地月空间术语

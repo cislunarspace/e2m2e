@@ -1,6 +1,6 @@
-import { SidebarConfig4Multiple } from "vuepress/config";
+import { SidebarConfig } from "vuepress/config";
 
-// 主侧边栏配置 - 用于主要页面
+// 主侧边栏配置
 const mainSidebar = [
     {
         title: "地月空间是什么",
@@ -56,28 +56,22 @@ const resourcesToolsSidebar = [
     }
 ];
 
-// @ts-ignore
-export default {
-    // 首页使用主侧边栏
-    "/": mainSidebar,
-    
-    // 主要页面使用主侧边栏
-    "/what-is-cislunarspace/": mainSidebar,
-    "/what-is-cislunarspace/environment": mainSidebar,
-    "/what-is-cislunarspace/references": mainSidebar,
-    "/cislunar-orbits/": mainSidebar,
-    "/research-frontiers/": mainSidebar,
-    "/research-frontiers/journals-conferences": mainSidebar,
-    "/research-frontiers/directions": mainSidebar,
-    "/research-frontiers/institutions": mainSidebar,
-    "/research-frontiers/major-projects": mainSidebar,
-    
+// VuePress 1.x 多侧边栏配置
+// 注意：回退配置 '/' 应该放在最后
+const sidebarConfig: SidebarConfig = {
     // 词典页面使用独立的词典侧边栏
     "/glossary/": glossarySidebar,
-    "/glossary/cr3bp": glossarySidebar,
-    "/glossary/xray-pulsar-navigation": glossarySidebar,
     
     // 资源与工具页面使用独立的资源与工具侧边栏
     "/resources-tools/": resourcesToolsSidebar,
-    "/resources-tools/datasets": resourcesToolsSidebar,
-} as SidebarConfig4Multiple;
+    
+    // 主要页面使用主侧边栏
+    "/what-is-cislunarspace/": mainSidebar,
+    "/cislunar-orbits/": mainSidebar,
+    "/research-frontiers/": mainSidebar,
+    
+    // 默认侧边栏（用于首页和其他页面）- 放在最后
+    "/": mainSidebar,
+};
+
+export default sidebarConfig;

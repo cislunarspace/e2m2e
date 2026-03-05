@@ -1,6 +1,5 @@
 ---
 layout: Page
-sidebar: /
 permalink: /resources-tools/
 wechatShare:
   title: 地月空间资源与工具
