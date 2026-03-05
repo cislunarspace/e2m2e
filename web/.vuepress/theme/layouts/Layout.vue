@@ -187,14 +187,20 @@ export default {
 
         const nodes = sidebar.querySelectorAll('.sidebar-link, .group-label, .sidebar-heading')
         let maxTextWidth = 0
+        
+        // 临时设置不换行来测量真实宽度
         nodes.forEach((el) => {
+          const originalWhiteSpace = el.style.whiteSpace
+          el.style.whiteSpace = 'nowrap'
           maxTextWidth = Math.max(maxTextWidth, el.scrollWidth)
+          el.style.whiteSpace = originalWhiteSpace
         })
 
         if (!maxTextWidth) return
 
         // 只用文字宽度，不加额外空间，最小宽度 160px，最大 520px
-        const width = Math.min(Math.max(maxTextWidth, 160), 520)
+        // 加上一些内边距和图标空间
+        const width = Math.min(Math.max(maxTextWidth + 32, 160), 520)
         document.documentElement.style.setProperty('--desktop-sidebar-width', `${width}px`)
 
         // Right TOC sidebar
@@ -203,10 +209,15 @@ export default {
           const links = tocBox.querySelectorAll('a')
           let maxTocWidth = 0
           links.forEach((el) => {
+            const originalWhiteSpace = el.style.whiteSpace
+            el.style.whiteSpace = 'nowrap'
             maxTocWidth = Math.max(maxTocWidth, el.scrollWidth)
+            el.style.whiteSpace = originalWhiteSpace
           })
           if (maxTocWidth) {
-            const tocWidth = Math.min(Math.max(maxTocWidth + 48, 190), 400)
+            // 只用文字宽度，不加额外空间，最小宽度 180px，最大 400px
+            // 加上一些内边距
+            const tocWidth = Math.min(Math.max(maxTocWidth + 24, 180), 400)
             document.documentElement.style.setProperty('--desktop-toc-width', `${tocWidth}px`)
           }
         }

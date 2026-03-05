@@ -50,6 +50,13 @@ export default {
 @media (min-width: 960px)
   .theme-container .sidebar
     width var(--desktop-sidebar-width) !important
+    
+  .theme-container .sidebar .sidebar-link,
+  .theme-container .sidebar .group-label,
+  .theme-container .sidebar .sidebar-heading
+    white-space: nowrap !important
+    overflow: hidden
+    text-overflow: ellipsis
 
   .theme-container .page
     padding-left calc(var(--desktop-sidebar-width) + 1.5rem) !important
@@ -98,17 +105,13 @@ export default {
   //width 100vw
   //overflow scroll
 .toc-container-sidebar
-
   order 2
   flex 0 0 auto
   width var(--desktop-toc-width, 240px)
-  //padding-left 32px
   display: block;
   position: relative;
   color $textColor
-  //: calc(100vw - 460px);
   top: 80px;
-  max-width: 32vw;
   background transparent
   margin-right: 0;
   margin-left: 0;
@@ -120,31 +123,51 @@ export default {
     top 80px;
     height 100vh
     overflow-x hidden
-    overflow-y auto
+    overflow-y hidden
 
     .icon-arrow
       position: relative;
       margin-left: -20px;
     .scroll-box
       overflow-x: hidden;
-      overflow-y: hidden;
+      overflow-y: auto;
+      max-height: calc(100vh - 120px);
+      padding-right: 8px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0,0,0,0.2) transparent;
+      &::-webkit-scrollbar {
+        width: 6px;
+      }
+      &::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      &::-webkit-scrollbar-thumb {
+        background-color: rgba(0,0,0,0.2);
+        border-radius: 3px;
+      }
       & > div:first-child
         overflow-x visible
         white-space: nowrap;
         text-overflow ellipsis
       hr
-        margin-top: 0.5rem
+        margin: 0.5rem 0 1rem 0;
+        border: none;
+        border-top: 1px solid rgba(0,0,0,0.1);
       .toc-box
-        max-height:81vh;
-        overflow-y: auto;
+        max-height: none;
+        overflow-y: visible;
         overflow-x: visible;
-        width: max-content;
+        width: 100%;
         min-width: 190px;
         padding-right: 16px;
         -webkit-box-sizing: border-box;
         box-sizing: border-box;
+        padding-bottom: 20px;
         a
-          white-space: nowrap
+          white-space: normal;
+          word-break: break-word;
+          display: inline-block;
+          max-width: 100%;
       & > ol
         margin-top: -8px;
         li
