@@ -73,19 +73,34 @@ export default defineConfig({
       "seo",
       {
         siteTitle: (_, $site) => $site.title,
-        title: ($page) => $page.title,
+        title: ($page) =>
+          $page.frontmatter.wechatShare?.title ||
+          $page.frontmatter.shareTitle ||
+          $page.title,
         description: ($page) =>
+          $page.frontmatter.wechatShare?.desc ||
+          $page.frontmatter.shareDesc ||
           $page.frontmatter.description || $page.description,
         author: (_, $site) => $site.themeConfig.author || author,
         tags: ($page) => $page.frontmatter.tags || tags,
         type: ($page) => "article",
         url: (_, $site, path) =>
           ($site.themeConfig.domain || domain || "") + path,
-        image: ($page, $site) =>
-          $page.frontmatter.image &&
-          (($site.themeConfig.domain &&
-            !$page.frontmatter.image.startsWith("http")) ||
-            "") + $page.frontmatter.image,
+        image: ($page, $site) => {
+          const siteDomain = ($site.themeConfig.domain || domain || "").replace(/\/$/, "");
+          const rawImage =
+            $page.frontmatter.wechatShare?.image ||
+            $page.frontmatter.shareImage ||
+            $page.frontmatter.image ||
+            "/logo.png";
+
+          if (/^https?:\/\//.test(rawImage)) {
+            return rawImage;
+          }
+
+          const normalizedPath = rawImage.startsWith("/") ? rawImage : `/${rawImage}`;
+          return `${siteDomain}${normalizedPath}`;
+        },
         publishedAt: ($page) =>
           $page.frontmatter.date && new Date($page.frontmatter.date),
         modifiedAt: ($page) => $page.lastUpdated && new Date($page.lastUpdated),
@@ -125,6 +140,7 @@ export default defineConfig({
   // 主题配置
   themeConfig: {
     logo: "/logo.png",
+    domain,
     nav: navbar,
     sidebar,
     lastUpdated: "最近更新",
