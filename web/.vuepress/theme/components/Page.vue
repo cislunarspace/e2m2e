@@ -78,15 +78,15 @@ export default {
   max-width none !important
   width 100%
   margin 0 !important
-  padding-right 16px !important
+  padding-right 32px !important
 .content
   display flex
   align-items flex-start
   justify-content flex-start
-  gap 1.5rem
+  gap 5rem
   margin 0 auto
   width 100%
-  padding 0 0.75rem
+  padding 0 1.5rem
   li, a , p, span
     word-wrap break-word
 

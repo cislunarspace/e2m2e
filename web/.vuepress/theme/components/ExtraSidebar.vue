@@ -101,7 +101,7 @@ function flatten (items, res) {
   z-index 11
   margin 0
   top 3.6rem
-  right 0
+  right 1.5rem
   bottom 0
   box-sizing border-box
   border-left 0px solid #eaecef
