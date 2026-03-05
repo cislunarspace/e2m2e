@@ -1,95 +1,177 @@
-# 地月空间入门指南（项目入口）
+<div align="center">
 
-本仓库用于建设「地月空间入门指南」知识站点，内容围绕地月空间基础概念、轨道类型、研究前沿、术语词典及资源工具整理。
+<img src="https://img.shields.io/badge/地月空间-入门指南-0078D7?style=for-the-badge&logo=rocket&logoColor=white" alt="地月空间入门指南">
+<img src="https://img.shields.io/badge/航天-知识库-42b883?style=for-the-badge&logo=spacex&logoColor=white" alt="航天知识库">
 
-## 项目结构
+# 🚀 地月空间入门指南
 
-- `web/`：VuePress 文档站点源码与内容目录（当前主项目）
-- `README.md`：仓库入口说明（本文件）
+**系统掌握地月空间科学、技术与工程实践 · 开源知识库**
 
-## 站点内容导航
+<p align="center">
+  <img src="https://img.shields.io/github/stars/cislunarspace/cislunarspace?style=flat-square&logo=github&label=Stars" alt="GitHub stars">
+  <img src="https://img.shields.io/github/forks/cislunarspace/cislunarspace?style=flat-square&logo=github&label=Forks" alt="GitHub forks">
+  <img src="https://img.shields.io/github/license/cislunarspace/cislunarspace?style=flat-square&logo=apache&label=License" alt="GitHub license">
+  <img src="https://img.shields.io/website?down_message=维护中&style=flat-square&up_color=green&up_message=在线&url=https%3A%2F%2Fcislunarspace.cn&label=网站" alt="Website">
+  <img src="https://img.shields.io/badge/版本-1.0.0-blue?style=flat-square&logo=semver" alt="Version">
+</p>
 
-站点主要内容位于 `web/` 下，包括：
+</div>
 
-- `地月空间是什么/`
-- `地月空间飞行器在什么轨道上运行/`
-- `地月空间科学研究前沿在哪里/`
-- `地月空间术语词典/`
-- `资源与工具/`
-- `关于本站/`
+## 📖 关于项目
 
-## 本地开发
+**地月空间入门指南**是一个开源的知识库项目，致力于降低地月空间知识的学习门槛，为航天爱好者、学生和研究人员提供系统、专业、易于理解的学习资源。
 
-请在 `web/` 目录执行：
+## 🛰️ 主要内容
 
-1. 安装依赖
+| 模块 | 描述 | 状态 |
+|------|------|------|
+| **地月空间基础** | 地月空间定义、特征、任务开展情况等基础知识 | ✅ 已完成 |
+| **轨道动力学** | 地月空间飞行器轨道类型、特点及相关知识 | ✅ 已完成 |
+| **研究前沿** | 地月空间科学研究的前沿领域、热点问题 | 🔄 更新中 |
+| **术语词典** | 地月空间领域专业术语的权威释义 | ✅ 已完成 |
+| **资源工具** | 数据集、软件工具、代码库等实用资源 | 🔄 更新中 |
 
+## 🚀 快速开始
+
+### 在线访问
+🌐 **官方网站**：[https://cislunarspace.cn](https://cislunarspace.cn)
+
+### 本地开发
 ```bash
+# 克隆项目
+git clone https://github.com/cislunarspace/cislunarspace.git
+
+# 进入项目目录
+cd cislunarspace/web
+
+# 安装依赖
 npm install
-```
 
-2. 启动开发环境
-
-```bash
+# 启动开发服务器
 npm run docs:dev
 ```
 
-3. 构建静态站点
+## 🛠️ 技术栈
 
-```bash
-npm run docs:build
+<div align="center">
+
+### 前端框架
+![VuePress](https://img.shields.io/badge/VuePress-2.x-42b883?style=for-the-badge&logo=vue.js&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Markdown](https://img.shields.io/badge/Markdown-文档编写-000000?style=for-the-badge&logo=markdown)
+
+### 开发工具
+![Node.js](https://img.shields.io/badge/Node.js-18.x-339933?style=for-the-badge&logo=node.js&logoColor=white)
+![Git](https://img.shields.io/badge/Git-版本控制-F05032?style=for-the-badge&logo=git&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-自动化-2088FF?style=for-the-badge&logo=github-actions&logoColor=white)
+
+</div>
+
+## 📊 项目统计
+
+<div align="center">
+  
+![GitHub last commit](https://img.shields.io/github/last-commit/cislunarspace/cislunarspace?style=flat-square)
+![GitHub repo size](https://img.shields.io/github/repo-size/cislunarspace/cislunarspace?style=flat-square)
+![GitHub contributors](https://img.shields.io/github/contributors/cislunarspace/cislunarspace?style=flat-square)
+![GitHub issues](https://img.shields.io/github/issues/cislunarspace/cislunarspace?style=flat-square)
+
+</div>
+
+## 🤝 参与贡献
+
+我们热烈欢迎任何形式的贡献！地月空间知识的传播需要大家的共同努力。
+
+贡献类型包括：📝内容完善（修正错误、补充内容、优化表述）、✨新章节（添加新的知识模块或专题）、🌐翻译校对（中英文翻译、语言润色）、🐛问题反馈（报告错误、提出改进建议）、💡功能建议（提出新功能或优化建议）、🔧代码优化（改进网站功能、性能优化）。
+
+### 🎯 贡献类型
+
+### 📋 贡献流程
+
+<div align="center">
+
+```mermaid
+graph LR
+    A[Fork 仓库] --> B[创建分支]
+    B --> C[进行修改]
+    C --> D[提交更改]
+    D --> E[发起 PR]
+    E --> F[代码审查]
+    F --> G[合并贡献]
 ```
 
-## 说明
+</div>
 
-- 首页与内容主入口见 `web/README.md`
-- 本项目持续完善中，欢迎补充地月空间相关高质量资料
+**详细步骤：**
+1. **Fork 仓库**：点击右上角的 Fork 按钮
+2. **克隆项目**：`git clone https://github.com/你的用户名/cislunarspace.git`
+3. **创建分支**：`git checkout -b feature/你的贡献`
+4. **进行修改**：在本地进行编辑和测试
+5. **提交更改**：`git commit -m '描述你的修改'`
+6. **推送分支**：`git push origin feature/你的贡献`
+7. **发起 PR**：在 GitHub 上创建 Pull Request
+8. **等待审核**：维护者会进行代码审查
+9. **合并贡献**：审核通过后合并到主分支
 
-## 微信分享卡片配置
+### 🏆 贡献者荣誉墙
 
-微信分享卡片相关说明维护在仓库根目录 README（本节），不放在站点首页文档中。
+我们将所有贡献者记录在 [CONTRIBUTORS.md](CONTRIBUTORS.md) 文件中，感谢每一位贡献者的付出！
 
-### 1. 站点级配置
+**查看实时贡献者统计：**
+![GitHub Contributors](https://contrib.rocks/image?repo=cislunarspace/cislunarspace)
 
-在 `web/.vuepress/config.ts` 的 `themeConfig.wechatShare` 中配置：
+<div align="center">
 
-- `enabled`: 是否开启
-- `signatureEndpoint`: 签名接口地址（必须可被线上页面访问）
-- `defaultTitle`: 默认分享标题
-- `defaultDesc`: 默认分享描述
-- `defaultImage`: 默认分享图片（建议使用绝对可访问路径，如 `/logo.png`）
+**✨ 你的每一份贡献，都在推动地月空间知识的传播！**
 
-### 2. 页面级配置
+</div>
 
-在任意 Markdown frontmatter 中使用：
+<div align="center">
 
-```yaml
-wechatShare:
-	title: 页面分享标题
-	desc: 页面分享描述
-	image: /your-share-image.png
-```
+### 🌐 官方平台
+[![GitHub](https://img.shields.io/badge/GitHub-@cislunarspace-181717?style=for-the-badge&logo=github)](https://github.com/cislunarspace)
+[![Gitee](https://img.shields.io/badge/Gitee-地月空间-C71D23?style=for-the-badge&logo=gitee)](https://gitee.com/cislunarspace)
+[![Website](https://img.shields.io/badge/🌐-cislunarspace.cn-0078D7?style=for-the-badge&logo=internet-explorer)](https://cislunarspace.cn)
 
-### 3. 签名接口
+### 📧 联系邮箱
+[![Email](https://img.shields.io/badge/📧-contact@cislunarspace.cn-D14836?style=for-the-badge&logo=gmail)](mailto:ouyangjiahong22@nudt.edu.cn)
+[![Issues](https://img.shields.io/badge/📋-GitHub%20Issues-6CC644?style=for-the-badge&logo=github)](https://github.com/cislunarspace/cislunarspace/issues)
 
-可参考示例文件：`web/.vuepress/wechat-signature-server.example.js`。
+### 📱 社交媒体
+*更多社交平台正在建设中...*
 
-接口约定：
+</div>
 
-- `GET /api/wechat-signature?url=<当前页面完整URL>`
-- 返回 JSON：
+### 💬 交流讨论
 
-```json
-{
-	"appId": "wx1234567890",
-	"timestamp": 1710000000,
-	"nonceStr": "randomString",
-	"signature": "sha1signature"
-}
-```
+- **问题反馈**：请使用 [GitHub Issues](https://github.com/cislunarspace/cislunarspace/issues)
+- **功能建议**：欢迎提交 Issue 或 Pull Request
+- **合作咨询**：请通过邮箱联系
 
-### 4. 注意事项
+---
 
-- 微信签名使用的 `url` 必须与页面实际 URL（不含 hash）严格一致。
-- 公众号后台要配置 JS 接口安全域名。
-- 分享卡片在微信中可能有缓存，修改后建议更换参数或等待刷新。
+<div align="center">
+
+**🚀 加入我们，共同探索地月空间的奥秘！**
+
+</div>
+
+## 📄 许可证
+
+本项目采用 **Apache License 2.0** 开源许可证。详见 [LICENSE](LICENSE) 文件。
+
+## 🙏 致谢
+
+感谢所有为地月空间知识传播做出贡献的开发者、研究者和爱好者！
+
+---
+
+<div align="center">
+
+**🌙 探索未知，连接地月**
+
+*让地月空间知识触手可及*
+
+![Visitor Count](https://visitor-badge.laobi.icu/badge?page_id=cislunarspace.cislunarspace)
+
+</div>
