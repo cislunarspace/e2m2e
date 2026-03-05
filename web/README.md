@@ -13,7 +13,7 @@ actionLink: /what-is-cislunar-space/
 #   details: 提供准确可靠的信息
 # - title: 实用导向
 #   details: 提供丰富的资源、工具
-footer: Apache Licensed | Copyright © 天疆说
+footer: Apache Licensed | 湘ICP备2026006405号-1
 wechatShare:
 	title: 地月空间入门指南 | 从入门到实践
 	desc: 地月空间定义、轨道、研究前沿、术语与工具资源一站式学习。
