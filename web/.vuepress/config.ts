@@ -166,7 +166,7 @@ export default defineConfig({
   ],
   // 主题配置
   themeConfig: {
-    logo: "/logo.png",
+    logo: "/icon.ico",
     domain,
     nav: navbar,
     sidebar,

@@ -46,7 +46,6 @@
     </div>
     <div class="chat-messages" ref="messagesContainer">
       <div v-if="messages.length === 0" class="chat-welcome">
-        <img src="/logo.png" alt="logo" class="welcome-logo" />
         <h2>地月空间 AI 问答助手</h2>
         <p>你好！我是地月空间入门指南的 AI 助手，可以回答关于地月空间、轨道动力学、航天器导航等方面的问题。</p>
         <div class="suggested-questions">
