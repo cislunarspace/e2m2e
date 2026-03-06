@@ -55,27 +55,58 @@ import katex from 'katex'
 import 'katex/dist/katex.min.css'
 
 function renderMd(text) {
-  // Split into blocks by double newline
-  var blocks = text.split(/\n{2,}/)
+  var lines = text.split('\n')
   var html = []
+  var i = 0
 
-  for (var i = 0; i < blocks.length; i++) {
-    var block = blocks[i].trim()
-    if (!block) continue
+  while (i < lines.length) {
+    var line = lines[i]
 
-    // Code block
-    var codeMatch = block.match(/^```(\w*)\n?([\s\S]*?)```$/)
-    if (codeMatch) {
-      html.push('<pre><code class="language-' + escHtml(codeMatch[1]) + '">' + escHtml(codeMatch[2].trim()) + '</code></pre>')
+    // Empty line — skip
+    if (line.trim() === '') {
+      i++
       continue
     }
 
-    // Table
-    if (/^\|.+\|/.test(block) && block.indexOf('\n') !== -1) {
-      var tableLines = block.split('\n').filter(function(l) { return l.trim() })
-      if (tableLines.length >= 2 && /^\|[\s:|-]+\|$/.test(tableLines[1].trim())) {
+    // Code block (fenced)
+    if (/^```/.test(line.trim())) {
+      var lang = line.trim().replace(/^```/, '').trim()
+      var codeLines = []
+      i++
+      while (i < lines.length && !/^```\s*$/.test(lines[i].trim())) {
+        codeLines.push(lines[i])
+        i++
+      }
+      i++ // skip closing ```
+      html.push('<pre><code class="language-' + escHtml(lang) + '">' + escHtml(codeLines.join('\n')) + '</code></pre>')
+      continue
+    }
+
+    // Heading
+    var headMatch = line.match(/^(#{1,6})\s+(.+)$/)
+    if (headMatch) {
+      var level = headMatch[1].length
+      html.push('<h' + level + '>' + inlineMd(headMatch[2].trim()) + '</h' + level + '>')
+      i++
+      continue
+    }
+
+    // Horizontal rule
+    if (/^\s*([-*_])\s*\1\s*\1[\s\-*_]*$/.test(line)) {
+      html.push('<hr>')
+      i++
+      continue
+    }
+
+    // Table: collect consecutive lines starting with |
+    if (/^\|.+\|/.test(line.trim())) {
+      var tableLines = []
+      while (i < lines.length && /^\|.+\|/.test(lines[i].trim())) {
+        tableLines.push(lines[i].trim())
+        i++
+      }
+      if (tableLines.length >= 2 && /^[\s|:|-]+$/.test(tableLines[1])) {
         var tableHtml = '<table>'
-        // header
         var hCells = tableLines[0].split('|').filter(function(c) { return c.trim() !== '' })
         tableHtml += '<thead><tr>'
         for (var h = 0; h < hCells.length; h++) tableHtml += '<th>' + inlineMd(hCells[h].trim()) + '</th>'
@@ -88,55 +119,73 @@ function renderMd(text) {
         }
         tableHtml += '</tbody></table>'
         html.push(tableHtml)
-        continue
+      } else {
+        // Not a real table, treat as paragraphs
+        for (var t = 0; t < tableLines.length; t++) {
+          html.push('<p>' + inlineMd(tableLines[t]) + '</p>')
+        }
       }
-    }
-
-    // Heading
-    var headMatch = block.match(/^(#{1,6})\s+(.+)$/)
-    if (headMatch) {
-      var level = headMatch[1].length
-      html.push('<h' + level + '>' + inlineMd(headMatch[2]) + '</h' + level + '>')
       continue
     }
 
-    // Blockquote
-    if (/^>\s/.test(block)) {
-      var bqContent = block.replace(/^>\s?/gm, '')
-      html.push('<blockquote>' + renderMd(bqContent) + '</blockquote>')
+    // Blockquote: collect consecutive > lines
+    if (/^>\s?/.test(line)) {
+      var bqLines = []
+      while (i < lines.length && /^>\s?/.test(lines[i])) {
+        bqLines.push(lines[i].replace(/^>\s?/, ''))
+        i++
+      }
+      html.push('<blockquote>' + renderMd(bqLines.join('\n')) + '</blockquote>')
       continue
     }
 
-    // Horizontal rule
-    if (/^[-*_]{3,}$/.test(block)) {
-      html.push('<hr>')
-      continue
-    }
-
-    // Unordered list
-    if (/^[-*+]\s/.test(block)) {
-      var items = block.split(/\n(?=[-*+]\s)/)
+    // Unordered list: collect consecutive - / * / + items (with possible continuation lines)
+    if (/^\s*[-*+]\s/.test(line)) {
+      var ulItems = []
+      while (i < lines.length && /^\s*[-*+]\s/.test(lines[i])) {
+        ulItems.push(lines[i].replace(/^\s*[-*+]\s/, '').trim())
+        i++
+      }
       html.push('<ul>')
-      for (var u = 0; u < items.length; u++) {
-        html.push('<li>' + inlineMd(items[u].replace(/^[-*+]\s/, '').trim()) + '</li>')
+      for (var u = 0; u < ulItems.length; u++) {
+        html.push('<li>' + inlineMd(ulItems[u]) + '</li>')
       }
       html.push('</ul>')
       continue
     }
 
-    // Ordered list
-    if (/^\d+\.\s/.test(block)) {
-      var oitems = block.split(/\n(?=\d+\.\s)/)
+    // Ordered list: collect consecutive numbered items
+    if (/^\s*\d+[.)]\s/.test(line)) {
+      var olItems = []
+      while (i < lines.length && /^\s*\d+[.)]\s/.test(lines[i])) {
+        olItems.push(lines[i].replace(/^\s*\d+[.)]\s/, '').trim())
+        i++
+      }
       html.push('<ol>')
-      for (var o = 0; o < oitems.length; o++) {
-        html.push('<li>' + inlineMd(oitems[o].replace(/^\d+\.\s/, '').trim()) + '</li>')
+      for (var o = 0; o < olItems.length; o++) {
+        html.push('<li>' + inlineMd(olItems[o]) + '</li>')
       }
       html.push('</ol>')
       continue
     }
 
-    // Paragraph (handle lines within block)
-    html.push('<p>' + inlineMd(block).replace(/\n/g, '<br>') + '</p>')
+    // Paragraph: collect consecutive non-empty, non-special lines
+    var paraLines = []
+    while (i < lines.length && lines[i].trim() !== '' &&
+      !/^```/.test(lines[i].trim()) &&
+      !/^#{1,6}\s/.test(lines[i]) &&
+      !/^\|.+\|/.test(lines[i].trim()) &&
+      !/^>\s?/.test(lines[i]) &&
+      !/^\s*[-*+]\s/.test(lines[i]) &&
+      !/^\s*\d+[.)]\s/.test(lines[i]) &&
+      !/^\s*([-*_])\s*\1\s*\1[\s\-*_]*$/.test(lines[i])
+    ) {
+      paraLines.push(lines[i])
+      i++
+    }
+    if (paraLines.length > 0) {
+      html.push('<p>' + inlineMd(paraLines.join('<br>')) + '</p>')
+    }
   }
 
   return html.join('\n')
