@@ -1,5 +1,49 @@
 <template>
   <div class="ai-chat-container">
+    <!-- Toolbar -->
+    <div class="chat-toolbar">
+      <div class="toolbar-title">AI 问答助手</div>
+      <div class="toolbar-actions">
+        <button class="toolbar-btn" @click="startNewChat" title="新对话">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          <span>新对话</span>
+        </button>
+        <button class="toolbar-btn" @click="showHistory = !showHistory" title="历史记录">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+          </svg>
+          <span>历史记录</span>
+        </button>
+      </div>
+    </div>
+    <!-- History panel -->
+    <div v-if="showHistory" class="history-panel">
+      <div class="history-header">
+        <h3>历史对话</h3>
+        <button class="history-close-btn" @click="showHistory = false">&times;</button>
+      </div>
+      <div v-if="historyList.length === 0" class="history-empty">暂无历史记录</div>
+      <div v-else class="history-list">
+        <div
+          v-for="(item, idx) in historyList"
+          :key="item.id"
+          :class="['history-item', currentSessionId === item.id ? 'history-item-active' : '']"
+          @click="loadSession(item.id)"
+        >
+          <div class="history-item-title">{{ item.title }}</div>
+          <div class="history-item-meta">
+            <span>{{ item.count }} 条消息</span>
+            <span>{{ formatTime(item.time) }}</span>
+          </div>
+          <button class="history-delete-btn" @click.stop="deleteSession(item.id)" title="删除">&times;</button>
+        </div>
+      </div>
+      <div v-if="historyList.length > 0" class="history-footer">
+        <button class="history-clear-btn" @click="clearAllHistory">清空所有记录</button>
+      </div>
+    </div>
     <div class="chat-messages" ref="messagesContainer">
       <div v-if="messages.length === 0" class="chat-welcome">
         <img src="/logo.png" alt="logo" class="welcome-logo" />
@@ -217,6 +261,9 @@ export default {
       messages: [],
       isLoading: false,
       config: null,
+      showHistory: false,
+      historyList: [],
+      currentSessionId: null,
       suggestedQuestions: [
         '什么是地月空间？',
         'CR3BP 模型是什么？',
@@ -227,8 +274,116 @@ export default {
   },
   async mounted() {
     await this.loadConfig()
+    this.loadHistoryList()
+    // Start or resume the latest session
+    if (this.historyList.length > 0) {
+      this.loadSession(this.historyList[0].id)
+    } else {
+      this.createSession()
+    }
+  },
+  watch: {
+    messages: {
+      deep: true,
+      handler() {
+        this.saveCurrentSession()
+      }
+    }
   },
   methods: {
+    // --- Session / History ---
+    createSession() {
+      this.currentSessionId = 'chat_' + Date.now()
+      this.messages = []
+    },
+
+    saveCurrentSession() {
+      if (!this.currentSessionId || this.messages.length === 0) return
+      var firstUserMsg = this.messages.find(function(m) { return m.role === 'user' })
+      var title = firstUserMsg ? firstUserMsg.content.slice(0, 30) : '新对话'
+      var session = {
+        id: this.currentSessionId,
+        title: title,
+        messages: this.messages,
+        time: Date.now(),
+        count: this.messages.length
+      }
+      try {
+        localStorage.setItem(this.currentSessionId, JSON.stringify(session))
+        this.loadHistoryList()
+      } catch (e) { /* localStorage full or unavailable */ }
+    },
+
+    loadHistoryList() {
+      var list = []
+      try {
+        for (var i = 0; i < localStorage.length; i++) {
+          var key = localStorage.key(i)
+          if (key && key.indexOf('chat_') === 0) {
+            var raw = localStorage.getItem(key)
+            if (raw) {
+              var parsed = JSON.parse(raw)
+              list.push({ id: parsed.id, title: parsed.title, time: parsed.time, count: parsed.count })
+            }
+          }
+        }
+      } catch (e) { /* ignore */ }
+      list.sort(function(a, b) { return b.time - a.time })
+      this.historyList = list
+    },
+
+    loadSession(id) {
+      try {
+        var raw = localStorage.getItem(id)
+        if (raw) {
+          var session = JSON.parse(raw)
+          this.currentSessionId = session.id
+          this.messages = session.messages || []
+          this.showHistory = false
+          this.scrollToBottom()
+        }
+      } catch (e) { /* ignore */ }
+    },
+
+    deleteSession(id) {
+      try { localStorage.removeItem(id) } catch (e) { /* ignore */ }
+      if (this.currentSessionId === id) {
+        this.createSession()
+      }
+      this.loadHistoryList()
+    },
+
+    clearAllHistory() {
+      var keys = []
+      try {
+        for (var i = 0; i < localStorage.length; i++) {
+          var key = localStorage.key(i)
+          if (key && key.indexOf('chat_') === 0) keys.push(key)
+        }
+        for (var k = 0; k < keys.length; k++) localStorage.removeItem(keys[k])
+      } catch (e) { /* ignore */ }
+      this.createSession()
+      this.loadHistoryList()
+    },
+
+    startNewChat() {
+      this.saveCurrentSession()
+      this.createSession()
+      this.showHistory = false
+      this.scrollToBottom()
+    },
+
+    formatTime(ts) {
+      if (!ts) return ''
+      var d = new Date(ts)
+      var mm = d.getMonth() + 1
+      var dd = d.getDate()
+      var hh = d.getHours()
+      var mi = d.getMinutes()
+      return mm + '/' + dd + ' ' + (hh < 10 ? '0' : '') + hh + ':' + (mi < 10 ? '0' : '') + mi
+    },
+
+    // --- Config ---
     async loadConfig() {
       try {
         const url = this.$withBase
@@ -466,6 +621,183 @@ export default {
   border-radius: 12px;
   overflow: hidden;
   background: #fff;
+  position: relative;
+}
+
+/* Toolbar */
+.chat-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+  flex-shrink: 0;
+}
+
+.toolbar-title {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #2d3748;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #4a5568;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.toolbar-btn:hover {
+  background: #f7fafc;
+  border-color: #3eaf7c;
+  color: #3eaf7c;
+}
+
+/* History panel */
+.history-panel {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  width: 320px;
+  max-height: calc(100% - 44px);
+  background: #fff;
+  border-left: 1px solid #e2e8f0;
+  box-shadow: -4px 0 12px rgba(0,0,0,0.08);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.history-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #2d3748;
+  border-bottom: none;
+}
+
+.history-close-btn {
+  border: none;
+  background: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  color: #a0aec0;
+  line-height: 1;
+  padding: 0 0.2rem;
+}
+
+.history-close-btn:hover {
+  color: #e53e3e;
+}
+
+.history-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #a0aec0;
+  font-size: 0.9rem;
+}
+
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem 0;
+}
+
+.history-item {
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.history-item:hover {
+  background: #f7fafc;
+}
+
+.history-item-active {
+  background: #f0faf5;
+  border-left: 3px solid #3eaf7c;
+}
+
+.history-item-title {
+  font-size: 0.9rem;
+  color: #2d3748;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 1.5rem;
+}
+
+.history-item-meta {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #a0aec0;
+  margin-top: 0.2rem;
+}
+
+.history-delete-btn {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: none;
+  font-size: 1.2rem;
+  color: #cbd5e0;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s;
+  padding: 0 0.3rem;
+}
+
+.history-item:hover .history-delete-btn {
+  opacity: 1;
+}
+
+.history-delete-btn:hover {
+  color: #e53e3e;
+}
+
+.history-footer {
+  padding: 0.5rem 1rem;
+  border-top: 1px solid #e2e8f0;
+  text-align: center;
+}
+
+.history-clear-btn {
+  border: none;
+  background: none;
+  color: #e53e3e;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.3rem 0.6rem;
+}
+
+.history-clear-btn:hover {
+  text-decoration: underline;
 }
 
 .chat-messages {
@@ -783,6 +1115,13 @@ export default {
   }
   .message-content {
     max-width: 85%;
+  }
+  .toolbar-btn span {
+    display: none;
+  }
+  .history-panel {
+    width: 100%;
+    border-left: none;
   }
 }
 </style>
