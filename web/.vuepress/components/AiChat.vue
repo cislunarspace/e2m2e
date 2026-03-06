@@ -2,29 +2,29 @@
   <div class="ai-chat-container">
     <!-- Toolbar -->
     <div class="chat-toolbar">
-      <div class="toolbar-title">AI 问答助手</div>
+      <div class="toolbar-title">{{ t('toolbarTitle') }}</div>
       <div class="toolbar-actions">
-        <button class="toolbar-btn" @click="startNewChat" title="新对话">
+        <button class="toolbar-btn" @click="startNewChat" :title="t('newChat')">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 5v14M5 12h14"/>
           </svg>
-          <span>新对话</span>
+          <span>{{ t('newChat') }}</span>
         </button>
-        <button class="toolbar-btn" @click="showHistory = !showHistory" title="历史记录">
+        <button class="toolbar-btn" @click="showHistory = !showHistory" :title="t('history')">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
           </svg>
-          <span>历史记录</span>
+          <span>{{ t('history') }}</span>
         </button>
       </div>
     </div>
     <!-- History panel -->
     <div v-if="showHistory" class="history-panel">
       <div class="history-header">
-        <h3>历史对话</h3>
+        <h3>{{ t('historyTitle') }}</h3>
         <button class="history-close-btn" @click="showHistory = false">&times;</button>
       </div>
-      <div v-if="historyList.length === 0" class="history-empty">暂无历史记录</div>
+      <div v-if="historyList.length === 0" class="history-empty">{{ t('noHistory') }}</div>
       <div v-else class="history-list">
         <div
           v-for="(item, idx) in historyList"
@@ -34,20 +34,20 @@
         >
           <div class="history-item-title">{{ item.title }}</div>
           <div class="history-item-meta">
-            <span>{{ item.count }} 条消息</span>
+            <span>{{ item.count }} {{ t('messages') }}</span>
             <span>{{ formatTime(item.time) }}</span>
           </div>
-          <button class="history-delete-btn" @click.stop="deleteSession(item.id)" title="删除">&times;</button>
+          <button class="history-delete-btn" @click.stop="deleteSession(item.id)" :title="t('delete')">&times;</button>
         </div>
       </div>
       <div v-if="historyList.length > 0" class="history-footer">
-        <button class="history-clear-btn" @click="clearAllHistory">清空所有记录</button>
+        <button class="history-clear-btn" @click="clearAllHistory">{{ t('clearAll') }}</button>
       </div>
     </div>
     <div class="chat-messages" ref="messagesContainer">
       <div v-if="messages.length === 0" class="chat-welcome">
-        <h2>地月空间 AI 问答助手</h2>
-        <p>你好！我是地月空间入门指南的 AI 助手，可以回答关于地月空间、轨道动力学、航天器导航等方面的问题。</p>
+        <h2>{{ t('welcomeTitle') }}</h2>
+        <p>{{ t('welcomeDesc') }}</p>
         <div class="suggested-questions">
           <button
             v-for="(q, i) in suggestedQuestions"
@@ -79,7 +79,7 @@
       <textarea
         v-model="userInput"
         @keydown.enter.exact="handleEnter"
-        placeholder="输入你的问题..."
+        :placeholder="t('inputPlaceholder')"
         rows="1"
         ref="inputArea"
         :disabled="isLoading"
@@ -264,15 +264,28 @@ export default {
       historyList: [],
       currentSessionId: null,
       abortController: null,
-      suggestedQuestions: [
-        '什么是地月空间？',
-        'CR3BP 模型是什么？',
-        'NRHO 轨道有哪些特点？',
-        '拉格朗日点有什么用途？'
-      ]
+      suggestedQuestions: []
+    }
+  },
+  computed: {
+    isEn() {
+      return (this.$localePath || '/') === '/en/'
     }
   },
   async mounted() {
+    this.suggestedQuestions = this.isEn
+      ? [
+          'What is cislunar space?',
+          'What is the CR3BP model?',
+          'What are the characteristics of NRHO orbits?',
+          'What are the uses of Lagrange points?'
+        ]
+      : [
+          '什么是地月空间？',
+          'CR3BP 模型是什么？',
+          'NRHO 轨道有哪些特点？',
+          '拉格朗日点有什么用途？'
+        ]
     await this.loadConfig()
     this.loadHistoryList()
     // Start or resume the latest session
@@ -291,6 +304,29 @@ export default {
     }
   },
   methods: {
+    // --- i18n helper ---
+    t(key) {
+      var strings = {
+        toolbarTitle: { zh: 'AI 问答助手', en: 'AI Chat Assistant' },
+        newChat: { zh: '新对话', en: 'New Chat' },
+        history: { zh: '历史记录', en: 'History' },
+        historyTitle: { zh: '历史对话', en: 'Chat History' },
+        noHistory: { zh: '暂无历史记录', en: 'No history yet' },
+        messages: { zh: '条消息', en: 'messages' },
+        delete: { zh: '删除', en: 'Delete' },
+        clearAll: { zh: '清空所有记录', en: 'Clear All' },
+        welcomeTitle: { zh: '地月空间 AI 问答助手', en: 'Cislunar Space AI Assistant' },
+        welcomeDesc: {
+          zh: '你好！我是地月空间入门指南的 AI 助手，可以回答关于地月空间、轨道动力学、航天器导航等方面的问题。',
+          en: 'Hello! I am the AI assistant for the Cislunar Space Beginner\'s Guide. I can answer questions about cislunar space, orbital dynamics, spacecraft navigation, and more.'
+        },
+        inputPlaceholder: { zh: '输入你的问题...', en: 'Type your question...' }
+      }
+      var item = strings[key]
+      if (!item) return key
+      return this.isEn ? item.en : item.zh
+    },
+
     // --- Session / History ---
     createSession() {
       this.currentSessionId = 'chat_' + Date.now()
@@ -300,7 +336,7 @@ export default {
     saveCurrentSession() {
       if (!this.currentSessionId || this.messages.length === 0) return
       var firstUserMsg = this.messages.find(function(m) { return m.role === 'user' })
-      var title = firstUserMsg ? firstUserMsg.content.slice(0, 30) : '新对话'
+      var title = firstUserMsg ? firstUserMsg.content.slice(0, 30) : (this.isEn ? 'New Chat' : '新对话')
       var session = {
         id: this.currentSessionId,
         title: title,
@@ -509,7 +545,9 @@ export default {
       if (!this.config) {
         this.messages.push({
           role: 'assistant',
-          content: '⚠️ AI 配置加载失败，请联系管理员检查 `/ai-chat-config.json` 配置文件。'
+          content: this.isEn
+            ? '⚠️ AI configuration failed to load. Please contact the administrator to check the `/ai-chat-config.json` file.'
+            : '⚠️ AI 配置加载失败，请联系管理员检查 `/ai-chat-config.json` 配置文件。'
         })
         return
       }
@@ -561,7 +599,7 @@ export default {
         })
 
         if (!response.ok) {
-          throw new Error(`API 请求失败: ${response.status} ${response.statusText}`)
+          throw new Error(this.isEn ? `API request failed: ${response.status} ${response.statusText}` : `API 请求失败: ${response.status} ${response.statusText}`)
         }
 
         if (this.config.stream && response.body) {
@@ -608,7 +646,7 @@ export default {
           // Non-streaming response
           const data = await response.json()
           if (this.currentSessionId !== sessionId) return
-          const content = data.choices?.[0]?.message?.content || '抱歉，未获取到有效回复。'
+          const content = data.choices?.[0]?.message?.content || (this.isEn ? 'Sorry, no valid response received.' : '抱歉，未获取到有效回复。')
           this.messages.push({ role: 'assistant', content })
         }
       } catch (error) {
@@ -616,7 +654,7 @@ export default {
         if (this.currentSessionId !== sessionId) return
         this.messages.push({
           role: 'assistant',
-          content: `⚠️ 请求出错: ${error.message}`
+          content: this.isEn ? `⚠️ Request error: ${error.message}` : `⚠️ 请求出错: ${error.message}`
         })
       } finally {
         if (this.currentSessionId === sessionId) {

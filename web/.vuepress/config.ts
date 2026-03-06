@@ -1,6 +1,8 @@
 import { defineConfig } from "vuepress/config";
 import navbar from "./navbar";
+import navbarEn from "./navbar-en";
 import sidebar from "./sidebar";
+import sidebarEn from "./sidebar-en";
 import footer from "./footer";
 import extraSideBar from "./extraSideBar";
 
@@ -9,6 +11,18 @@ const domain = "https://cislunarspace.cn";
 const tags = ["地月空间", "航天", "轨道动力学"];
 
 export default defineConfig({
+  locales: {
+    '/': {
+      lang: 'zh-CN',
+      title: '地月空间入门指南',
+      description: '系统掌握地月空间科学、技术与工程实践',
+    },
+    '/en/': {
+      lang: 'en-US',
+      title: 'Cislunar Space Beginner\'s Guide',
+      description: 'Systematically master cislunar space science, technology, and engineering practice',
+    },
+  },
   title: "地月空间入门指南",
   description: "系统掌握地月空间科学、技术与工程实践",
   head: [
@@ -76,14 +90,14 @@ export default defineConfig({
     ["@vuepress/back-to-top"],
     // latex 数学公式支持
     [
-    "vuepress-plugin-mathjax",
-    {
-      target: "svg", // 输出格式：'svg' 或 'chtml'
-      macros: {
-        // 自定义宏，可选
-        "\\Z": "\\mathbb{Z}",
+      "vuepress-plugin-mathjax",
+      {
+        target: "svg", // 输出格式：'svg' 或 'chtml'
+        macros: {
+          // 自定义宏，可选
+          "\\Z": "\\mathbb{Z}",
+        },
       },
-    },
     ],
     // Google 分析
     [
@@ -171,6 +185,26 @@ export default defineConfig({
     nav: navbar,
     sidebar,
     lastUpdated: "最近更新",
+
+    // i18n locales for theme
+    locales: {
+      '/': {
+        selectText: '语言',
+        label: '简体中文',
+        nav: navbar,
+        sidebar,
+        lastUpdated: '最近更新',
+        editLinkText: '完善页面',
+      },
+      '/en/': {
+        selectText: 'Languages',
+        label: 'English',
+        nav: navbarEn,
+        sidebar: sidebarEn,
+        lastUpdated: 'Last Updated',
+        editLinkText: 'Improve this page',
+      },
+    },
 
     // 微信分享卡片配置（需配合后端签名接口）
     wechatShare: {
