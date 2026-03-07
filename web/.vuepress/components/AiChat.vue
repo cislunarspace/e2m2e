@@ -307,6 +307,10 @@ export default {
     }
   },
   async mounted() {
+    // 先清理旧历史记录
+    this.cleanupOldHistory()
+    
+    // 立即加载建议问题（轻量级）
     this.suggestedQuestions = this.isEn
       ? [
           'What is cislunar space?',
@@ -320,14 +324,23 @@ export default {
           'NRHO 轨道有哪些特点？',
           '拉格朗日点有什么用途？'
         ]
+    
+    // 异步加载配置
     await this.loadConfig()
-    this.loadHistoryList()
-    // Start or resume the latest session
-    if (this.historyList.length > 0) {
-      this.loadSession(this.historyList[0].id)
-    } else {
-      this.createSession()
-    }
+    
+    // 延迟加载历史记录和会话，避免阻塞主线程
+    setTimeout(() => {
+      this.loadHistoryList()
+      
+      // 再延迟加载会话
+      setTimeout(() => {
+        if (this.historyList.length > 0) {
+          this.loadSession(this.historyList[0].id)
+        } else {
+          this.createSession()
+        }
+      }, 100)
+    }, 100)
   },
   watch: {
     messages: {
@@ -413,19 +426,77 @@ export default {
     loadHistoryList() {
       var list = []
       try {
-        for (var i = 0; i < localStorage.length; i++) {
+        // 限制最多检查100个键，避免遍历整个localStorage
+        var maxKeysToCheck = 100
+        var keysChecked = 0
+        
+        for (var i = 0; i < localStorage.length && keysChecked < maxKeysToCheck; i++) {
           var key = localStorage.key(i)
+          keysChecked++
+          
           if (key && key.indexOf('chat_') === 0) {
             var raw = localStorage.getItem(key)
             if (raw) {
-              var parsed = JSON.parse(raw)
-              list.push({ id: parsed.id, title: parsed.title, time: parsed.time, count: parsed.count })
+              try {
+                var parsed = JSON.parse(raw)
+                list.push({ 
+                  id: parsed.id, 
+                  title: parsed.title, 
+                  time: parsed.time, 
+                  count: parsed.count 
+                })
+              } catch (e) {
+                // 解析失败，删除损坏的数据
+                localStorage.removeItem(key)
+              }
             }
           }
         }
       } catch (e) { /* ignore */ }
+      
       list.sort(function(a, b) { return b.time - a.time })
-      this.historyList = list
+      
+      // 限制历史记录显示数量
+      this.historyList = list.slice(0, 50) // 最多显示50条
+    },
+    
+    // 清理旧历史记录
+    cleanupOldHistory() {
+      try {
+        const now = Date.now()
+        const maxAge = 30 * 24 * 60 * 60 * 1000 // 30天
+        const maxSessions = 100 // 最多保留100个会话
+        
+        const sessions = []
+        
+        // 收集所有会话
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && key.indexOf('chat_') === 0) {
+            const raw = localStorage.getItem(key)
+            if (raw) {
+              try {
+                const session = JSON.parse(raw)
+                sessions.push({ key, time: session.time })
+              } catch (e) {
+                localStorage.removeItem(key) // 删除损坏的数据
+              }
+            }
+          }
+        }
+        
+        // 按时间排序
+        sessions.sort((a, b) => b.time - a.time)
+        
+        // 删除过期的会话
+        sessions.forEach((session, index) => {
+          if (now - session.time > maxAge || index >= maxSessions) {
+            localStorage.removeItem(session.key)
+          }
+        })
+      } catch (e) { 
+        console.warn('Failed to cleanup old history:', e)
+      }
     },
 
     loadSession(id) {
@@ -493,30 +564,52 @@ export default {
 
     // --- Config ---
     async loadConfig() {
+      // 检查内存缓存
+      if (window.__aiChatConfigCache) {
+        this.config = sanitizeClientConfig(window.__aiChatConfigCache)
+        this.config.systemPrompt = this.getSystemPrompt()
+        return
+      }
+      
+      // 检查sessionStorage缓存（页面会话期间有效）
+      try {
+        const cached = sessionStorage.getItem('ai_chat_config')
+        if (cached) {
+          const config = JSON.parse(cached)
+          if (Date.now() - (config._timestamp || 0) < 5 * 60 * 1000) { // 5分钟缓存
+            this.config = sanitizeClientConfig(config)
+            this.config.systemPrompt = this.getSystemPrompt()
+            window.__aiChatConfigCache = config
+            return
+          }
+        }
+      } catch (e) { /* ignore */ }
+      
       try {
         const url = this.$withBase
           ? this.$withBase('/ai-chat-config.json')
           : '/ai-chat-config.json'
-        console.log('AI chat config loading from:', url)
+        
         const res = await fetch(url)
-        console.log('AI chat config fetch response:', res.status, res.statusText)
         if (!res.ok) {
-          console.error('AI chat config fetch failed:', res.status, res.statusText, 'URL:', url)
-          // 显示更详细的错误信息
-          this.showConfigError(`配置文件加载失败: ${res.status} ${res.statusText}`)
-          return
+          throw new Error(`HTTP ${res.status}`)
         }
-        const text = await res.text()
-        console.log('AI chat config raw text length:', text.length)
+        
+        const config = sanitizeClientConfig(await res.json())
+        
+        // 缓存配置
+        this.config = config
+        this.config.systemPrompt = this.getSystemPrompt()
+        
+        // 设置内存缓存
+        window.__aiChatConfigCache = config
+        
+        // 设置sessionStorage缓存（带时间戳）
         try {
-          this.config = sanitizeClientConfig(JSON.parse(text))
-          console.log('AI chat config parsed successfully:', this.config)
-          // Override system prompt based on language
-          this.config.systemPrompt = this.getSystemPrompt()
-        } catch (parseErr) {
-          console.error('AI chat config JSON parse error:', parseErr, 'Response:', text.slice(0, 200))
-          this.showConfigError(`配置文件解析错误: ${parseErr.message}`)
-        }
+          config._timestamp = Date.now()
+          sessionStorage.setItem('ai_chat_config', JSON.stringify(config))
+        } catch (e) { /* ignore */ }
+        
       } catch (e) {
         console.error('Failed to load AI chat config:', e)
         this.showConfigError(`配置文件加载异常: ${e.message}`)
