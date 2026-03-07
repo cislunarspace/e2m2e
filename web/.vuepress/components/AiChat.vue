@@ -763,40 +763,56 @@ Based on the website content and your own knowledge, answer user questions about
           this.messages.push({ role: 'assistant', content: '' })
           const assistantIndex = this.messages.length - 1
           const reader = response.body.getReader()
-          const decoder = new TextDecoder()
+          const decoder = new TextDecoder('utf-8')
           let buffer = ''
+          let isFirstChunk = true
 
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            // Stop writing if session has changed
-            if (this.currentSessionId !== sessionId) {
-              reader.cancel()
-              break
-            }
-            buffer += decoder.decode(value, { stream: true })
-            const lines = buffer.split('\n')
-            buffer = lines.pop() || ''
+          try {
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              // Stop writing if session has changed
+              if (this.currentSessionId !== sessionId) {
+                reader.cancel()
+                break
+              }
+              buffer += decoder.decode(value, { stream: true })
+              const lines = buffer.split('\n')
+              buffer = lines.pop() || ''
 
-            for (const line of lines) {
-              const trimmed = line.trim()
-              if (!trimmed || !trimmed.startsWith('data:')) continue
-              const data = trimmed.slice(5).trim()
-              if (data === '[DONE]') continue
-              try {
-                const parsed = JSON.parse(data)
-                const delta = parsed.choices?.[0]?.delta?.content
-                if (delta) {
-                  this.$set(this.messages, assistantIndex, {
-                    role: 'assistant',
-                    content: this.messages[assistantIndex].content + delta
-                  })
-                  this.scrollToBottom()
+              for (const line of lines) {
+                const trimmed = line.trim()
+                if (!trimmed) continue
+                
+                // Handle SSE format
+                if (trimmed.startsWith('data:')) {
+                  const data = trimmed.slice(5).trim()
+                  if (data === '[DONE]') continue
+                  
+                  try {
+                    const parsed = JSON.parse(data)
+                    const delta = parsed.choices?.[0]?.delta?.content
+                    if (delta) {
+                      // 确保内容被正确追加
+                      const currentContent = this.messages[assistantIndex].content
+                      this.messages[assistantIndex].content = currentContent + delta
+                      this.$forceUpdate() // 强制更新视图
+                      this.scrollToBottom()
+                      
+                      // 如果是第一个chunk，稍微延迟以确保渲染
+                      if (isFirstChunk) {
+                        isFirstChunk = false
+                        await new Promise(resolve => setTimeout(resolve, 10))
+                      }
+                    }
+                  } catch (e) {
+                    console.warn('Failed to parse SSE chunk:', e, 'Data:', data)
+                  }
                 }
-              } catch (e) {
-                // skip unparseable chunks
               }
             }
+          } finally {
+            reader.cancel()
           }
         } else {
           // Non-streaming response
@@ -825,7 +841,11 @@ Based on the website content and your own knowledge, answer user questions about
       this.$nextTick(() => {
         const container = this.$refs.messagesContainer
         if (container) {
-          container.scrollTop = container.scrollHeight
+          // 使用平滑滚动
+          container.scrollTo({
+            top: container.scrollHeight,
+            behavior: 'smooth'
+          })
         }
       })
     }
