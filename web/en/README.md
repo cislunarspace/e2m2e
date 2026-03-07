@@ -37,7 +37,7 @@ twitter:
 You are welcome to submit new entries, revision suggestions, or other contributions through the [Gitee Repository](https://gitee.com/cislunarspace/cislunarspace/) or [GitHub Repository](https://github.com/cislunarspace/cislunarspace/), and help us improve this cislunar space knowledge base together.
 
 <div style="text-align: center; margin: 40px 0;">
-  <a href="/en/what-is-cislunarspace/" class="start-learning-btn" style="
+  <a href="/en/ai-chat" class="start-learning-btn" style="
     display: inline-block;
     padding: 15px 30px;
     background-color: #3eaf7c;
@@ -49,7 +49,7 @@ You are welcome to submit new entries, revision suggestions, or other contributi
     transition: all 0.3s ease;
     box-shadow: 0 4px 6px rgba(62, 175, 124, 0.2);
   ">
-    Start Learning →
+    Start AI Q&A →
   </a>
 </div>
 
