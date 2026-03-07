@@ -61,6 +61,9 @@
 </template>
 
 <script>
+import katex from 'katex'
+import 'katex/dist/katex.min.css'
+
 import sidebarConfig from '../sidebar.ts'
 import sidebarConfigEn from '../sidebar-en.ts'
 
@@ -158,12 +161,54 @@ function escapeHtml(text) {
     .replace(/"/g, '&quot;')
 }
 
-function renderLinkedHtml(text) {
+function renderKatex(text) {
+  const placeholders = []
+  let nextText = String(text || '')
+
+  function pushPlaceholder(source, displayMode) {
+    const id = placeholders.length
+
+    try {
+      placeholders.push(katex.renderToString(source.trim(), { displayMode, throwOnError: false }))
+    } catch (error) {
+      placeholders.push(escapeHtml(source))
+    }
+
+    return `%%KATEX_${id}%%`
+  }
+
+  nextText = nextText.replace(/\$\$([\s\S]+?)\$\$/g, function(_, source) {
+    return pushPlaceholder(source, true)
+  })
+
+  nextText = nextText.replace(/\\\[([\s\S]+?)\\\]/g, function(_, source) {
+    return pushPlaceholder(source, true)
+  })
+
+  nextText = nextText.replace(/\\\(([\s\S]+?)\\\)/g, function(_, source) {
+    return pushPlaceholder(source, false)
+  })
+
+  nextText = nextText.replace(/(^|[^\\$])\$([^$\n]+)\$/g, function(_, prefix, source) {
+    return prefix + pushPlaceholder(source, false)
+  })
+
+  return {
+    text: nextText,
+    placeholders
+  }
+}
+
+function renderInlineMarkdown(text, placeholders) {
   let html = escapeHtml(text)
 
   html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|\/[A-Za-z0-9\-_/]+\/?(?:#[A-Za-z0-9\-_]+)?)\)/g, function(_, label, href) {
     return `<a href="${href}" class="chat-link">${label}</a>`
   })
+
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+  html = html.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>')
+  html = html.replace(/(^|[^_])_([^_\n]+)_(?!_)/g, '$1<em>$2</em>')
 
   html = html.replace(/(^|\s)(https?:\/\/[^\s<]+)/g, function(_, prefix, href) {
     return `${prefix}<a href="${href}" class="chat-link">${href}</a>`
@@ -173,7 +218,34 @@ function renderLinkedHtml(text) {
     return `${prefix}<a href="${href}" class="chat-link">${href}</a>`
   })
 
-  return html.replace(/\n/g, '<br>')
+  html = html.replace(/%%KATEX_(\d+)%%/g, function(_, id) {
+    return placeholders[Number(id)] || ''
+  })
+
+  return html
+}
+
+function renderLinkedHtml(text) {
+  const katexResult = renderKatex(text)
+  const lines = katexResult.text.split('\n')
+  const html = []
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+
+    if (!trimmed) continue
+
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/)
+    if (headingMatch) {
+      const level = headingMatch[1].length
+      html.push(`<h${level}>${renderInlineMarkdown(headingMatch[2], katexResult.placeholders)}</h${level}>`)
+      continue
+    }
+
+    html.push(`<p>${renderInlineMarkdown(line, katexResult.placeholders)}</p>`)
+  }
+
+  return html.join('')
 }
 
 const zhSidebarEntries = buildSidebarEntries(sidebarConfig)
@@ -272,8 +344,8 @@ export default {
         : [
             '什么是地月空间？',
             'CR3BP 模型是什么？',
-            'NRHO 轨道有哪些特点？',
-            '拉格朗日点有什么用途？'
+            '有谁在研究地月空间？',
+            '地月空间研究前沿是什么？'
           ]
     },
 
@@ -588,6 +660,48 @@ export default {
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.assistant-message .message-content {
+  white-space: normal;
+}
+
+.assistant-message .message-content ::v-deep p {
+  margin: 0 0 0.75rem;
+}
+
+.assistant-message .message-content ::v-deep p:last-child {
+  margin-bottom: 0;
+}
+
+.assistant-message .message-content ::v-deep h1,
+.assistant-message .message-content ::v-deep h2,
+.assistant-message .message-content ::v-deep h3,
+.assistant-message .message-content ::v-deep h4,
+.assistant-message .message-content ::v-deep h5,
+.assistant-message .message-content ::v-deep h6 {
+  margin: 0 0 0.75rem;
+  color: #0f172a;
+  border-bottom: none;
+  line-height: 1.35;
+}
+
+.assistant-message .message-content ::v-deep h1 { font-size: 1.4rem; }
+.assistant-message .message-content ::v-deep h2 { font-size: 1.25rem; }
+.assistant-message .message-content ::v-deep h3 { font-size: 1.1rem; }
+
+.assistant-message .message-content ::v-deep strong {
+  font-weight: 700;
+}
+
+.assistant-message .message-content ::v-deep em {
+  font-style: italic;
+}
+
+.assistant-message .message-content ::v-deep .katex-display {
+  margin: 0.85rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .user-message .message-content {
