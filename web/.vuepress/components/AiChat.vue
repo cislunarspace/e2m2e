@@ -309,7 +309,11 @@ export default {
       saveSessionTimer: null,
       pendingHistoryRefresh: false,
       streamRenderTimer: null,
-      pendingStreamRender: null
+      pendingStreamRender: null,
+      historyLoadTimer: null,
+      sessionLoadTimer: null,
+      pageShowHandler: null,
+      pageHideHandler: null
     }
   },
   computed: {
@@ -320,38 +324,24 @@ export default {
   async mounted() {
     // 先清理旧历史记录
     this.cleanupOldHistory()
+
+    this.pageShowHandler = (event) => {
+      this.handlePageShow(event)
+    }
+    this.pageHideHandler = () => {
+      this.handlePageHide()
+    }
+
+    window.addEventListener('pageshow', this.pageShowHandler)
+    window.addEventListener('pagehide', this.pageHideHandler)
     
     // 立即加载建议问题（轻量级）
-    this.suggestedQuestions = this.isEn
-      ? [
-          'What is cislunar space?',
-          'What is the CR3BP model?',
-          'What are the characteristics of NRHO orbits?',
-          'What are the uses of Lagrange points?'
-        ]
-      : [
-          '什么是地月空间？',
-          'CR3BP 模型是什么？',
-          'NRHO 轨道有哪些特点？',
-          '拉格朗日点有什么用途？'
-        ]
+    this.updateSuggestedQuestions(this.isEn)
     
     // 异步加载配置
     await this.loadConfig()
-    
-    // 延迟加载历史记录和会话，避免阻塞主线程
-    setTimeout(() => {
-      this.loadHistoryList()
-      
-      // 再延迟加载会话
-      setTimeout(() => {
-        if (this.historyList.length > 0) {
-          this.loadSession(this.historyList[0].id)
-        } else {
-          this.createSession()
-        }
-      }, 100)
-    }, 100)
+
+    this.scheduleInitialSessionLoad()
   },
   watch: {
     isEn: {
@@ -359,19 +349,7 @@ export default {
       handler(newVal, oldVal) {
         if (newVal !== oldVal) {
           // Update suggested questions when language changes
-          this.suggestedQuestions = newVal
-            ? [
-                'What is cislunar space?',
-                'What is the CR3BP model?',
-                'What are the characteristics of NRHO orbits?',
-                'What are the uses of Lagrange points?'
-              ]
-            : [
-                '什么是地月空间？',
-                'CR3BP 模型是什么？',
-                'NRHO 轨道有哪些特点？',
-                '拉格朗日点有什么用途？'
-              ]
+          this.updateSuggestedQuestions(newVal)
           
           // Update system prompt when language changes
           if (this.config) {
@@ -382,10 +360,106 @@ export default {
     }
   },
   beforeDestroy() {
+    if (this.pageShowHandler) {
+      window.removeEventListener('pageshow', this.pageShowHandler)
+      this.pageShowHandler = null
+    }
+    if (this.pageHideHandler) {
+      window.removeEventListener('pagehide', this.pageHideHandler)
+      this.pageHideHandler = null
+    }
+    this.abortActiveRequest()
+    this.clearInitializationTimers()
     this.flushPendingSessionSave()
     this.clearPendingRenderWork()
   },
   methods: {
+    updateSuggestedQuestions(isEn) {
+      this.suggestedQuestions = isEn
+        ? [
+            'What is cislunar space?',
+            'What is the CR3BP model?',
+            'What are the characteristics of NRHO orbits?',
+            'What are the uses of Lagrange points?'
+          ]
+        : [
+            '什么是地月空间？',
+            'CR3BP 模型是什么？',
+            'NRHO 轨道有哪些特点？',
+            '拉格朗日点有什么用途？'
+          ]
+    },
+
+    clearInitializationTimers() {
+      if (this.historyLoadTimer) {
+        clearTimeout(this.historyLoadTimer)
+        this.historyLoadTimer = null
+      }
+
+      if (this.sessionLoadTimer) {
+        clearTimeout(this.sessionLoadTimer)
+        this.sessionLoadTimer = null
+      }
+    },
+
+    scheduleInitialSessionLoad() {
+      this.clearInitializationTimers()
+
+      this.historyLoadTimer = setTimeout(() => {
+        this.historyLoadTimer = null
+        this.loadHistoryList()
+
+        this.sessionLoadTimer = setTimeout(() => {
+          this.sessionLoadTimer = null
+
+          if (this.currentSessionId && this.messages.length > 0) {
+            return
+          }
+
+          if (this.historyList.length > 0) {
+            this.loadSession(this.historyList[0].id)
+          } else if (!this.currentSessionId) {
+            this.createSession()
+          }
+        }, 100)
+      }, 100)
+    },
+
+    abortActiveRequest() {
+      if (this.abortController) {
+        this.abortController.abort()
+        this.abortController = null
+      }
+
+      this.isLoading = false
+    },
+
+    handlePageHide() {
+      this.abortActiveRequest()
+      this.flushPendingSessionSave()
+      this.clearPendingRenderWork()
+      this.clearInitializationTimers()
+    },
+
+    async handlePageShow(event) {
+      if (!event || !event.persisted) return
+
+      this.abortActiveRequest()
+      this.clearPendingRenderWork()
+
+      if (!this.config) {
+        await this.loadConfig()
+      }
+
+      if (!this.currentSessionId) {
+        this.scheduleInitialSessionLoad()
+        return
+      }
+
+      this.renderedContent = this.messages.map((msg) => this.renderMarkdownSync(msg.content))
+      this.scrollToBottom('auto')
+    },
+
     // --- i18n helper ---
     t(key) {
       var strings = {
