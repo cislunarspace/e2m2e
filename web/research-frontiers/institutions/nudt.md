@@ -28,7 +28,9 @@ twitter:
 >
 > 本站地址：[https://cislunarspace.cn](https://cislunarspace.cn)
 
-# 国防科技大学空天科学学院
+# 国防科技大学
+
+![国防科技大学logo-横版组合-彩色](/research-frontiers/institutions/国防科技大学logo-横版组合-彩色.png)
 
 ## 杨乐平
 

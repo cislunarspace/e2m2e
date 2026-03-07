@@ -53,7 +53,7 @@
   - 优化：地月空间科学研究前沿与热点方向分析
   - 关键词：地月空间研究，科学前沿，热点方向
 
-- **研究方向** (`/research-frontiers/directions.md`)
+- **研究方向** (`/research-frontiers/directions/README.md`)
   - 当前：研究方向
   - 优化：地月空间主要研究方向与技术挑战解析
   - 关键词：地月空间研究方向，技术挑战，研究领域
