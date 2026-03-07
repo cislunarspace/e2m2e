@@ -10,17 +10,6 @@ const mainSidebar = [
         ]
     },
     {
-        title: "地月空间飞行器运行轨道",
-        collapsable: true,
-        children: [
-            ["/cislunar-orbits/", "引言"],
-            // ["/cislunar-orbits/transfer-orbit", "地月间转移轨道"],
-            // ["/cislunar-orbits/near-moon-orbit", "近月轨道"],
-            // ["/cislunar-orbits/collinear-libration-point-orbit", "共线平动点轨道"],
-            // ["/cislunar-orbits/triangular-libration-point-orbit", "三角平动点轨道"]
-        ]
-    },
-    {
         title: "地月空间科学研究前沿",
         collapsable: true,
         children: [
@@ -44,11 +33,23 @@ const mainSidebar = [
                     ["/research-frontiers/institutions/nudt", "国防科技大学空天科学学院"],
                     ["/research-frontiers/institutions/npu", "西北工业大学航天学院"],
                     ["/research-frontiers/institutions/seu", "航天工程大学"],
-                    ["/research-frontiers/institutions/dfhscl", "航天东方红卫星有限公司"]
+                    ["/research-frontiers/institutions/dfhscl", "航天东方红卫星有限公司"],
+                    ["/research-frontiers/institutions/thu", "清华大学"],
                 ]
             },
             ["/research-frontiers/journals-conferences", "期刊会议"],
             ["/research-frontiers/major-projects", "重大项目"],
+        ]
+    },
+    {
+        title: "地月空间飞行器运行轨道",
+        collapsable: true,
+        children: [
+            ["/cislunar-orbits/", "引言"],
+            // ["/cislunar-orbits/transfer-orbit", "地月间转移轨道"],
+            // ["/cislunar-orbits/near-moon-orbit", "近月轨道"],
+            // ["/cislunar-orbits/collinear-libration-point-orbit", "共线平动点轨道"],
+            // ["/cislunar-orbits/triangular-libration-point-orbit", "三角平动点轨道"]
         ]
     },
 ];
@@ -72,7 +73,7 @@ const resourcesToolsSidebar = [
         title: "资源与工具",
         collapsable: false,
         children: [
-            ["/resources-tools/", "概述"],
+            ["/resources-tools/", "引言"],
             ["/resources-tools/datasets", "数据集"],
         ]
     }
