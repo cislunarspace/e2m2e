@@ -28,7 +28,17 @@ const mainSidebar = [
         children: [
             ["/research-frontiers/", "引言"],
             ["/research-frontiers/directions", "研究方向"],
-            ["/research-frontiers/institutions", "研究机构和组织"],
+            {
+                title: "研究机构和组织",
+                path: "/research-frontiers/institutions/",
+                collapsable: true,
+                children: [
+                    ["/research-frontiers/institutions/nudt", "国防科技大学空天科学学院"],
+                    ["/research-frontiers/institutions/npu", "西北工业大学航天学院"],
+                    ["/research-frontiers/institutions/seu", "航天工程大学"],
+                    ["/research-frontiers/institutions/dfhscl", "航天东方红卫星有限公司"]
+                ]
+            },
             ["/research-frontiers/journals-conferences", "期刊会议"],
             ["/research-frontiers/major-projects", "重大项目"],
         ]

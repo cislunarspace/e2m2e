@@ -58,7 +58,7 @@
   - 优化：地月空间主要研究方向与技术挑战解析
   - 关键词：地月空间研究方向，技术挑战，研究领域
 
-- **研究机构** (`/research-frontiers/institutions.md`)
+- **研究机构** (`/research-frontiers/institutions/README.md`)
   - 当前：研究机构
   - 优化：全球地月空间研究机构与实验室介绍
   - 关键词：地月空间研究机构，实验室，全球研究机构
