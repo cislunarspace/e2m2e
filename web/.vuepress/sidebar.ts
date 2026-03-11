@@ -22,7 +22,15 @@ const mainSidebar = [
                     ["/research-frontiers/directions/strategy", "地月空间战略"],
                     ["/research-frontiers/directions/low-energy-transfer", "地月空间低能转移轨道"],
                     ["/research-frontiers/directions/orbit-characterization", "地月空间轨道参数表征"],
-                    ["/research-frontiers/directions/simulation-systems", "地月空间仿真系统设计"]
+                    ["/research-frontiers/directions/simulation-systems", "地月空间仿真系统设计"],
+                    {
+                        title:"地月空间轨道博弈",
+                        path: "/research-frontiers/directions/orbital-game/",
+                        collapsable: true,
+                        children: [
+                            ["/research-frontiers/directions/orbital-game/orbital-game-inspection", "地月空间轨道博弈"],
+                        ]
+                    },
                 ]
             },
             {
