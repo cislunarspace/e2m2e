@@ -124,9 +124,7 @@ def detect_naff(
     t = np.asarray(times, dtype=float).ravel()
     y = np.asarray(data, dtype=float).ravel()
     if t.shape != y.shape:
-        raise ValueError(
-            f"times 与 data 形状不一致：times={t.shape} data={y.shape}"
-        )
+        raise ValueError(f"times 与 data 形状不一致：times={t.shape} data={y.shape}")
     if t.size < 2:
         raise ValueError("时间序列至少需要 2 个采样点")
     dt = float(np.mean(np.diff(t)))
@@ -241,9 +239,7 @@ def fft_extract(
     t = np.asarray(times, dtype=float).ravel()
     y = np.asarray(data, dtype=float).ravel()
     if t.shape != y.shape:
-        raise ValueError(
-            f"times 与 data 形状不一致：times={t.shape} data={y.shape}"
-        )
+        raise ValueError(f"times 与 data 形状不一致：times={t.shape} data={y.shape}")
     n = int(t.size)
     if n < 4:
         return []
@@ -460,9 +456,7 @@ def least_squares_sin_cos_fit(
     y = np.asarray(data, dtype=float).ravel()
     w = np.asarray(frequencies, dtype=float).ravel()
     if t.shape != y.shape:
-        raise ValueError(
-            f"times 与 data 形状不一致：times={t.shape} data={y.shape}"
-        )
+        raise ValueError(f"times 与 data 形状不一致：times={t.shape} data={y.shape}")
     if w.size == 0 or t.size == 0:
         return []
 
@@ -472,7 +466,7 @@ def least_squares_sin_cos_fit(
     components: list[FFTComponent] = []
     for omega in w:
         if abs(omega) < 1e-14:
-            mean_val = float(np.mean(data))
+            mean_val = float(np.mean(np.asarray(data, dtype=float)))
             components.append(
                 FFTComponent(
                     freq=0.0,
@@ -494,9 +488,7 @@ def least_squares_sin_cos_fit(
         b2 = float(np.dot(s_cos, y))
         det = a11 * a22 - a12 * a12
         if abs(det) < 1e-30:
-            components.append(
-                FFTComponent(freq=float(omega), amp_s=0.0, amp_c=0.0, amp=0.0)
-            )
+            components.append(FFTComponent(freq=float(omega), amp_s=0.0, amp_c=0.0, amp=0.0))
             continue
         amp_s = (a22 * b1 - a12 * b2) / det
         amp_c = (a11 * b2 - a12 * b1) / det

@@ -246,15 +246,15 @@ def test_reconstruct_derivative_matches_analytical():
     components = [
         FFTComponent(freq=omega, amp_s=0.3, amp_c=0.4),
     ]
-    expected = -0.3 * omega * np.sin(omega * t) - 0.4 * omega * np.sin(omega * t) * 0.0 + (
-        0.3 * omega * np.cos(omega * t) - 0.4 * omega * np.sin(omega * t)
+    expected = (
+        -0.3 * omega * np.sin(omega * t)
+        - 0.4 * omega * np.sin(omega * t) * 0.0
+        + (0.3 * omega * np.cos(omega * t) - 0.4 * omega * np.sin(omega * t))
     )
     # 重写 expected = s·ω·cos − c·ω·sin
     s, c = 0.3, 0.4
     expected = s * omega * np.cos(omega * t) - c * omega * np.sin(omega * t)
-    np.testing.assert_allclose(
-        reconstruct_derivative(t, components), expected, atol=1e-12
-    )
+    np.testing.assert_allclose(reconstruct_derivative(t, components), expected, atol=1e-12)
 
 
 # ---------------------------------------------------------------------------

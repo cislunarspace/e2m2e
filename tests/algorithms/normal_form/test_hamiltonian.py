@@ -124,9 +124,7 @@ def test_build_hamiltonian_powers_match_coefficients(l1_hamiltonian):
     """幂次向量数组与系数 dict 一一对应。"""
     assert l1_hamiltonian.n_terms == len(l1_hamiltonian.coefficients)
     keys_in_dict = set(l1_hamiltonian.coefficients.keys())
-    keys_in_array = {
-        tuple(int(p) for p in row) for row in l1_hamiltonian.powers
-    }
+    keys_in_array = {tuple(int(p) for p in row) for row in l1_hamiltonian.powers}
     assert keys_in_dict == keys_in_array
 
 
@@ -147,8 +145,13 @@ def test_build_hamiltonian_sources_are_recorded(l1_hamiltonian):
     """``store_sources=True`` 时输出含 6 块组成的诊断 dict。"""
     sources = l1_hamiltonian.sources
     expected_keys = {
-        "force", "kinetic", "coriolis", "centrifugal",
-        "pot_earth", "pot_moon", "pot_sun",
+        "force",
+        "kinetic",
+        "coriolis",
+        "centrifugal",
+        "pot_earth",
+        "pot_moon",
+        "pot_sun",
     }
     assert expected_keys.issubset(set(sources.keys()))
 
@@ -167,12 +170,27 @@ def test_hamiltonian_contains_kinetic_diagonal_terms(l1_hamiltonian):
 def test_dynamic_param_names_cover_eval_params_keys():
     """动态参数名集合至少包含 Eval_expr 主要项。"""
     needed = {
-        "Cpq1", "Cpq5", "Cqq5",
-        "f1", "f2", "f3",
-        "rex", "rey", "rez", "re0",
-        "rmx", "rmy", "rmz", "rm0",
-        "rsx", "rsy", "rsz", "rs0",
-        "mu_e", "mu_m", "mu_s",
+        "Cpq1",
+        "Cpq5",
+        "Cqq5",
+        "f1",
+        "f2",
+        "f3",
+        "rex",
+        "rey",
+        "rez",
+        "re0",
+        "rmx",
+        "rmy",
+        "rmz",
+        "rm0",
+        "rsx",
+        "rsy",
+        "rsz",
+        "rs0",
+        "mu_e",
+        "mu_m",
+        "mu_s",
     }
     assert needed.issubset(set(DYNAMIC_PARAM_NAMES))
 
@@ -201,9 +219,7 @@ def test_evaluate_hamiltonian_runs(spice_loaded, l1_hamiltonian, l1_context):
 
 
 @requires_spice
-def test_hamiltonian_constant_term_matches_qiao_value(
-    spice_loaded, l1_hamiltonian, l1_context
-):
+def test_hamiltonian_constant_term_matches_qiao_value(spice_loaded, l1_hamiltonian, l1_context):
     """L1 Hamilton 常数项与 qiao ``L1_EM_Hamilton.mat`` 在 t=0 一致。"""
     times = np.array([0.0])
     h0 = hamiltonian_constant_term(l1_hamiltonian, times, l1_context)
@@ -211,9 +227,7 @@ def test_hamiltonian_constant_term_matches_qiao_value(
 
 
 @requires_qiao
-def test_evaluate_hamiltonian_against_qiao_fixture(
-    spice_loaded, l1_context, l1_legendre
-):
+def test_evaluate_hamiltonian_against_qiao_fixture(spice_loaded, l1_context, l1_legendre):
     """与 qiao ``L1_EM_Hamilton.mat`` 在 t=0 处逐项比对。
 
     qiao fixture 在 N=15 上有 687 项；本测试只用 order=4，因此 qiao 中
@@ -235,8 +249,7 @@ def test_evaluate_hamiltonian_against_qiao_fixture(
     evaled = evaluate_hamiltonian(h, times, l1_context)
     arr = evaled.coefficients
     our_lookup = {
-        tuple(int(x) for x in evaled.powers[j]): float(arr[0, j])
-        for j in range(evaled.n_terms)
+        tuple(int(x) for x in evaled.powers[j]): float(arr[0, j]) for j in range(evaled.n_terms)
     }
 
     n_match = 0
@@ -259,9 +272,7 @@ def test_evaluate_hamiltonian_against_qiao_fixture(
 
 
 @requires_spice
-def test_evaluate_hamiltonian_time_series_bounded(
-    spice_loaded, l1_hamiltonian, l1_context
-):
+def test_evaluate_hamiltonian_time_series_bounded(spice_loaded, l1_hamiltonian, l1_context):
     """时间序列的常数项 H_0(t) 在 [0, 10] TU 内单调有界（不应发散）。"""
     times = np.linspace(0.0, 10.0, 11)
     h0 = hamiltonian_constant_term(l1_hamiltonian, times, l1_context)

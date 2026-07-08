@@ -53,7 +53,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from math import factorial
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpy.typing as npt
@@ -158,9 +158,7 @@ class CenterManifoldResult:
 # ---------------------------------------------------------------------------
 
 
-def _characteristic_freq(
-    pow_tuple: tuple[int, ...], lam: float, wp: float, wv: float
-) -> complex:
+def _characteristic_freq(pow_tuple: tuple[int, ...], lam: float, wp: float, wv: float) -> complex:
     """同调方程的特征频率 ``k``（复值）。
 
     ``k = (j_1 − i_1)·λ + (j_2 − i_2)·i·ω_p + (j_3 − i_3)·i·ω_v``，
@@ -213,9 +211,9 @@ def _solve_wfunc_fft(
 
     F = np.fft.fft(f_ext)
     if N_ext % 2 == 0:
-        freq = np.arange(-N_ext // 2, N_ext // 2)
+        freq = np.arange(-N_ext // 2, N_ext // 2, dtype=float)
     else:
-        freq = np.arange(-(N_ext - 1) // 2, (N_ext - 1) // 2 + 1)
+        freq = np.arange(-(N_ext - 1) // 2, (N_ext - 1) // 2 + 1, dtype=float)
     freq = freq * (1.0 / (N_ext * dt))
     omega = 2.0 * np.pi * freq
     omega[np.abs(omega) < 1e-12] = 1e-12  # 避免零频奇异
@@ -287,9 +285,9 @@ def _solve_wfunc_fft_imag(
 
     F = np.fft.fft(f_ext)
     if N_ext % 2 == 0:
-        freq = np.arange(-N_ext // 2, N_ext // 2)
+        freq = np.arange(-N_ext // 2, N_ext // 2, dtype=float)
     else:
-        freq = np.arange(-(N_ext - 1) // 2, (N_ext - 1) // 2 + 1)
+        freq = np.arange(-(N_ext - 1) // 2, (N_ext - 1) // 2 + 1, dtype=float)
     freq = freq * (1.0 / (N_ext * dt))
     omega = 2.0 * np.pi * freq
     omega[np.abs(omega) < 1e-12] = 1e-12
@@ -548,40 +546,41 @@ def _lie_transform_step(
             if cur_order > max_order:
                 continue
             num = 1
-            p_prev = H_j
+            # poly_poisson 在本数值路径下输入/输出系数均为 ndarray，但其签名
+            # 为 object（兼顾 sympy 路径）；用 Any 局部标注表达 cascade 运算。
+            p_prev: Any = H_j
             while cur_order <= max_order:
-                p = poly_poisson(p_prev, W_temp)
+                p: dict[tuple[int, ...], Any] = poly_poisson(p_prev, W_temp)
                 for kk in p:
                     p[kk] = p[kk] / factorial(num)
                 num += 1
                 if cur_order not in H_by_order:
                     H_by_order[cur_order] = {}
+                target = H_by_order[cur_order]
                 for kk, v in p.items():
-                    H_by_order[cur_order][kk] = H_by_order[cur_order].get(
-                        kk, 0.0
-                    ) + v
+                    existing: Any = target.get(kk, 0.0)
+                    target[kk] = existing + v
                 cur_order += order - 2
                 p_prev = p
 
         # 加 Ẇ 项
         if order in H_by_order:
+            target = H_by_order[order]
             for kk, v in Wd_temp.items():
-                H_by_order[order][kk] = H_by_order[order].get(kk, 0.0) + v
+                # Wd 项为复值；与既有（可能复值）累加项相加。
+                cur: Any = target.get(kk, 0.0)
+                target[kk] = cur + v
 
         # 按 delete_criterion 删除该阶残余/新生项（Code10 与 Code11 不同）
         if order in H_by_order:
             H_by_order[order] = {
-                k: v
-                for k, v in H_by_order[order].items()
-                if delete_criterion(k, eliminated)
+                k: v for k, v in H_by_order[order].items() if delete_criterion(k, eliminated)
             }
             if not H_by_order[order]:
                 H_by_order[order] = {(0, 0, 0, 0, 0, 0): np.zeros(N)}
 
     # 化简各阶
-    H_by_order = {
-        o: polylist_simplify(v) for o, v in H_by_order.items() if v
-    }
+    H_by_order = {o: polylist_simplify(v) for o, v in H_by_order.items() if v}
     return H_by_order, W_series
 
 
@@ -636,8 +635,7 @@ class CenterManifoldReducer:
     def reduce(
         self,
         qf_result: QuasiFloquetResult,
-        hamiltonian_terms: Mapping[tuple[int, ...], npt.ArrayLike]
-        | None = None,
+        hamiltonian_terms: Mapping[tuple[int, ...], npt.ArrayLike] | None = None,
         steps: tuple[str, ...] | None = None,
     ) -> CenterManifoldResult:
         """对 ``qf_result`` 执行中心流形化简。
@@ -665,9 +663,7 @@ class CenterManifoldReducer:
         steps_resolved = tuple(steps) if steps is not None else ("invariant", "center")
         bad = [s for s in steps_resolved if s not in valid_steps]
         if bad:
-            raise ValueError(
-                f"steps 只能含 {sorted(valid_steps)}，得到非法值：{bad}"
-            )
+            raise ValueError(f"steps 只能含 {sorted(valid_steps)}，得到非法值：{bad}")
         if self.max_order < 1:
             raise ValueError(f"max_order 必须为正，得到 {self.max_order}")
 
@@ -680,9 +676,7 @@ class CenterManifoldReducer:
         N = tlist.size
 
         # 组装初始 Hamiltonian 多项式表 {order: {pow: coef}}
-        H_by_order = self._assemble_hamiltonian(
-            qf_result, hamiltonian_terms, tlist, N, lam, wp, wv
-        )
+        H_by_order = self._assemble_hamiltonian(qf_result, hamiltonian_terms, tlist, N, lam, wp, wv)
 
         W_all: dict[str, dict[int, dict[tuple[int, ...], npt.NDArray[np.complex128]]]] = {}
         steps_done: list[str] = []
@@ -716,9 +710,7 @@ class CenterManifoldReducer:
             # W 为纯虚（实部≈0）。coord_trans 的 QF↔CM Lie 流在复域操作，
             # 必须拿到完整复值 W，故此处不取实部。对应 qiao Code10/Code11
             # 输出复值 ``L?_InvarManifold.npz`` / ``L?_CenterManifold.npz``。
-            W_all[step] = {
-                o: _polylist_to_complex(w) for o, w in W_step.items()
-            }
+            W_all[step] = {o: _polylist_to_complex(w) for o, w in W_step.items()}
             steps_done.append(step)
 
         # 汇总化简后 Hamiltonian（所有阶合并成一个 pow→coef 表）
@@ -733,9 +725,7 @@ class CenterManifoldReducer:
         final_terms = polylist_simplify(final_terms)
 
         # 化简前最大双曲-中心耦合（诊断：用原始 hamiltonian_terms）
-        pre_coupling = _max_hyperbolic_center_coupling(
-            self._flat_terms(hamiltonian_terms, N)
-        )
+        pre_coupling = _max_hyperbolic_center_coupling(self._flat_terms(hamiltonian_terms, N))
 
         return CenterManifoldResult(
             context=self.context,

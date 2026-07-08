@@ -111,9 +111,7 @@ class LibrationCatalogTransformer:
     # 公开变换
     # ------------------------------------------------------------------
 
-    def rho_to_param(
-        self, X_rho: npt.ArrayLike, t: float
-    ) -> npt.NDArray[np.floating]:
+    def rho_to_param(self, X_rho: npt.ArrayLike, t: float) -> npt.NDArray[np.floating]:
         """rho 坐标 → 表征参数（完整逆链）。
 
         对应 qiao ``rho2param``：``rho → EM → DS → QF → CM → param``。
@@ -134,9 +132,7 @@ class LibrationCatalogTransformer:
             self.data.cm_result,
         )
 
-    def param_to_rho(
-        self, X_param: npt.ArrayLike, t: float
-    ) -> npt.NDArray[np.floating]:
+    def param_to_rho(self, X_param: npt.ArrayLike, t: float) -> npt.NDArray[np.floating]:
         """表征参数 → rho 坐标（完整正链）。
 
         对应 qiao ``param2rho``：``param → CM → QF → DS → EM → rho``。

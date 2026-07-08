@@ -133,9 +133,7 @@ class NormalFormContext:
         )
 
         # 频率体系
-        self.base_frequencies: npt.NDArray[np.floating] = np.array(
-            BASE_FREQUENCIES, dtype=float
-        )
+        self.base_frequencies: npt.NDArray[np.floating] = np.array(BASE_FREQUENCIES, dtype=float)
         nu1, nu2 = central_frequencies(self.libration_point)
         self.central_frequencies: tuple[float, float] = (nu1, nu2)
         self.characteristic_exponent: float = characteristic_exponent(self.libration_point)

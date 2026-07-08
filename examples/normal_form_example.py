@@ -22,9 +22,7 @@ def main():
     print("=" * 60)
 
     # 1. 构造上下文：地月 CR3BP、L1 点、J2000 历元、4 阶展开
-    system = CR3BP_System(
-        mu=1.215058560962404e-2, primary="Earth", secondary="Moon"
-    )
+    system = CR3BP_System(mu=1.215058560962404e-2, primary="Earth", secondary="Moon")
     system.set_characteristic_scales(distance=384405.0, period=27.32 * 86400.0)
     context = NormalFormContext(
         system=system,
@@ -64,14 +62,8 @@ def main():
     print(f"  message      = {result.message}")
     print(f"  residual     = {result.residual:.3e}")
     print(f"  spice_used   = {result.metadata.get('spice_available')}")
-    print(
-        f"  qf 辛误差   = "
-        f"{result.metadata.get('qf_symplectic_error', float('nan')):.3e}"
-    )
-    print(
-        f"  cm 双曲耦合 = "
-        f"{result.metadata.get('cm_hyperbolic_coupling', float('nan')):.3e}"
-    )
+    print(f"  qf 辛误差   = {result.metadata.get('qf_symplectic_error', float('nan')):.3e}")
+    print(f"  cm 双曲耦合 = {result.metadata.get('cm_hyperbolic_coupling', float('nan')):.3e}")
 
     if result.catalog_transformer is not None:
         # 5. rho 坐标 → 表征参数 [q1, p1, I2, θ2, I3, θ3]

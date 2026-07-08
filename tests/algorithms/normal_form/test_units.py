@@ -22,8 +22,10 @@ from e2m2e.core import LibrationPoint
 def ctx(earth_moon_system) -> NormalFormContext:
     """L1 上下文，使用 qiao 默认 LU/TU。"""
     return NormalFormContext(
-        system=earth_moon_system, libration_point=LibrationPoint.L1,
-        epoch=2451545.0, order=2,
+        system=earth_moon_system,
+        libration_point=LibrationPoint.L1,
+        epoch=2451545.0,
+        order=2,
     )
 
 
@@ -37,7 +39,7 @@ def test_to_normalized_divides_position_and_velocity_by_LU_VU(ctx):
     state_si = np.array([384747.981, 0.0, 0.0, 1.02416, 0.0, 0.0])
     state_norm = to_normalized(state_si, ctx)
 
-    assert state_norm[0] == pytest.approx(1.0)            # x_km / LU = 1
+    assert state_norm[0] == pytest.approx(1.0)  # x_km / LU = 1
     assert state_norm[3] == pytest.approx(1.02416 / VU_KMS)
 
 
@@ -72,10 +74,10 @@ def test_norm_to_si_to_norm_round_trip(ctx):
 @pytest.mark.parametrize(
     "state_si",
     [
-        np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),                    # 原点
-        np.array([LU_KM, 0.0, 0.0, 0.0, 0.0, 0.0]),                  # x = 1 LU
-        np.array([-LU_KM, LU_KM, LU_KM, VU_KMS, -VU_KMS, VU_KMS]),   # 全分量
-        np.array([384400.0, 0.0, 0.0, 0.0, 1.022, 0.0]),             # 类 LEO/月球轨道量级
+        np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),  # 原点
+        np.array([LU_KM, 0.0, 0.0, 0.0, 0.0, 0.0]),  # x = 1 LU
+        np.array([-LU_KM, LU_KM, LU_KM, VU_KMS, -VU_KMS, VU_KMS]),  # 全分量
+        np.array([384400.0, 0.0, 0.0, 0.0, 1.022, 0.0]),  # 类 LEO/月球轨道量级
     ],
 )
 def test_round_trip_various_states(ctx, state_si):
@@ -132,13 +134,18 @@ def test_wrong_last_dim_raises_from_normalized(ctx):
 def test_custom_LU_TU_change_scaling(earth_moon_system):
     """覆盖 LU/TU 后缩放比例同步更新。"""
     ctx_default = NormalFormContext(
-        system=earth_moon_system, libration_point=LibrationPoint.L1,
-        epoch=2451545.0, order=2,
+        system=earth_moon_system,
+        libration_point=LibrationPoint.L1,
+        epoch=2451545.0,
+        order=2,
     )
     ctx_custom = NormalFormContext(
-        system=earth_moon_system, libration_point=LibrationPoint.L1,
-        epoch=2451545.0, order=2,
-        LU=1000.0, TU=100.0,
+        system=earth_moon_system,
+        libration_point=LibrationPoint.L1,
+        epoch=2451545.0,
+        order=2,
+        LU=1000.0,
+        TU=100.0,
     )
     state_si = np.array([12345.6, 0.0, 0.0, 0.5, 0.0, 0.0])
 

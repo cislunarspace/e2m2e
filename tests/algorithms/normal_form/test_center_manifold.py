@@ -192,17 +192,13 @@ def test_invariant_step_reduces_hyperbolic_center_coupling(l1_context):
 
     result = reducer.reduce(qf, hamiltonian_terms=terms, steps=("invariant",))
     post = result.max_hyperbolic_coupling
-    assert post < 1e-3 * pre, (
-        f"Step 1 化简后双曲-中心耦合 {post:.2e} 未显著低于化简前 {pre:.2e}"
-    )
+    assert post < 1e-3 * pre, f"Step 1 化简后双曲-中心耦合 {post:.2e} 未显著低于化简前 {pre:.2e}"
     # 化简后保留的项（3 阶以上）要么是纯双曲（pow1==pow4）要么纯中心；
     # 二阶实标准形项不参与断言。
     for pow_tuple in result.hamiltonian_terms:
         if sum(pow_tuple) < 3:
             continue
-        assert pow_tuple[0] == pow_tuple[3], (
-            f"Step 1 后 3+ 阶仍含双曲不平衡项 {pow_tuple}"
-        )
+        assert pow_tuple[0] == pow_tuple[3], f"Step 1 后 3+ 阶仍含双曲不平衡项 {pow_tuple}"
 
 
 def test_center_step_leaves_only_action_terms(l1_context):
@@ -293,9 +289,7 @@ def test_center_step_produces_nonzero_complex_W(l1_context):
         (0, 3, 0, 0, 1, 0): 0.08 * ones,  # pow2=3 ≠ pow5=1
         (0, 2, 1, 0, 1, 1): 0.05 * ones,  # pow2=2 ≠ pow5=1
     }
-    result = reducer.reduce(
-        qf, hamiltonian_terms=center_terms, steps=("center",)
-    )
+    result = reducer.reduce(qf, hamiltonian_terms=center_terms, steps=("center",))
     # W_series["center"] 必须含至少一个非零项
     nonzero_W = any(
         np.any(np.abs(v)) > 1e-9
@@ -325,9 +319,7 @@ def test_center_step_reduces_center_coupling(l1_context):
         (0, 3, 0, 0, 1, 0): 0.08 * ones,
         (0, 2, 1, 0, 1, 1): 0.05 * ones,
     }
-    result = reducer.reduce(
-        qf, hamiltonian_terms=center_terms, steps=("center",)
-    )
+    result = reducer.reduce(qf, hamiltonian_terms=center_terms, steps=("center",))
     for pow_tuple in result.hamiltonian_terms:
         if sum(pow_tuple) < 3:
             continue
@@ -336,9 +328,7 @@ def test_center_step_reduces_center_coupling(l1_context):
             and pow_tuple[1] == pow_tuple[4]
             and pow_tuple[2] == pow_tuple[5]
         )
-        assert is_action, (
-            f"Step 2 后 3+ 阶仍含中心非作用量项 {pow_tuple}"
-        )
+        assert is_action, f"Step 2 后 3+ 阶仍含中心非作用量项 {pow_tuple}"
 
 
 def test_W_for_accessor_and_keyerror(l1_context):

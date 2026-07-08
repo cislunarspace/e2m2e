@@ -37,6 +37,8 @@ Hamilton 流的右端 ``dX/dt = J·∇W`` 用向量化实现
 
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 import numpy.typing as npt
 
@@ -60,7 +62,7 @@ _D[5, 5] = 1.0 / np.sqrt(2.0)
 _D[5, 2] = 1j / np.sqrt(2.0)
 
 #: ``D`` 的逆（预计算，供 Re2Im 复用）。
-_D_INV: npt.NDArray[np.complex128] = np.linalg.inv(_D)
+_D_INV: npt.NDArray[np.complex128] = cast("npt.NDArray[np.complex128]", np.linalg.inv(_D))
 
 
 def _re_to_im(X_real: npt.NDArray[np.floating]) -> npt.NDArray[np.complex128]:
@@ -184,9 +186,7 @@ def _apply_lie_series(
             continue
 
         def rhs(_t, X_local, exps=exps, coefs=coefs):
-            return _hamilton_flow_rhs(
-                np.asarray(X_local, dtype=complex), exps, coefs
-            )
+            return _hamilton_flow_rhs(np.asarray(X_local, dtype=complex), exps, coefs)
 
         sol = solve_ivp(
             rhs,
@@ -197,9 +197,7 @@ def _apply_lie_series(
             atol=atol,
         )
         if not sol.success:
-            raise RuntimeError(
-                f"QF↔CM Lie 级数 ODE 积分失败（order={order}）：{sol.message}"
-            )
+            raise RuntimeError(f"QF↔CM Lie 级数 ODE 积分失败（order={order}）：{sol.message}")
         X = np.asarray(sol.y[:, -1], dtype=complex)
     return X
 

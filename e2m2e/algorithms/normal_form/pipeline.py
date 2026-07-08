@@ -88,9 +88,7 @@ class NormalFormPipeline:
     center_steps: tuple[str, ...] = ("invariant", "center")
     dynamical_kwargs: dict[str, object] = field(default_factory=dict)
 
-    def reduce(
-        self, orbit: npt.ArrayLike
-    ) -> NormalFormResult:
+    def reduce(self, orbit: npt.ArrayLike) -> NormalFormResult:
         """对 rho 坐标初值跑完整法型化流水线。
 
         Args:
@@ -126,38 +124,26 @@ class NormalFormPipeline:
         }
         ds_kwargs.update(self.dynamical_kwargs)
         try:
-            ds_corrector = DynamicalSubstituteCorrector(
-                context=self.context, **ds_kwargs
-            )
+            ds_corrector = DynamicalSubstituteCorrector(context=self.context, **ds_kwargs)
             ds_result = ds_corrector.reduce(seed=x0)
         except Exception as exc:
-            return self._failure(
-                "dynamical_substitution", exc, ds_result, qf_result, cm_result
-            )
+            return self._failure("dynamical_substitution", exc, ds_result, qf_result, cm_result)
 
         # —— 步骤 2：quasi-Floquet ——
         try:
-            qf_reducer = QuasiFloquetReducer(
-                context=self.context, method=self.quasi_floquet_method
-            )
+            qf_reducer = QuasiFloquetReducer(context=self.context, method=self.quasi_floquet_method)
             qf_result = qf_reducer.reduce(ds_result)
         except Exception as exc:
-            return self._failure(
-                "quasi_floquet", exc, ds_result, qf_result, cm_result
-            )
+            return self._failure("quasi_floquet", exc, ds_result, qf_result, cm_result)
 
         # —— 步骤 3：中心流形化简 ——
         try:
             cm_reducer = CenterManifoldReducer(
                 context=self.context, max_order=self.center_max_order
             )
-            cm_result = cm_reducer.reduce(
-                qf_result, steps=self.center_steps
-            )
+            cm_result = cm_reducer.reduce(qf_result, steps=self.center_steps)
         except Exception as exc:
-            return self._failure(
-                "center_manifold", exc, ds_result, qf_result, cm_result
-            )
+            return self._failure("center_manifold", exc, ds_result, qf_result, cm_result)
 
         # —— 步骤 4：表征参数目录变换器 ——
         try:
@@ -171,9 +157,7 @@ class NormalFormPipeline:
             )
             catalog_transformer = LibrationCatalogTransformer(data=data)
         except Exception as exc:
-            return self._failure(
-                "catalog", exc, ds_result, qf_result, cm_result
-            )
+            return self._failure("catalog", exc, ds_result, qf_result, cm_result)
 
         return NormalFormResult(
             context=self.context,
@@ -213,9 +197,7 @@ class NormalFormPipeline:
         else:
             arr = np.asarray(orbit, dtype=float).ravel()
         if arr.shape != (6,):
-            raise ValueError(
-                f"orbit 必须是形状 (6,) 的 rho 状态，得到 {arr.shape}"
-            )
+            raise ValueError(f"orbit 必须是形状 (6,) 的 rho 状态，得到 {arr.shape}")
         return arr
 
     def _failure(

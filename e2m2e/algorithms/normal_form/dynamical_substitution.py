@@ -63,7 +63,7 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 #: qiao Code05 默认总窗口：``0.1 * 2^16 = 6553.6 TU``。
-DEFAULT_TOTAL_TU: float = 0.1 * (2 ** 16)
+DEFAULT_TOTAL_TU: float = 0.1 * (2**16)
 #: qiao Code05 默认节点间距：``0.8 TU``。
 DEFAULT_NODE_STEP: float = 0.8
 #: qiao Code05 稠密输出采样间距：``0.1 TU``。
@@ -189,13 +189,10 @@ class DynamicalSubstituteCorrector:
 
         if not spice_available and not self.spice_optional:
             raise RuntimeError(
-                "SPICE 内核不可用且 spice_optional=False。"
-                "请加载 .tls + .bsp 或显式允许降级。"
+                "SPICE 内核不可用且 spice_optional=False。请加载 .tls + .bsp 或显式允许降级。"
             )
 
-        solver: SubstituteSolver = ODESubstituteSolver(
-            rhs=rhs, rtol=1e-10, atol=1e-12
-        )
+        solver: SubstituteSolver = ODESubstituteSolver(rhs=rhs, rtol=1e-10, atol=1e-12)
 
         # ---- 多重打靶 ----
         patch = ShootingPatch(t_Q=t_Q, X_Q=X_Q)
@@ -244,9 +241,7 @@ class DynamicalSubstituteCorrector:
     # 内部辅助
     # ------------------------------------------------------------------
 
-    def _normalize_seed(
-        self, seed: npt.ArrayLike | None
-    ) -> npt.NDArray[np.floating]:
+    def _normalize_seed(self, seed: npt.ArrayLike | None) -> npt.NDArray[np.floating]:
         if seed is None:
             return np.zeros(6, dtype=float)
         arr = np.asarray(seed, dtype=float).ravel()
@@ -254,7 +249,9 @@ class DynamicalSubstituteCorrector:
             raise ValueError(f"seed 必须是形状 (6,)，得到 {arr.shape}")
         return arr
 
-    def _build_dynamics(self) -> tuple[
+    def _build_dynamics(
+        self,
+    ) -> tuple[
         Callable[[float, npt.ArrayLike], npt.ArrayLike],
         Callable[[float], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] | None,
     ]:
@@ -302,12 +299,14 @@ class DynamicalSubstituteCorrector:
             if seg_t.size == 0:
                 continue
             sol = solve_ivp(
-                lambda t, X: np.asarray(
-                    solver.propagate_segment.__self__.rhs(t, X),  # type: ignore[attr-defined]
-                    dtype=float,
-                ).ravel()
-                if hasattr(solver.propagate_segment, "__self__")
-                else _ode_rhs_via_solver(solver, t, X),
+                lambda t, X: (
+                    np.asarray(
+                        solver.propagate_segment.__self__.rhs(t, X),  # type: ignore[attr-defined]
+                        dtype=float,
+                    ).ravel()
+                    if hasattr(solver.propagate_segment, "__self__")
+                    else _ode_rhs_via_solver(solver, t, X)
+                ),
                 (float(seg_t[0]), float(seg_t[-1])),
                 np.asarray(X_Q[i], dtype=float),
                 t_eval=seg_t,
@@ -423,9 +422,7 @@ def _ode_rhs_via_solver(
     return np.asarray(rhs(t, X), dtype=float).ravel()
 
 
-def _second_derivative(
-    y: npt.NDArray[np.floating], dt: float
-) -> npt.NDArray[np.floating]:
+def _second_derivative(y: npt.NDArray[np.floating], dt: float) -> npt.NDArray[np.floating]:
     """等距采样的二阶中心差分；首末端用一阶差分。
 
     对应 qiao ``list_deriv`` 的两遍应用：``ddot = deriv(deriv(y))``。
@@ -470,13 +467,9 @@ def _bdot2a(
 
     n = B.shape[0]
     if Bdot.shape != B.shape or Bddot.shape != B.shape:
-        raise ValueError(
-            f"B/Bdot/Bddot 形状不一致：{B.shape}/{Bdot.shape}/{Bddot.shape}"
-        )
+        raise ValueError(f"B/Bdot/Bddot 形状不一致：{B.shape}/{Bdot.shape}/{Bddot.shape}")
     if tlist.shape[0] != n:
-        raise ValueError(
-            f"tlist 长度必须等于 B 行数：{tlist.shape[0]} vs {n}"
-        )
+        raise ValueError(f"tlist 长度必须等于 B 行数：{tlist.shape[0]} vs {n}")
 
     try:
         from ._ephemeris import eval_params as _eval_params
@@ -552,10 +545,7 @@ def _build_dynamics_rhs_circular(
         d2n = d2 / np.linalg.norm(d2) ** 3
         # CR3BP 运动方程：忽略太阳；ρ̈ = -∇U - 2 ω×ρ̇ - ω×(ω×ρ)
         # U = ½(x²+y²) + (1-μ)/r1 + μ/r2  (围绕原点展开)
-        U_rho = -(
-            (1.0 - mu) * d1n
-            + mu * d2n
-        )
+        U_rho = -((1.0 - mu) * d1n + mu * d2n)
         coriolis = -2.0 * np.cross(omega, rhodot)
         centrifugal = -np.cross(omega, np.cross(omega, rho))
         rhodotdot = U_rho + coriolis + centrifugal
@@ -637,16 +627,8 @@ def _build_dynamics_rhs_spice(
             force
             - cqq @ rho
             - 2.0 * cpq @ rhodot
-            + (
-                -mu_e * (rex + rho) / d_e3
-                - mu_m * (rmx + rho) / d_m3
-                - mu_s * (rsx + rho) / d_s3
-            )
-            - (
-                -mu_e * rex / re0 ** 3
-                - mu_m * rmx / rm0 ** 3
-                - mu_s * rsx / rs0 ** 3
-            )
+            + (-mu_e * (rex + rho) / d_e3 - mu_m * (rmx + rho) / d_m3 - mu_s * (rsx + rho) / d_s3)
+            - (-mu_e * rex / re0**3 - mu_m * rmx / rm0**3 - mu_s * rsx / rs0**3)
             - r0dotdot
         )
 

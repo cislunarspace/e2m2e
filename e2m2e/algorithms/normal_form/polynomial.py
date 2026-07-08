@@ -21,7 +21,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpy.typing as npt
@@ -58,11 +58,14 @@ def _is_zero(coef: object, tol: float = 0.0) -> bool:
     try:
         if tol <= 0:
             return bool(coef == 0)
-        return abs(float(coef)) <= tol
+        # coef 可能是 sympy 表达式（动态属性），用 Any 表达 float() 调用。
+        numeric: Any = coef
+        return abs(float(numeric)) <= tol
     except (TypeError, ValueError):
         # sympy 符号无法直接判等：尝试数值化
         try:
-            return abs(float(coef)) <= tol
+            numeric = coef
+            return abs(float(numeric)) <= tol
         except (TypeError, ValueError):
             return False
 
@@ -84,8 +87,8 @@ def keys_by_order(
     grouped: dict[int, list[tuple[int, ...]]] = {}
     for k in poly:
         grouped.setdefault(order(k), []).append(tuple(k))
-    for k in grouped:
-        grouped[k].sort()
+    for deg in grouped:
+        grouped[deg].sort()
     return grouped
 
 
@@ -173,6 +176,8 @@ def poly2expr(
     if variables is None:
         variables = sp.symbols("q1 q2 q3 p1 p2 p3")
 
+    # variables 是 sympy 符号元组（动态属性），用 Any 表达下标与幂运算。
+    vars_any: Any = variables
     expr = sp.Integer(0)
     for pow_tuple, coef in poly.items():
         if _is_zero(coef):
@@ -180,7 +185,7 @@ def poly2expr(
         term = sp.sympify(coef)
         for i, p in enumerate(pow_tuple):
             if p:
-                term *= variables[i] ** p
+                term *= vars_any[i] ** p
         expr += term
     return sp.expand(expr)
 
@@ -225,7 +230,10 @@ def poly_poisson(
                 new_pow[k + 3] -= 1
                 if any(p < 0 for p in new_pow):
                     continue
-                coef = coef1 * coef2 * (a_k * b_pk - a_pk * b_k)
+                # coef1/coef2 为 sympy 表达式或 ndarray（动态属性），用 Any 表达乘法。
+                c1: Any = coef1
+                c2: Any = coef2
+                coef = c1 * c2 * (a_k * b_pk - a_pk * b_k)
                 if _is_zero(coef):
                     continue
                 key = tuple(new_pow)
@@ -249,7 +257,9 @@ def poly_simplify(
     merged: dict[tuple[int, ...], object] = {}
     for pow_tuple, coef in poly.items():
         key = tuple(int(p) for p in pow_tuple)
-        merged[key] = merged.get(key, 0) + coef
+        # coef 为 sympy 表达式或 ndarray（动态属性），用 Any 表达加法。
+        existing: Any = merged.get(key, 0)
+        merged[key] = existing + coef
 
     result: dict[tuple[int, ...], object] = {}
     for pow_tuple, coef in merged.items():
@@ -294,9 +304,12 @@ def polylist_simplify(
 
 def _sample_coef(
     poly1: Mapping[tuple[int, ...], object],
-    poly2: Mapping[tuple[int, ...], object],
+    poly2: Mapping[tuple[int, ...], object] | None = None,
 ) -> object:
-    """从两个多项式 dict 中取一个样本系数用于生成零值。"""
+    """从多项式 dict 中取一个样本系数用于生成零值。
+
+    ``poly2`` 省略或为空时退化为只看 ``poly1``。
+    """
     for poly in (poly1, poly2):
         if poly:
             return next(iter(poly.values()))

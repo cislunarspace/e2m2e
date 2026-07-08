@@ -71,9 +71,7 @@ def test_expand_legendre_does_not_depend_on_p():
     for pow_tuple, coef in res.polynomial.items():
         p_exponents = pow_tuple[3:]
         if any(p > 0 for p in p_exponents):
-            assert coef == 0, (
-                f"1/r 标量场不应含 p 依赖；幂次 {pow_tuple} 系数 = {coef}"
-            )
+            assert coef == 0, f"1/r 标量场不应含 p 依赖；幂次 {pow_tuple} 系数 = {coef}"
 
 
 def test_expand_legendre_constant_term_is_inverse_r0():
@@ -125,9 +123,7 @@ def test_legendre_reproduces_1_over_r_numerically(max_degree):
     ]
     tolerance = 1e-4 if max_degree == 3 else 1e-5
     for q1, q2, q3 in test_qs:
-        exact = 1.0 / math.sqrt(
-            (rx - q1) ** 2 + (ry - q2) ** 2 + (rz - q3) ** 2
-        )
+        exact = 1.0 / math.sqrt((rx - q1) ** 2 + (ry - q2) ** 2 + (rz - q3) ** 2)
         recon = 0.0
         for pow_tuple, coef in res.polynomial.items():
             n1, n2, n3 = pow_tuple[:3]

@@ -27,6 +27,7 @@ API：
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 # 共线平动点（库内几何稀疏）推荐阶数。
 DEFAULT_COLLINEAR_ORDER: int = 10
@@ -83,9 +84,7 @@ def expand_legendre_1_over_r(
 
     from .polynomial import expr2poly, trim_degree
 
-    rx, ry, rz, q1, q2, q3, r0, q = symbols(
-        "rx ry rz q1 q2 q3 r0 q", real=True
-    )
+    rx, ry, rz, q1, q2, q3, r0, q = symbols("rx ry rz q1 q2 q3 r0 q", real=True)
     p1, p2, p3 = symbols("p1 p2 p3", real=True)
 
     # 1/r 标量场与 p 无关：把 p 占位为 0，让 ``expr2poly`` 输出 6 元 dict。
@@ -100,10 +99,7 @@ def expand_legendre_1_over_r(
 
     for n in range(1, max_degree):
         x = qv.dot(r0v) / (q * r0)
-        next_p = simplify(
-            (2 * n + 1) / (n + 1) * x * p_list[n]
-            - n / (n + 1) * p_list[n - 1]
-        )
+        next_p = simplify((2 * n + 1) / (n + 1) * x * p_list[n] - n / (n + 1) * p_list[n - 1])
         p_list.append(next_p)
 
     # 乘 (q/r0)^n 后求和再除以 r0
@@ -156,7 +152,9 @@ def expand_legendre_for_body(
             continue
         # 标量场系数是 sympy 符号 + rx/ry/rz/r0；这里只乘浮点
         # ``-mu``，符号留待 ``hamiltonian`` 替换为 (rx*/ry*/rz*/r0*)。
-        result[tuple(int(p) for p in pow_tuple)] = -float(mu) * coef
+        # coef 是 sympy 表达式（动态属性），用 Any 局部标注表达乘法语义。
+        sympy_coef: Any = coef
+        result[tuple(int(p) for p in pow_tuple)] = -float(mu) * sympy_coef
     return result
 
 
@@ -172,7 +170,9 @@ def legendre_free_symbols(
     symbols_set: set[object] = set()
     for coef in expansion.polynomial.values():
         try:
-            symbols_set.update(coef.free_symbols)
+            # coef 是 sympy 表达式（动态属性），用 Any 表达 free_symbols 访问。
+            sympy_coef: Any = coef
+            symbols_set.update(sympy_coef.free_symbols)
         except AttributeError:
             # 非 sympy 系数（数值 0/1）
             continue

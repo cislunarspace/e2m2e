@@ -79,35 +79,25 @@ def _derive_moon_param(
 
     # J_EM = -Σ GM * (V*|R|^2 - 3*<R,V>*R) / |R|^5
     rv_em = float(np.dot(r_em, v_em))
-    j_em = -(gm_e + gm_m) / (r_em2 * r_em2 * r_em_n) * (
-        r_em2 * v_em - 3 * rv_em * r_em
-    )
+    j_em = -(gm_e + gm_m) / (r_em2 * r_em2 * r_em_n) * (r_em2 * v_em - 3 * rv_em * r_em)
     rv_sm = float(np.dot(r_sm, v_sm))
-    j_em = j_em - gm_s / (r_sm2 * r_sm2 * r_sm_n) * (
-        r_sm2 * v_sm - 3 * rv_sm * r_sm
-    )
+    j_em = j_em - gm_s / (r_sm2 * r_sm2 * r_sm_n) * (r_sm2 * v_sm - 3 * rv_sm * r_sm)
     rv_es = float(np.dot(r_es, v_es))
-    j_em = j_em - gm_s / (r_es2 * r_es2 * r_es_n) * (
-        r_es2 * v_es - 3 * rv_es * r_es
-    )
+    j_em = j_em - gm_s / (r_es2 * r_es2 * r_es_n) * (r_es2 * v_es - 3 * rv_es * r_es)
 
     # Rotation matrix C(t)
     em_r = r_em_n
     ldot = rv_em / em_r
-    ldotdot = (
-        (float(np.dot(v_em, v_em) + np.dot(r_em, a_em)) * em_r - ldot * rv_em)
-        / em_r**2
-    )
+    ldotdot = (float(np.dot(v_em, v_em) + np.dot(r_em, a_em)) * em_r - ldot * rv_em) / em_r**2
 
     h = _cross3(r_em, v_em)
     hn = float(np.linalg.norm(h))
     hdot = _cross3(r_em, a_em)
     hndot = float(np.dot(hdot, h)) / hn
     hdotdot = _cross3(r_em, j_em) + _cross3(v_em, a_em)
-    hndotdot = (
-        (float(np.dot(hdotdot, h)) + float(np.dot(hdot, hdot))) / hn
-        - float(np.dot(h, hdot)) * hndot / (hn * hn)
-    )
+    hndotdot = (float(np.dot(hdotdot, h)) + float(np.dot(hdot, hdot))) / hn - float(
+        np.dot(h, hdot)
+    ) * hndot / (hn * hn)
 
     x_hat = r_em / em_r
     z_hat = h / hn
@@ -173,11 +163,7 @@ def _lp_state(
     )
     m = c @ r_mat @ c.T
     r_lp = m @ r_em
-    v_lp = (
-        c @ r_mat @ c.T @ v_em
-        + c @ r_mat @ cdot.T @ r_em
-        + cdot @ r_mat @ c.T @ r_em
-    )
+    v_lp = c @ r_mat @ c.T @ v_em + c @ r_mat @ cdot.T @ r_em + cdot @ r_mat @ c.T @ r_em
     a_lp = (
         c @ r_mat @ c.T @ a_em
         + 2 * c @ r_mat @ cdot.T @ v_em
@@ -233,9 +219,15 @@ def eval_params(jd_tdb: float, context: NormalFormContext) -> dict[str, float]:
 
     r_em, v_em, r_es, v_es = _ephemeris_states(jd_tdb)
     c, cdot, cdotdot, a_em = _derive_moon_param(
-        r_em, v_em, r_es, v_es,
-        mu_e=mu_e, mu_m=mu_m, mu_s=mu_s,
-        lu=lu, tu=tu,
+        r_em,
+        v_em,
+        r_es,
+        v_es,
+        mu_e=mu_e,
+        mu_m=mu_m,
+        mu_s=mu_s,
+        lu=lu,
+        tu=tu,
     )
 
     # 平动点（J2000 系，km / km/s / km/s²）；再转无量纲 EMR 坐标。
@@ -247,11 +239,7 @@ def eval_params(jd_tdb: float, context: NormalFormContext) -> dict[str, float]:
 
     r0 = c.T @ (r_lp / lu)
     r0dot = cdot_nd.T @ (r_lp / lu) + c.T @ (v_lp / v_u)
-    r0dotdot = (
-        cdotdot_nd.T @ (r_lp / lu)
-        + 2 * cdot_nd.T @ (v_lp / v_u)
-        + c.T @ (a_lp / a_u)
-    )
+    r0dotdot = cdotdot_nd.T @ (r_lp / lu) + 2 * cdot_nd.T @ (v_lp / v_u) + c.T @ (a_lp / a_u)
 
     rm_nd = c.T @ (r_em / lu)
     rs_nd = c.T @ (r_es / lu)

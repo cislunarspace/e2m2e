@@ -146,9 +146,7 @@ def rho_to_param(
     # rho → EM
     X_em = rho_to_em(X_rho, t, context)
     # EM → DS
-    W_at_t = _interp_W_at(
-        ds_result.W_poly, np.asarray(ds_result.tlist, dtype=float).ravel(), t
-    )
+    W_at_t = _interp_W_at(ds_result.W_poly, np.asarray(ds_result.tlist, dtype=float).ravel(), t)
     X_ds = em_to_ds(X_em, W_at_t)
     # DS → QF
     B_at_t = qf_result.B(t)
@@ -193,9 +191,7 @@ def param_to_rho(
     B_at_t = qf_result.B(t)
     X_ds = qf_to_ds(X_qf, B_at_t)
     # DS → EM
-    W_at_t = _interp_W_at(
-        ds_result.W_poly, np.asarray(ds_result.tlist, dtype=float).ravel(), t
-    )
+    W_at_t = _interp_W_at(ds_result.W_poly, np.asarray(ds_result.tlist, dtype=float).ravel(), t)
     X_em = ds_to_em(X_ds, W_at_t)
     # EM → rho
     return em_to_rho(X_em, t, context)

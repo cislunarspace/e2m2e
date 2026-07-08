@@ -95,9 +95,7 @@ def _small_lyapunov_orbit(l1_context, *, amp: float = 1e-3, T: float = 0.6, n: i
     # 最大纯虚特征值（平面中心对）
     w, V = np.linalg.eig(M0)
     imag_idx = [
-        i
-        for i in range(6)
-        if abs(w[i].imag) > 1e-6 and abs(w[i].real) < 1e-8 and w[i].imag > 0
+        i for i in range(6) if abs(w[i].imag) > 1e-6 and abs(w[i].real) < 1e-8 and w[i].imag > 0
     ]
     assert imag_idx, "L1 线性化应含纯虚特征值（中心方向）"
     i_planar = max(imag_idx, key=lambda i: w[i].imag)
@@ -194,9 +192,7 @@ def test_reducer_rejects_too_few_samples(l1_context):
         reducer.reduce(ds)
 
 
-def test_reduce_returns_result_with_required_fields(
-    matrix_reducer, small_orbit_ds_result
-):
+def test_reduce_returns_result_with_required_fields(matrix_reducer, small_orbit_ds_result):
     """``reduce`` 返回 :class:`QuasiFloquetResult`，字段齐备。"""
     result = matrix_reducer.reduce(small_orbit_ds_result)
     assert isinstance(result, QuasiFloquetResult)
@@ -231,9 +227,7 @@ def test_matrix_method_preserves_symplecticity(matrix_reducer, small_orbit_ds_re
     )
 
 
-def test_lie_algebra_method_preserves_symplecticity(
-    lie_reducer, small_orbit_ds_result
-):
+def test_lie_algebra_method_preserves_symplecticity(lie_reducer, small_orbit_ds_result):
     """李代数法：``B(t)`` 在所有采样点上 ``‖Bᵀ J B − J‖∞ < 1e-12``。
 
     ``B=exp(ξ)``、``ξ ∈ sp(6)`` 自动保辛，无需投影。
@@ -251,9 +245,7 @@ def test_both_methods_share_same_normal_form(l1_context, small_orbit_ds_result):
         float(l1_context.central_frequencies[0]),
         float(l1_context.central_frequencies[1]),
     )
-    r_mat = QuasiFloquetReducer(context=l1_context, method="matrix").reduce(
-        small_orbit_ds_result
-    )
+    r_mat = QuasiFloquetReducer(context=l1_context, method="matrix").reduce(small_orbit_ds_result)
     r_lie = QuasiFloquetReducer(context=l1_context, method="lie_algebra").reduce(
         small_orbit_ds_result
     )
@@ -271,9 +263,7 @@ def test_both_methods_agree_on_B(l1_context, small_orbit_ds_result):
     格式（~5e-6 误差），矩阵法用 DOP853（~1e-11），二者之差由李代数法
     主导。
     """
-    r_mat = QuasiFloquetReducer(context=l1_context, method="matrix").reduce(
-        small_orbit_ds_result
-    )
+    r_mat = QuasiFloquetReducer(context=l1_context, method="matrix").reduce(small_orbit_ds_result)
     r_lie = QuasiFloquetReducer(context=l1_context, method="lie_algebra").reduce(
         small_orbit_ds_result
     )

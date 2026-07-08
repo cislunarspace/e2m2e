@@ -32,8 +32,7 @@ from e2m2e.core import LibrationPoint
 
 @pytest.mark.parametrize(
     "point",
-    [LibrationPoint.L1, LibrationPoint.L2, LibrationPoint.L3,
-     LibrationPoint.L4, LibrationPoint.L5],
+    [LibrationPoint.L1, LibrationPoint.L2, LibrationPoint.L3, LibrationPoint.L4, LibrationPoint.L5],
 )
 def test_context_constructs_for_all_libration_points(earth_moon_system, point):
     """L1–L5 都能成功构造 ``NormalFormContext``。"""
@@ -85,27 +84,27 @@ def test_base_frequencies_match_qiao(earth_moon_system):
 def test_central_frequencies_vary_with_point(earth_moon_system):
     """L1/L2/L3 的中心流形频率各不相同；L4/L5 也给出数值。"""
     ctx_l1 = NormalFormContext(
-        system=earth_moon_system, libration_point=LibrationPoint.L1,
-        epoch=JD0_J2000, order=2,
+        system=earth_moon_system,
+        libration_point=LibrationPoint.L1,
+        epoch=JD0_J2000,
+        order=2,
     )
     ctx_l2 = NormalFormContext(
-        system=earth_moon_system, libration_point=LibrationPoint.L2,
-        epoch=JD0_J2000, order=2,
+        system=earth_moon_system,
+        libration_point=LibrationPoint.L2,
+        epoch=JD0_J2000,
+        order=2,
     )
     ctx_l4 = NormalFormContext(
-        system=earth_moon_system, libration_point=LibrationPoint.L4,
-        epoch=JD0_J2000, order=2,
+        system=earth_moon_system,
+        libration_point=LibrationPoint.L4,
+        epoch=JD0_J2000,
+        order=2,
     )
 
-    assert ctx_l1.central_frequencies == pytest.approx(
-        (2.33774371420711, 2.27427342163957)
-    )
-    assert ctx_l2.central_frequencies == pytest.approx(
-        (1.86464967793235, 1.79093984309149)
-    )
-    assert ctx_l4.central_frequencies == pytest.approx(
-        (0.30259440630339, 1.00408270193080)
-    )
+    assert ctx_l1.central_frequencies == pytest.approx((2.33774371420711, 2.27427342163957))
+    assert ctx_l2.central_frequencies == pytest.approx((1.86464967793235, 1.79093984309149))
+    assert ctx_l4.central_frequencies == pytest.approx((0.30259440630339, 1.00408270193080))
     # 各点中心流形频率应不同（互不相等）
     assert ctx_l1.central_frequencies != ctx_l2.central_frequencies
 
@@ -115,8 +114,10 @@ def test_characteristic_exponent_per_point(earth_moon_system):
     lambdas = {}
     for point in LibrationPoint:
         ctx = NormalFormContext(
-            system=earth_moon_system, libration_point=point,
-            epoch=JD0_J2000, order=2,
+            system=earth_moon_system,
+            libration_point=point,
+            epoch=JD0_J2000,
+            order=2,
         )
         lambdas[point] = ctx.characteristic_exponent
 
@@ -145,8 +146,10 @@ def test_characteristic_exponent_per_point(earth_moon_system):
 def test_collinear_libration_positions(earth_moon_system, point, expected_x):
     """共线点位置用 qiao γ 值给出，符合 ``(1 ± γ, 0, 0)`` / ``(-γ, 0, 0)``。"""
     ctx = NormalFormContext(
-        system=earth_moon_system, libration_point=point,
-        epoch=JD0_J2000, order=2,
+        system=earth_moon_system,
+        libration_point=point,
+        epoch=JD0_J2000,
+        order=2,
     )
     np.testing.assert_allclose(ctx.libration_position, [expected_x, 0.0, 0.0], atol=1e-12)
     assert ctx.gamma is not None
@@ -162,13 +165,13 @@ def test_collinear_libration_positions(earth_moon_system, point, expected_x):
 def test_triangular_libration_positions(earth_moon_system, point, expected_y):
     """三角点位置为等边三角形顶点 ``(1/2 - mu, ±√3/2, 0)``，γ 为 None。"""
     ctx = NormalFormContext(
-        system=earth_moon_system, libration_point=point,
-        epoch=JD0_J2000, order=2,
+        system=earth_moon_system,
+        libration_point=point,
+        epoch=JD0_J2000,
+        order=2,
     )
     expected_x = 0.5 - MU
-    np.testing.assert_allclose(
-        ctx.libration_position, [expected_x, expected_y, 0.0], atol=1e-12
-    )
+    np.testing.assert_allclose(ctx.libration_position, [expected_x, expected_y, 0.0], atol=1e-12)
     assert ctx.gamma is None
 
 
@@ -183,8 +186,10 @@ def test_epoch_accepts_datetime(earth_moon_system):
 
     dt = datetime(2000, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
     ctx = NormalFormContext(
-        system=earth_moon_system, libration_point=LibrationPoint.L1,
-        epoch=dt, order=2,
+        system=earth_moon_system,
+        libration_point=LibrationPoint.L1,
+        epoch=dt,
+        order=2,
     )
     assert ctx.epoch == pytest.approx(JD0_J2000)
 
@@ -193,27 +198,38 @@ def test_invalid_order_raises(earth_moon_system):
     """``order <= 0`` 或非整数应抛 ``ValueError``。"""
     with pytest.raises(ValueError, match="order"):
         NormalFormContext(
-            system=earth_moon_system, libration_point=LibrationPoint.L1,
-            epoch=JD0_J2000, order=0,
+            system=earth_moon_system,
+            libration_point=LibrationPoint.L1,
+            epoch=JD0_J2000,
+            order=0,
         )
     with pytest.raises(ValueError, match="order"):
         NormalFormContext(
-            system=earth_moon_system, libration_point=LibrationPoint.L1,
-            epoch=JD0_J2000, order=-3,
+            system=earth_moon_system,
+            libration_point=LibrationPoint.L1,
+            epoch=JD0_J2000,
+            order=-3,
         )
     with pytest.raises(ValueError, match="order"):
         NormalFormContext(
-            system=earth_moon_system, libration_point=LibrationPoint.L1,
-            epoch=JD0_J2000, order=2.5,  # type: ignore[arg-type]
+            system=earth_moon_system,
+            libration_point=LibrationPoint.L1,
+            epoch=JD0_J2000,
+            order=2.5,  # type: ignore[arg-type]
         )
 
 
 def test_explicit_overrides_take_effect(earth_moon_system):
     """显式传入 ``LU``/``TU``/``mu`` 时覆盖默认值。"""
     ctx = NormalFormContext(
-        system=earth_moon_system, libration_point=LibrationPoint.L1,
-        epoch=JD0_J2000, order=2,
-        LU=1.0, TU=1.0, mu=0.0123, mu_s=999.0,
+        system=earth_moon_system,
+        libration_point=LibrationPoint.L1,
+        epoch=JD0_J2000,
+        order=2,
+        LU=1.0,
+        TU=1.0,
+        mu=0.0123,
+        mu_s=999.0,
     )
     assert ctx.LU == 1.0
     assert ctx.TU == 1.0
@@ -228,8 +244,10 @@ def test_context_system_mu_preferred_over_default(earth_moon_system):
     # 显式重设 system.mu 后构造 context，应拿到新 mu。
     earth_moon_system.mu = 0.0123
     ctx = NormalFormContext(
-        system=earth_moon_system, libration_point=LibrationPoint.L1,
-        epoch=JD0_J2000, order=2,
+        system=earth_moon_system,
+        libration_point=LibrationPoint.L1,
+        epoch=JD0_J2000,
+        order=2,
     )
     assert ctx.mu == pytest.approx(0.0123)
 
@@ -242,8 +260,10 @@ def test_context_system_mu_preferred_over_default(earth_moon_system):
 def test_seconds_to_tu_round_trip(earth_moon_system):
     """秒 ↔ TU 互为逆运算。"""
     ctx = NormalFormContext(
-        system=earth_moon_system, libration_point=LibrationPoint.L1,
-        epoch=JD0_J2000, order=2,
+        system=earth_moon_system,
+        libration_point=LibrationPoint.L1,
+        epoch=JD0_J2000,
+        order=2,
     )
     t_s = 12345.6789
     assert ctx.tu_to_seconds(ctx.seconds_to_tu(t_s)) == pytest.approx(t_s)
@@ -259,8 +279,10 @@ def test_seconds_to_tu_round_trip(earth_moon_system):
 def test_normal_form_result_is_constructible(earth_moon_system):
     """``NormalFormResult`` 至少能以默认参数构造（具体填充后续切片实现）。"""
     ctx = NormalFormContext(
-        system=earth_moon_system, libration_point=LibrationPoint.L1,
-        epoch=JD0_J2000, order=2,
+        system=earth_moon_system,
+        libration_point=LibrationPoint.L1,
+        epoch=JD0_J2000,
+        order=2,
     )
     res = NormalFormResult(context=ctx, order=2)
     assert res.context is ctx
@@ -274,8 +296,10 @@ def test_normal_form_result_is_constructible(earth_moon_system):
 def test_repr_and_str_are_informative(earth_moon_system):
     """``__repr__`` / ``__str__`` 不抛异常且包含平动点名称。"""
     ctx = NormalFormContext(
-        system=earth_moon_system, libration_point=LibrationPoint.L2,
-        epoch=JD0_J2000, order=3,
+        system=earth_moon_system,
+        libration_point=LibrationPoint.L2,
+        epoch=JD0_J2000,
+        order=3,
     )
     assert "L2" in repr(ctx)
     assert "L2" in str(ctx)

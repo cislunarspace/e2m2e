@@ -25,7 +25,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpy.typing as npt
@@ -45,13 +45,42 @@ if TYPE_CHECKING:
 # Hamilton 量在评估时需要从 ``Eval_expr`` 注入的全部动态参数。
 # 该列表与 ``_ephemeris.eval_params`` 的返回键一致。
 DYNAMIC_PARAM_NAMES: tuple[str, ...] = (
-    "Cpq1", "Cpq2", "Cpq3", "Cpq4", "Cpq5", "Cpq6", "Cpq7", "Cpq8", "Cpq9",
-    "Cqq1", "Cqq2", "Cqq3", "Cqq4", "Cqq5", "Cqq6", "Cqq7", "Cqq8", "Cqq9",
-    "f1", "f2", "f3",
-    "rex", "rey", "rez", "re0",
-    "rmx", "rmy", "rmz", "rm0",
-    "rsx", "rsy", "rsz", "rs0",
-    "mu_e", "mu_m", "mu_s",
+    "Cpq1",
+    "Cpq2",
+    "Cpq3",
+    "Cpq4",
+    "Cpq5",
+    "Cpq6",
+    "Cpq7",
+    "Cpq8",
+    "Cpq9",
+    "Cqq1",
+    "Cqq2",
+    "Cqq3",
+    "Cqq4",
+    "Cqq5",
+    "Cqq6",
+    "Cqq7",
+    "Cqq8",
+    "Cqq9",
+    "f1",
+    "f2",
+    "f3",
+    "rex",
+    "rey",
+    "rez",
+    "re0",
+    "rmx",
+    "rmy",
+    "rmz",
+    "rm0",
+    "rsx",
+    "rsy",
+    "rsz",
+    "rs0",
+    "mu_e",
+    "mu_m",
+    "mu_s",
 )
 
 
@@ -167,27 +196,47 @@ def build_hamiltonian(
 
     if store_sources:
         sources["force"] = trim_degree(expr2poly(fv.dot(qv)), deg)
-        sources["kinetic"] = trim_degree(
-            expr2poly(Rational(1, 2) * pv.dot(pv)), deg
-        )
+        sources["kinetic"] = trim_degree(expr2poly(Rational(1, 2) * pv.dot(pv)), deg)
         sources["coriolis"] = trim_degree(expr2poly(pv.dot(cpq * qv)), deg)
-        sources["centrifugal"] = trim_degree(
-            expr2poly(Rational(1, 2) * qv.dot(cqq * qv)), deg
-        )
+        sources["centrifugal"] = trim_degree(expr2poly(Rational(1, 2) * qv.dot(cqq * qv)), deg)
 
     h_poly = expr2poly(h_quad)
 
     h_poly = _add_body(
-        h_poly, legendre_result, rex, rey, rez, re0, float(context.mu_e),
-        "pot_earth", sources, deg,
+        h_poly,
+        legendre_result,
+        rex,
+        rey,
+        rez,
+        re0,
+        float(context.mu_e),
+        "pot_earth",
+        sources,
+        deg,
     )
     h_poly = _add_body(
-        h_poly, legendre_result, rmx, rmy, rmz, rm0, float(context.mu_m),
-        "pot_moon", sources, deg,
+        h_poly,
+        legendre_result,
+        rmx,
+        rmy,
+        rmz,
+        rm0,
+        float(context.mu_m),
+        "pot_moon",
+        sources,
+        deg,
     )
     h_poly = _add_body(
-        h_poly, legendre_result, rsx, rsy, rsz, rs0, float(context.mu_s),
-        "pot_sun", sources, deg,
+        h_poly,
+        legendre_result,
+        rsx,
+        rsy,
+        rsz,
+        rs0,
+        float(context.mu_s),
+        "pot_sun",
+        sources,
+        deg,
     )
 
     h_poly = trim_degree(h_poly, deg)
@@ -246,7 +295,9 @@ def _add_body(
 
     body_terms: dict[tuple[int, ...], object] = {}
     for pow_tuple, coef in legendre_result.polynomial.items():
-        subbed = coef.subs(body_sub_map)
+        # coef 是 sympy 表达式（动态属性 subs），用 Any 表达符号替换语义。
+        sympy_coef: Any = coef
+        subbed = sympy_coef.subs(body_sub_map)
         signed = -mu * subbed
         if signed == 0:
             continue
@@ -283,9 +334,7 @@ def evaluate_hamiltonian(
         - ``max_degree`` 等字段与输入一致。
     """
     if not isinstance(hamiltonian.coefficients, dict):
-        raise ValueError(
-            "Hamiltonian 缺少 sympy 系数 dict；请先用 build_hamiltonian 构造。"
-        )
+        raise ValueError("Hamiltonian 缺少 sympy 系数 dict；请先用 build_hamiltonian 构造。")
 
     times_arr = np.asarray(times, dtype=float)
     if times_arr.ndim != 1:
@@ -309,15 +358,14 @@ def evaluate_hamiltonian(
 
     if arr.shape[1] > 0:
         cols = {
-            tuple(int(p) for p in hamiltonian.powers[k]): arr[:, k]
-            for k in range(arr.shape[1])
+            tuple(int(p) for p in hamiltonian.powers[k]): arr[:, k] for k in range(arr.shape[1])
         }
         cols = polylist_simplify(cols)
         new_keys = sorted(cols.keys())
         new_powers = np.array(new_keys, dtype=np.int64)
         new_arr = np.column_stack([cols[k] for k in new_keys])
         arr = new_arr
-        powers_out = new_powers
+        powers_out: npt.NDArray[np.integer] = new_powers
     else:
         powers_out = hamiltonian.powers
 
@@ -340,12 +388,16 @@ def _eval_coef(coef: object, params: dict[str, float]) -> float:
         return 0.0
     if not hasattr(coef, "free_symbols"):
         try:
-            return float(coef)
+            # coef 此处为数值（无 free_symbols），用 Any 表达 float() 调用。
+            numeric: Any = coef
+            return float(numeric)
         except (TypeError, ValueError):
             return 0.0
+    # coef 此处为 sympy 表达式（含 free_symbols），用 Any 表达动态属性。
+    sympy_coef: Any = coef
     sub_map: dict[object, float] = {}
     missing: list[str] = []
-    for s in coef.free_symbols:
+    for s in sympy_coef.free_symbols:
         name = getattr(s, "name", None)
         if name in params:
             sub_map[s] = float(params[name])
@@ -355,7 +407,7 @@ def _eval_coef(coef: object, params: dict[str, float]) -> float:
         # 不抛错：用 0 填；保守处理，等价于 qiao eval 出现无法求值的项时
         # 把该项记为 0（Code04 在 exceptions 时也是写 0.0）。
         return 0.0
-    return float(coef.subs(sub_map))
+    return float(sympy_coef.subs(sub_map))
 
 
 def hamiltonian_constant_term(
@@ -371,7 +423,9 @@ def hamiltonian_constant_term(
     """
     if not isinstance(hamiltonian.coefficients, np.ndarray):
         evaled = evaluate_hamiltonian(hamiltonian, times, context)
-        arr = evaled.coefficients  # type: ignore[assignment]
+        # evaluate_hamiltonian 必返回 ndarray 形式 coefficients（见其实现），
+        # 但 dataclass 标注为联合类型，此处显式标注为 ndarray。
+        arr: npt.NDArray[np.floating] = evaled.coefficients  # type: ignore[assignment]
         powers = evaled.powers
     else:
         arr = hamiltonian.coefficients

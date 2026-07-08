@@ -321,9 +321,7 @@ def test_ode_substitute_solver_matches_direct_integration_for_toy_rhs():
     x0 = np.array([1.0, 0.0, 0.0, 0.0, 1.0, 0.0])
     xf, phi = solver.propagate_segment(0.0, np.pi / 2, x0)
 
-    sol = solve_ivp(
-        _toy_rhs, (0.0, np.pi / 2), x0, method="DOP853", rtol=1e-12, atol=1e-14
-    )
+    sol = solve_ivp(_toy_rhs, (0.0, np.pi / 2), x0, method="DOP853", rtol=1e-12, atol=1e-14)
     np.testing.assert_allclose(xf, sol.y[:, -1], atol=1e-9)
     # STM 在 ρ̈=-ρ 问题上应当近似 [[cos, 0, sin], ...]
     expected_phi = np.array(
@@ -353,7 +351,7 @@ def test_ode_substitute_solver_rejects_bad_shape():
 
 def test_default_constants_match_qiao():
     """默认窗口/间距与 qiao Code05 一致。"""
-    assert pytest.approx(0.1 * (2 ** 16)) == DEFAULT_TOTAL_TU
+    assert pytest.approx(0.1 * (2**16)) == DEFAULT_TOTAL_TU
     assert pytest.approx(0.8) == DEFAULT_NODE_STEP
 
 
@@ -408,13 +406,9 @@ def test_W_poly_regression_against_qiao_L1DynSubs_npz():
     """
     import os
 
-    fixture = os.path.join(
-        os.path.dirname(__file__), "data", "L1DynSubs.npz"
-    )
+    fixture = os.path.join(os.path.dirname(__file__), "data", "L1DynSubs.npz")
     if not os.path.exists(fixture):
-        pytest.skip(
-            "qiao L1DynSubs.npz 未引入仓库；W_poly 逐系数回归待 fixture 就绪"
-        )
+        pytest.skip("qiao L1DynSubs.npz 未引入仓库；W_poly 逐系数回归待 fixture 就绪")
 
 
 # ---------------------------------------------------------------------------
@@ -422,9 +416,7 @@ def test_W_poly_regression_against_qiao_L1DynSubs_npz():
 # ---------------------------------------------------------------------------
 
 
-def test_substitute_orbit_suppresses_center_manifold_frequencies(
-    l1_context, monkeypatch
-):
+def test_substitute_orbit_suppresses_center_manifold_frequencies(l1_context, monkeypatch):
     """星历模型下重复积分后的 FFT 中心流形频率幅值检查。
 
     验收标准要求：动力学替代轨道在星历模型下重复积分后仍只含受迫频率，
@@ -452,8 +444,7 @@ def test_substitute_orbit_suppresses_center_manifold_frequencies(
 
     if not spice_ready:
         pytest.skip(
-            "SPICE leapseconds 内核不可用；星历模型端到端 FFT 中心流形"
-            "频率压制检查待内核就绪"
+            "SPICE leapseconds 内核不可用；星历模型端到端 FFT 中心流形频率压制检查待内核就绪"
         )
 
     corrector = DynamicalSubstituteCorrector(

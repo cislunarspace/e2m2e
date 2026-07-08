@@ -54,8 +54,7 @@ class SubstituteSolver(Protocol):
 
     def propagate_segment(
         self, t0: float, tf: float, x0: npt.ArrayLike
-    ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
-        ...
+    ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]: ...
 
 
 @dataclass(frozen=True)
@@ -76,9 +75,7 @@ class ShootingPatch:
         if self.X_Q.ndim != 2 or self.X_Q.shape[1] != 6:
             raise ValueError(f"X_Q 必须是 (N, 6) 形状，得到 {self.X_Q.shape}")
         if self.t_Q.shape[0] != self.X_Q.shape[0]:
-            raise ValueError(
-                f"t_Q 与 X_Q 长度不一致：{self.t_Q.shape[0]} vs {self.X_Q.shape[0]}"
-            )
+            raise ValueError(f"t_Q 与 X_Q 长度不一致：{self.t_Q.shape[0]} vs {self.X_Q.shape[0]}")
 
 
 @dataclass(frozen=True)
@@ -129,13 +126,9 @@ def solve_block_tridiagonal(
     """
     n_seg = phi_stack.shape[0]
     if xf_stack.shape != (n_seg, 6):
-        raise ValueError(
-            f"xf_stack 形状必须为 ({n_seg}, 6)，得到 {xf_stack.shape}"
-        )
+        raise ValueError(f"xf_stack 形状必须为 ({n_seg}, 6)，得到 {xf_stack.shape}")
     if X_Q.shape[0] != n_seg + 1:
-        raise ValueError(
-            f"X_Q 行数必须为 phi_stack 行数 + 1，得到 {X_Q.shape[0]} vs {n_seg + 1}"
-        )
+        raise ValueError(f"X_Q 行数必须为 phi_stack 行数 + 1，得到 {X_Q.shape[0]} vs {n_seg + 1}")
 
     I6 = np.eye(6)
 
@@ -176,7 +169,10 @@ def solve_block_tridiagonal(
     # 末段：Y_{n_seg-1} = D_{n_seg-1}^{-1} X_d_{n_seg-1}
     Y[n_seg - 1] = np.linalg.solve(D[n_seg - 1], X_d[n_seg - 1])
     for i in range(n_seg - 2, -1, -1):
-        Y[i] = np.linalg.solve(D[i], X_d[i]) - L[i + 1].T @ Y[i + 1]
+        # L[i+1] 对应 i+1 ∈ [1, n_seg-1]，前代循环已全部赋为非 None 矩阵；
+        # 仅 L[0]（前代首段）为 None，本循环不触及。
+        l_next: npt.NDArray[np.floating] = L[i + 1]  # type: ignore[assignment]
+        Y[i] = np.linalg.solve(D[i], X_d[i]) - l_next.T @ Y[i + 1]
 
     # ---- 拼装 delta_Q ----
     delta_Q = np.zeros_like(X_Q)
@@ -252,9 +248,7 @@ def multiple_shooting_newton(
             phi_stack_curr = np.zeros((n_seg, 6, 6), dtype=float)
             xf_stack_curr = np.zeros((n_seg, 6), dtype=float)
             for i in range(n_seg):
-                xf_i, phi_i = solver.propagate_segment(
-                    float(t_Q[i]), float(t_Q[i + 1]), X_Q[i]
-                )
+                xf_i, phi_i = solver.propagate_segment(float(t_Q[i]), float(t_Q[i + 1]), X_Q[i])
                 phi_stack_curr[i] = phi_i
                 xf_stack_curr[i] = xf_i
         else:

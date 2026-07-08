@@ -68,9 +68,12 @@ def _resolve_C_Cdot(
         from .._ephemeris import _derive_moon_param, _ephemeris_states
 
         r_em, v_em, r_es, v_es = _ephemeris_states(jd)
-        # _derive_moon_param 返回 (A_em, J_em, C, Cdot, Cdotdot)
-        _, _, C, cdot, _ = _derive_moon_param(
-            r_em, v_em, r_es, v_es,
+        # _derive_moon_param 返回 (C, Cdot, Cdotdot, A_em)（见 _ephemeris.py）
+        C, cdot, _, _ = _derive_moon_param(
+            r_em,
+            v_em,
+            r_es,
+            v_es,
             mu_e=float(context.mu_e),
             mu_m=float(context.mu_m),
             mu_s=float(context.mu_s),

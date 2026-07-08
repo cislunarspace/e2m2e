@@ -60,9 +60,7 @@ J6: npt.NDArray[np.floating] = np.block(
 )
 
 
-def real_normal_form_matrix(
-    lam: float, wp: float, wv: float
-) -> npt.NDArray[np.floating]:
+def real_normal_form_matrix(lam: float, wp: float, wv: float) -> npt.NDArray[np.floating]:
     """构造 6×6 实标准形矩阵 ``D``。
 
     对应 qiao ``Global_File`` 中固化的 ``Mat_D``：一双曲方向 ``±λ``、
@@ -211,9 +209,7 @@ class QuasiFloquetResult:
 # ---------------------------------------------------------------------------
 
 
-def _cr3bp_hessian_symmetric(
-    r: npt.NDArray[np.floating], mu: float
-) -> npt.NDArray[np.floating]:
+def _cr3bp_hessian_symmetric(r: npt.NDArray[np.floating], mu: float) -> npt.NDArray[np.floating]:
     """纯 CR3BP 会合系下二阶导 ``Ω`` 的对称 Hessian（无量纲）。
 
     返回对称矩阵 ``S = ∂²Ω/∂x_i ∂x_j``，对应
@@ -486,14 +482,9 @@ class QuasiFloquetReducer:
             ValueError: ``method`` 非法，或 ``ds_result`` 数据不足。
         """
         if self.method not in ("matrix", "lie_algebra"):
-            raise ValueError(
-                f"method 必须是 'matrix' 或 'lie_algebra'，得到 {self.method!r}"
-            )
+            raise ValueError(f"method 必须是 'matrix' 或 'lie_algebra'，得到 {self.method!r}")
         if ds_result.Xlist.shape[0] < 2:
-            raise ValueError(
-                "ds_result 至少需要 2 个采样点，得到 "
-                f"{ds_result.Xlist.shape[0]}"
-            )
+            raise ValueError(f"ds_result 至少需要 2 个采样点，得到 {ds_result.Xlist.shape[0]}")
 
         # —— 实标准形 D（qiao Global_File 频率）——
         nu1, nu2 = self.context.central_frequencies
@@ -505,17 +496,11 @@ class QuasiFloquetReducer:
 
         # —— 求解 B(t) ——
         if self.method == "matrix":
-            B_samples = _solve_qf_matrix(
-                M_at, D, ds_result.tlist, rtol=self.rtol, atol=self.atol
-            )
+            B_samples = _solve_qf_matrix(M_at, D, ds_result.tlist, rtol=self.rtol, atol=self.atol)
             if self.project:
-                B_samples = np.array(
-                    [symplectic_project(B) for B in B_samples], dtype=float
-                )
+                B_samples = np.array([symplectic_project(B) for B in B_samples], dtype=float)
         else:
-            B_samples = _solve_qf_lie(
-                M_at, D, ds_result.tlist, rtol=self.rtol, atol=self.atol
-            )
+            B_samples = _solve_qf_lie(M_at, D, ds_result.tlist, rtol=self.rtol, atol=self.atol)
 
         return QuasiFloquetResult(
             context=self.context,

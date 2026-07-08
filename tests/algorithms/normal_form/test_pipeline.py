@@ -205,6 +205,7 @@ def test_reduce_accepts_orbit_like_object(fast_pipeline, l1_context):
 
 def test_failure_records_completed_subresults(l1_context, monkeypatch):
     """某步异常时 success=False，保留已完成子结果，message 记录失败步骤。"""
+
     # 让 quasi-Floquet 步抛异常，DS 步应已完成
     def _boom(*args, **kwargs):
         raise RuntimeError("synthetic QF failure")
@@ -285,6 +286,5 @@ def test_qiao_L1_Halo_Large_regression_is_skipped_without_fixture():
     fixture = Path(__file__).parent / "data" / "L1_rho2param_data.npz"
     if not fixture.exists():
         pytest.skip(
-            "qiao L1_Halo_Large fixture 未引入仓库；表征参数一致性回归待 "
-            "fixture + SPICE 内核就绪"
+            "qiao L1_Halo_Large fixture 未引入仓库；表征参数一致性回归待 fixture + SPICE 内核就绪"
         )

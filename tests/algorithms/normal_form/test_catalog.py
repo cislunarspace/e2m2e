@@ -425,9 +425,7 @@ def test_w_series_interp_uses_real_tlist(l1_context):
     tlist = np.asarray(qf.tlist, dtype=float).ravel()
     expected = float(np.interp(t, tlist, arr))  # 真实网格解析值
     wrong = float(np.interp(t, np.arange(arr.size) * 0.1, arr))  # 兜底网格错误值
-    assert abs(expected - wrong) > 1e-3, (
-        "测试前提不成立：真实网格与兜底网格在该点应明显不同"
-    )
+    assert abs(expected - wrong) > 1e-3, "测试前提不成立：真实网格与兜底网格在该点应明显不同"
 
     coeffs = _interp_W_series_at_t(cm, qf, t)
     got = coeffs[order][pow_tuple].real
@@ -526,12 +524,8 @@ def test_end_to_end_roundtrip_trivial(catalog_data, l1_context):
     rng = np.random.default_rng(101)
     X_rho = 1e-3 * rng.standard_normal(6)
     t = 1.35
-    X_param = rho_to_param(
-        X_rho, t, l1_context, data.ds_result, data.qf_result, data.cm_result
-    )
-    X_back = param_to_rho(
-        X_param, t, l1_context, data.ds_result, data.qf_result, data.cm_result
-    )
+    X_param = rho_to_param(X_rho, t, l1_context, data.ds_result, data.qf_result, data.cm_result)
+    X_back = param_to_rho(X_param, t, l1_context, data.ds_result, data.qf_result, data.cm_result)
     # 线性段全程：机器精度
     np.testing.assert_allclose(X_back, X_rho, atol=1e-12)
 
@@ -545,12 +539,20 @@ def test_end_to_end_roundtrip_with_high_order(catalog_data, l1_context):
     X_rho = 1e-3 * rng.standard_normal(6)
     t = 1.35
     X_param = rho_to_param(
-        X_rho, t, l1_context,
-        catalog_data.ds_result, catalog_data.qf_result, catalog_data.cm_result,
+        X_rho,
+        t,
+        l1_context,
+        catalog_data.ds_result,
+        catalog_data.qf_result,
+        catalog_data.cm_result,
     )
     X_back = param_to_rho(
-        X_param, t, l1_context,
-        catalog_data.ds_result, catalog_data.qf_result, catalog_data.cm_result,
+        X_param,
+        t,
+        l1_context,
+        catalog_data.ds_result,
+        catalog_data.qf_result,
+        catalog_data.cm_result,
     )
     np.testing.assert_allclose(X_back, X_rho, atol=1e-7)
 
@@ -561,12 +563,20 @@ def test_end_to_end_at_multiple_times(catalog_data, l1_context):
     X_rho = 1e-3 * rng.standard_normal(6)
     for t in [0.0, 0.5, 1.0, 2.0, 2.9]:
         X_param = rho_to_param(
-            X_rho, t, l1_context,
-            catalog_data.ds_result, catalog_data.qf_result, catalog_data.cm_result,
+            X_rho,
+            t,
+            l1_context,
+            catalog_data.ds_result,
+            catalog_data.qf_result,
+            catalog_data.cm_result,
         )
         X_back = param_to_rho(
-            X_param, t, l1_context,
-            catalog_data.ds_result, catalog_data.qf_result, catalog_data.cm_result,
+            X_param,
+            t,
+            l1_context,
+            catalog_data.ds_result,
+            catalog_data.qf_result,
+            catalog_data.cm_result,
         )
         np.testing.assert_allclose(X_back, X_rho, atol=1e-7, err_msg=f"t={t}")
 
@@ -592,8 +602,12 @@ def test_transformer_methods_match_functional(catalog_data, l1_context):
 
     X_param_oo = tr.rho_to_param(X_rho, t)
     X_param_fn = rho_to_param(
-        X_rho, t, l1_context,
-        catalog_data.ds_result, catalog_data.qf_result, catalog_data.cm_result,
+        X_rho,
+        t,
+        l1_context,
+        catalog_data.ds_result,
+        catalog_data.qf_result,
+        catalog_data.cm_result,
     )
     np.testing.assert_allclose(X_param_oo, X_param_fn, atol=1e-14)
 
