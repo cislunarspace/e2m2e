@@ -8,6 +8,9 @@ import time
 import numpy as np
 import pytest
 
+# sympy 是 normal-form optional dep；未安装时整个文件 skip（不 error）。
+pytest.importorskip("sympy")
+
 from e2m2e.algorithms.normal_form import NormalFormContext
 from e2m2e.algorithms.normal_form.constants import JD0_J2000
 from e2m2e.algorithms.normal_form.hamiltonian import (
