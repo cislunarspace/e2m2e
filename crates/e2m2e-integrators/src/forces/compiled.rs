@@ -201,7 +201,9 @@ pub fn supports_jacobian(force: &CompiledForce) -> bool {
 /// 计算单个 force 的加速度 + 雅可比（3×3）。
 ///
 /// - PointMass：解析 `-μ(I/r³ − 3rrᵀ/r⁵)`
-/// - GravityField：body-fixed 系 FD + R·J·Rᵀ（需 SPICE）
+/// - GravityField：传播系下有限差分（不含 body-fixed 旋转 sandwich，
+///   精度略低于 forces crate 的 `GravityFieldContext::jacobian_fd`，
+///   但避免了构建 context 的复杂度）
 /// - ThirdBody：spk_accel 解析
 /// - IndirectTerm：零矩阵（不依赖航天器位置）
 /// - SRP/Relativistic：返回 Err

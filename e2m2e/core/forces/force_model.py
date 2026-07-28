@@ -433,7 +433,7 @@ class ForceModel:
             [float(x) for x in y0],
             float(tol),
             float(tol),
-            None,  # max_step: 不限制
+            float(self.max_step),
             int(max_steps),
         )
 
