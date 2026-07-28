@@ -314,13 +314,21 @@ impl GravityFieldContext {
     ) -> Result<Self, SpiceFfiError> {
         // 1. 查天体位置（平移偏移）
         let (prop_origin_state_ssb, _) = e2m2e_spice::spice_ffi::spkezr(
-            propagation_origin, et, propagation_frame, "NONE", "SOLAR SYSTEM BARYCENTER",
+            propagation_origin,
+            et,
+            propagation_frame,
+            "NONE",
+            "SOLAR SYSTEM BARYCENTER",
         )?;
         let origin_offset = if body == propagation_origin {
             [0.0; 3]
         } else {
             let (body_state_ssb, _) = e2m2e_spice::spice_ffi::spkezr(
-                body, et, propagation_frame, "NONE", "SOLAR SYSTEM BARYCENTER",
+                body,
+                et,
+                propagation_frame,
+                "NONE",
+                "SOLAR SYSTEM BARYCENTER",
             )?;
             [
                 prop_origin_state_ssb[0] - body_state_ssb[0],
@@ -339,7 +347,16 @@ impl GravityFieldContext {
             effective_coefficients(et, body, c_flat, s_flat, mu, radius, tide)?
         };
 
-        Ok(Self { rotation, origin_offset, c_eff, s_eff, mu, radius, degree, order })
+        Ok(Self {
+            rotation,
+            origin_offset,
+            c_eff,
+            s_eff,
+            mu,
+            radius,
+            degree,
+            order,
+        })
     }
 
     /// 计算加速度（propagation frame），与 `gravity_field_acceleration` 逐位等价。
@@ -355,7 +372,13 @@ impl GravityFieldContext {
 
         // 球谐加速度（body-fixed 系）
         let a_input = spherical_harmonic::spherical_harmonic_accel(
-            &r_input, &self.c_eff, &self.s_eff, self.mu, self.radius, self.degree, self.order,
+            &r_input,
+            &self.c_eff,
+            &self.s_eff,
+            self.mu,
+            self.radius,
+            self.degree,
+            self.order,
         );
         let a_input_arr = [a_input[0], a_input[1], a_input[2]];
 

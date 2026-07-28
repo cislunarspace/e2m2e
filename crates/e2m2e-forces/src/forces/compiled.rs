@@ -78,7 +78,11 @@ impl CompiledForce {
                 let r_norm_sq = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
                 let r_norm = r_norm_sq.sqrt().max(1e-6);
                 let inv_r3 = 1.0 / (r_norm * r_norm * r_norm);
-                Ok([-mu * r[0] * inv_r3, -mu * r[1] * inv_r3, -mu * r[2] * inv_r3])
+                Ok([
+                    -mu * r[0] * inv_r3,
+                    -mu * r[1] * inv_r3,
+                    -mu * r[2] * inv_r3,
+                ])
             }
             Self::GravityField {
                 c_flat,
@@ -218,7 +222,11 @@ pub fn acceleration_and_jacobian(
             let r_norm = r_norm_sq.sqrt().max(1e-6);
             let inv_r3 = 1.0 / (r_norm * r_norm * r_norm);
             let inv_r5 = inv_r3 / (r_norm * r_norm);
-            let acc = [-mu * r[0] * inv_r3, -mu * r[1] * inv_r3, -mu * r[2] * inv_r3];
+            let acc = [
+                -mu * r[0] * inv_r3,
+                -mu * r[1] * inv_r3,
+                -mu * r[2] * inv_r3,
+            ];
             let mut jac = [[0.0_f64; 3]; 3];
             for i in 0..3 {
                 for j in 0..3 {
@@ -229,9 +237,19 @@ pub fn acceleration_and_jacobian(
             Ok((acc, jac))
         }
         CompiledForce::GravityField {
-            c_flat, s_flat, mu, radius, degree, order,
-            input_frame, propagation_frame, body, propagation_origin,
-            tide_mode, k_love_flat, k_plus_flat,
+            c_flat,
+            s_flat,
+            mu,
+            radius,
+            degree,
+            order,
+            input_frame,
+            propagation_frame,
+            body,
+            propagation_origin,
+            tide_mode,
+            k_love_flat,
+            k_plus_flat,
         } => {
             let r_sc = [state[0], state[1], state[2]];
             let tide = TideConfig {
@@ -240,9 +258,20 @@ pub fn acceleration_and_jacobian(
                 k_plus_flat: k_plus_flat.clone(),
             };
             let ctx = gravity_field::GravityFieldContext::build(
-                et, c_flat, s_flat, *mu, *radius, *degree, *order,
-                input_frame, propagation_frame, body, propagation_origin, &tide,
-            ).map_err(|e| format!("{:?}", e))?;
+                et,
+                c_flat,
+                s_flat,
+                *mu,
+                *radius,
+                *degree,
+                *order,
+                input_frame,
+                propagation_frame,
+                body,
+                propagation_origin,
+                &tide,
+            )
+            .map_err(|e| format!("{:?}", e))?;
             let acc = ctx.accel(&r_sc).map_err(|e| format!("{:?}", e))?;
             let jac = ctx.jacobian_fd(&r_sc).map_err(|e| format!("{:?}", e))?;
             Ok((acc, jac))
@@ -251,7 +280,8 @@ pub fn acceleration_and_jacobian(
             let sc_pos = [state[0], state[1], state[2]];
             let (acc, jac) = spk_accel::third_body_acceleration_and_jacobian(
                 et, body, observer, &sc_pos, *mu, 1e-6,
-            ).map_err(|e| format!("{:?}", e))?;
+            )
+            .map_err(|e| format!("{:?}", e))?;
             Ok((acc, jac))
         }
         CompiledForce::IndirectTerm { .. } => {

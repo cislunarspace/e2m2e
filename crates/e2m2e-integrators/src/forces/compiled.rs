@@ -78,7 +78,11 @@ impl CompiledForce {
                 let r_norm_sq = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
                 let r_norm = r_norm_sq.sqrt().max(1e-6);
                 let inv_r3 = 1.0 / (r_norm * r_norm * r_norm);
-                Ok([-mu * r[0] * inv_r3, -mu * r[1] * inv_r3, -mu * r[2] * inv_r3])
+                Ok([
+                    -mu * r[0] * inv_r3,
+                    -mu * r[1] * inv_r3,
+                    -mu * r[2] * inv_r3,
+                ])
             }
             Self::GravityField {
                 c_flat,
@@ -220,7 +224,11 @@ pub fn acceleration_and_jacobian(
             let r_norm = r_norm_sq.sqrt().max(1e-6);
             let inv_r3 = 1.0 / (r_norm * r_norm * r_norm);
             let inv_r5 = inv_r3 / (r_norm * r_norm);
-            let acc = [-mu * r[0] * inv_r3, -mu * r[1] * inv_r3, -mu * r[2] * inv_r3];
+            let acc = [
+                -mu * r[0] * inv_r3,
+                -mu * r[1] * inv_r3,
+                -mu * r[2] * inv_r3,
+            ];
             let mut jac = [[0.0_f64; 3]; 3];
             for i in 0..3 {
                 for j in 0..3 {
@@ -231,14 +239,24 @@ pub fn acceleration_and_jacobian(
             Ok((acc, jac))
         }
         CompiledForce::GravityField {
-            c_flat, s_flat, mu, radius, degree, order,
-            input_frame, propagation_frame, body, propagation_origin,
-            tide_mode, k_love_flat, k_plus_flat,
+            c_flat,
+            s_flat,
+            mu,
+            radius,
+            degree,
+            order,
+            input_frame,
+            propagation_frame,
+            body,
+            propagation_origin,
+            tide_mode,
+            k_love_flat,
+            k_plus_flat,
         } => {
             // 用有限差分计算雅可比（在传播系下做 FD，与 forces crate 的 body-fixed FD
             // 精度相当，因为坐标变换是光滑旋转）
             let acc = force.acceleration(et, state, observer)?;
-            let r_norm = (state[0]*state[0] + state[1]*state[1] + state[2]*state[2]).sqrt();
+            let r_norm = (state[0] * state[0] + state[1] * state[1] + state[2] * state[2]).sqrt();
             let h = (f64::EPSILON.sqrt() * r_norm).max(1e-6);
             let mut jac = [[0.0_f64; 3]; 3];
             for dim in 0..3 {
@@ -258,7 +276,8 @@ pub fn acceleration_and_jacobian(
             let sc_pos = [state[0], state[1], state[2]];
             let (acc, jac) = spk_accel::third_body_acceleration_and_jacobian(
                 et, body, observer, &sc_pos, *mu, 1e-6,
-            ).map_err(|e| format!("{:?}", e))?;
+            )
+            .map_err(|e| format!("{:?}", e))?;
             Ok((acc, jac))
         }
         CompiledForce::IndirectTerm { .. } => {

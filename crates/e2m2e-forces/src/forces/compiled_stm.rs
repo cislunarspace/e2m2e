@@ -6,9 +6,7 @@
 //!
 //! 复用 `nbody_stm` 的 `compute_jacobian_A` + `stm_derivative`。
 
-use crate::forces::compiled::{
-    CompiledForce, compute_total_acceleration_and_jacobian,
-};
+use crate::forces::compiled::{compute_total_acceleration_and_jacobian, CompiledForce};
 use crate::forces::nbody_stm;
 use e2m2e_propagation::butcher::{explicit_rk_step, suggest_next_step};
 use e2m2e_propagation::pd45::PD45_TABLE;
@@ -38,8 +36,14 @@ fn augmented_eom(
     et: f64,
     augmented: &[f64],
 ) -> Result<Vec<f64>, String> {
-    let state6 = [augmented[0], augmented[1], augmented[2],
-                  augmented[3], augmented[4], augmented[5]];
+    let state6 = [
+        augmented[0],
+        augmented[1],
+        augmented[2],
+        augmented[3],
+        augmented[4],
+        augmented[5],
+    ];
     let mut stm = [0.0_f64; 36];
     stm.copy_from_slice(&augmented[6..42]);
 
@@ -61,7 +65,12 @@ fn augmented_eom(
 }
 
 /// 预检：在 t0 做一次加速度 + 雅可比计算，SPICE 配置错误立即显式失败。
-pub fn precheck(forces: &[CompiledForce], observer: &str, et: f64, state: &[f64; 6]) -> Result<(), String> {
+pub fn precheck(
+    forces: &[CompiledForce],
+    observer: &str,
+    et: f64,
+    state: &[f64; 6],
+) -> Result<(), String> {
     compute_total_acceleration_and_jacobian(forces, et, state, observer)?;
     Ok(())
 }
@@ -119,11 +128,19 @@ pub fn propagate_compiled_stm(
     let mut n_rejected = 0usize;
 
     let mut times = vec![t_span.0];
-    let mut states = vec![[initial_state[0], initial_state[1], initial_state[2],
-                           initial_state[3], initial_state[4], initial_state[5]]];
+    let mut states = vec![[
+        initial_state[0],
+        initial_state[1],
+        initial_state[2],
+        initial_state[3],
+        initial_state[4],
+        initial_state[5],
+    ]];
     let mut stms = {
         let mut stm0 = [0.0_f64; 36];
-        for i in 0..6 { stm0[i * 6 + i] = 1.0; }
+        for i in 0..6 {
+            stm0[i * 6 + i] = 1.0;
+        }
         vec![stm0]
     };
 
@@ -139,7 +156,10 @@ pub fn propagate_compiled_stm(
         }
         h = h.min(h_max);
         if h < MIN_STEP * (t_span.1 - t_span.0).abs() {
-            return Err(format!("step size collapsed below minimum after {} steps", n_steps));
+            return Err(format!(
+                "step size collapsed below minimum after {} steps",
+                n_steps
+            ));
         }
 
         let forces_ref = forces;
@@ -178,9 +198,16 @@ pub fn propagate_compiled_stm(
     if times.len() != t_eval.len() {
         return Err(format!(
             "output length mismatch: got {} time points, expected {}",
-            times.len(), t_eval.len()
+            times.len(),
+            t_eval.len()
         ));
     }
 
-    Ok(CompiledStmResult { states, stms, times, n_steps, n_rejected })
+    Ok(CompiledStmResult {
+        states,
+        stms,
+        times,
+        n_steps,
+        n_rejected,
+    })
 }

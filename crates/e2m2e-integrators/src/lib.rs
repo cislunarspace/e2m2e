@@ -660,10 +660,9 @@ fn parse_force_tuple(item: &Bound<'_, PyAny>) -> PyResult<forces::compiled::Comp
 
     match tag.as_str() {
         "point_mass" => {
-            let mu: f64 = tuple
-                .get_item(1)?
-                .extract()
-                .map_err(|_| pyo3::exceptions::PyTypeError::new_err("point_mass mu must be float"))?;
+            let mu: f64 = tuple.get_item(1)?.extract().map_err(|_| {
+                pyo3::exceptions::PyTypeError::new_err("point_mass mu must be float")
+            })?;
             Ok(CompiledForce::PointMass { mu })
         }
         "gravity" => {
@@ -1072,7 +1071,9 @@ fn propagate_compiled_stm_py(
     let result = propagate_compiled_stm(
         &forces, observer, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps,
     )
-    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("STM propagation failed: {}", e)))?;
+    .map_err(|e| {
+        pyo3::exceptions::PyRuntimeError::new_err(format!("STM propagation failed: {}", e))
+    })?;
 
     let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
     let stm_list: Vec<Vec<f64>> = result.stms.iter().map(|s| s.to_vec()).collect();

@@ -35,7 +35,11 @@ pub fn compute_nbody_acceleration_and_jacobian(
         if body == &config.origin {
             let r_norm_sq = r_sc[0] * r_sc[0] + r_sc[1] * r_sc[1] + r_sc[2] * r_sc[2];
             let r_norm = r_norm_sq.sqrt();
-            let r_safe = if r_norm < MIN_DISTANCE { MIN_DISTANCE } else { r_norm };
+            let r_safe = if r_norm < MIN_DISTANCE {
+                MIN_DISTANCE
+            } else {
+                r_norm
+            };
             let inv_r3 = 1.0 / (r_safe * r_safe * r_safe);
             let inv_r5 = inv_r3 / (r_safe * r_safe);
 
@@ -48,7 +52,12 @@ pub fn compute_nbody_acceleration_and_jacobian(
             }
         } else {
             let (a_body, jac_body) = spk_accel::third_body_acceleration_and_jacobian(
-                et, body, &config.origin, r_sc, *gm, MIN_DISTANCE,
+                et,
+                body,
+                &config.origin,
+                r_sc,
+                *gm,
+                MIN_DISTANCE,
             )
             .map_err(|e| format!("SPICE query failed for {}: {:?}", body, e))?;
 
