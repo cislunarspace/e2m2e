@@ -230,17 +230,15 @@ fn effective_coefficients(
         };
     let mut perturbers_flat: Vec<f64> = Vec::with_capacity(perturbers_names.len() * 4);
     for &name in perturbers_names {
-        let pos_j2000: [f64; 3] = match e2m2e_spice::ephem_cache::lookup_body_position(
-            name, body, et,
-        ) {
-            Ok(Some(p)) => p,
-            Ok(None) => {
-                let (st, _) =
-                    e2m2e_spice::spice_ffi::spkezr(name, et, "J2000", "NONE", body)?;
-                [st[0], st[1], st[2]]
-            }
-            Err(e) => return Err(e.into()),
-        };
+        let pos_j2000: [f64; 3] =
+            match e2m2e_spice::ephem_cache::lookup_body_position(name, body, et) {
+                Ok(Some(p)) => p,
+                Ok(None) => {
+                    let (st, _) = e2m2e_spice::spice_ffi::spkezr(name, et, "J2000", "NONE", body)?;
+                    [st[0], st[1], st[2]]
+                }
+                Err(e) => return Err(e.into()),
+            };
         let pos_bf = mat3_t_mul_vec(&r_input_to_j2000, &pos_j2000);
         perturbers_flat.extend_from_slice(&pos_bf);
         // GM 用硬编码表（与 Python spice.get_gm 一致；DE430 bsp 不带 GM）
