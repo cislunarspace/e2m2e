@@ -179,9 +179,9 @@ struct FrameSpline {
 
 /// 单个 (from, to) 帧对的 6×6 状态变换矩阵 36 分量样条（行优先）。
 ///
-/// sxform 返回的 6×6 矩阵前 3×3 是旋转 R，后 3×3 是 R·Rdot（角速度
-/// 相关项）。缓存 36 个分量可直接插值整个矩阵，供 Lense-Thirring 等
-/// 需要 Rdot 的力模型使用。
+/// SPICE `sxform` 返回的 6×6 矩阵分块为 ``[R 0; Rdot R]``——左上 3×3 是
+/// 旋转 R，左下 3×3 是 R·ω（R 对时间导数），右下仍为 R。缓存 36 个分量
+/// 可直接插值整个矩阵，供 Lense-Thirring 等需要 Rdot 的力模型使用。
 struct SxformSpline {
     comps: [CubicSpline; 36],
 }

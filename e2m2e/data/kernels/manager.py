@@ -238,10 +238,10 @@ class SPICEManager(EphemerisProvider):
                     for k in (b.upper(), kid)
                 ],
                 frame_pairs,
-                sxform_pairs,
                 et_start,
                 et_end,
                 dt=dt,
+                sxform_pairs=sxform_pairs,
             )
         except ImportError:
             # 非 spice 构建（_integrators 无该函数）：仅 Python 层缓存生效

@@ -1777,19 +1777,19 @@ fn lambert_batch_py(
 /// - `frame_pairs`: 要缓存的帧旋转对 ``[(from, to), ...]``，如
 ///   ``[("ITRF93", "J2000"), ("MOON_PA", "J2000")]``
 /// - `sxform_pairs`: 要缓存的 6×6 状态变换对 ``[(from, to), ...]``，如
-///   ``[("ITRF93", "J2000")]``（Lense-Thirring 用）。可为空列表。
+///   ``[("ITRF93", "J2000")]``（Lense-Thirring 用）。关键字参数，默认 ``None``。
 /// - `et_start`, `et_end`: 积分时间范围（SPICE et 秒）
 /// - `dt`: 网格步长（秒），默认 3600
 #[cfg(feature = "spice")]
 #[pyfunction]
-#[pyo3(signature = (targets, frame_pairs, sxform_pairs, et_start, et_end, dt=3600.0))]
+#[pyo3(signature = (targets, frame_pairs, et_start, et_end, dt=3600.0, *, sxform_pairs=None))]
 fn enable_ephem_cache(
     targets: &Bound<'_, PyList>,
     frame_pairs: &Bound<'_, PyList>,
-    sxform_pairs: &Bound<'_, PyList>,
     et_start: f64,
     et_end: f64,
     dt: f64,
+    sxform_pairs: Option<&Bound<'_, PyList>>,
 ) -> PyResult<()> {
     let mut bodies: Vec<(String, String)> = Vec::new();
     for item in targets.iter() {
@@ -1802,9 +1802,11 @@ fn enable_ephem_cache(
         frames.push(tup);
     }
     let mut sxforms: Vec<(String, String)> = Vec::new();
-    for item in sxform_pairs.iter() {
-        let tup: (String, String) = item.extract()?;
-        sxforms.push(tup);
+    if let Some(pairs) = sxform_pairs {
+        for item in pairs.iter() {
+            let tup: (String, String) = item.extract()?;
+            sxforms.push(tup);
+        }
     }
     let cache = e2m2e_spice::ephem_cache::EphemCache::build(
         &bodies, &frames, &sxforms, et_start, et_end, dt,
