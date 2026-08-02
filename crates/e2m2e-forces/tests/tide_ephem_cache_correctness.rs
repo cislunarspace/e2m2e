@@ -1,3 +1,5 @@
+#![cfg(feature = "spice")]
+
 //! 潮汐缓存物理正确性测试（ADR 0013：按定义验证，不用 golden file）。
 //!
 //! PR #271 把 `gravity_field.rs` 的潮汐扰动体位置查询从裸调 spkezr
