@@ -76,7 +76,7 @@ fn test_tide_delta_zero_when_k_love_zero() {
     load_kernels();
 
     let et = 0.0; // J2000
-    // 月球系数（随便填，仅作 base 参照）
+                  // 月球系数（随便填，仅作 base 参照）
     let nn = 5usize; // degree+1 = 5
     let base_c: Vec<f64> = (0..nn * nn).map(|i| 1e-6 * (i as f64 + 1.0)).collect();
     let base_s: Vec<f64> = (0..nn * nn).map(|i| 1e-7 * (i as f64 + 1.0)).collect();
@@ -88,11 +88,7 @@ fn test_tide_delta_zero_when_k_love_zero() {
     };
 
     let (c_eff, s_eff) = effective_coefficients(
-        et,
-        "MOON",
-        &base_c,
-        &base_s,
-        4902.8001, // mu_moon (km³/s²)
+        et, "MOON", &base_c, &base_s, 4902.8001, // mu_moon (km³/s²)
         1738.0,    // radius_moon (km)
         &tide,
     )
@@ -141,8 +137,8 @@ fn test_perturber_position_cache_hit_consistency() {
             .expect("cache lookup failed")
             .expect("cache miss (should have been covered)");
 
-        let (st, _) = spice_ffi::spkezr("MOON", et, "J2000", "NONE", "EARTH")
-            .expect("spkezr failed");
+        let (st, _) =
+            spice_ffi::spkezr("MOON", et, "J2000", "NONE", "EARTH").expect("spkezr failed");
         let direct = [st[0], st[1], st[2]];
 
         for k in 0..3 {
