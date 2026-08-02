@@ -841,11 +841,7 @@ def design_orbit(
         # 扰动体→中心天体对（与 Rust perturbers_for_body 一致）：
         #   EARTH → [SUN, MOON]，MOON → [EARTH]。
         _perturber_map = {"EARTH": ["SUN", "MOON"], "MOON": ["EARTH"]}
-        _perturber_names = {
-            p
-            for b in bodies
-            for p in _perturber_map.get(b.upper(), [])
-        }
+        _perturber_names = {p for b in bodies for p in _perturber_map.get(b.upper(), [])}
         # 合并：原 bodies + 扰动体中未包含的天体（如 SUN），
         # enable_ephem_cache 自动注册 (name, observer) + (name, SSB) + NAIF-ID 变体。
         _cache_bodies = list(dict.fromkeys([*bodies, *_perturber_names]))

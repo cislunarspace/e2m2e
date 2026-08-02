@@ -177,6 +177,4 @@ def test_ephem_cache_tide_solid_consistency(earth_system):
         disable_ephem_cache()
 
     diff = np.linalg.norm(state_cached - state_baseline)
-    assert diff < 1e-2, (
-        f"tide=1 缓存 vs 未缓存末态差异 {diff:.3e} km 超过 1e-2"
-    )
+    assert diff < 1e-2, f"tide=1 缓存 vs 未缓存末态差异 {diff:.3e} km 超过 1e-2"
