@@ -141,9 +141,7 @@ class TestUnsupported:
     def test_ecom_srp_produces_ecom_config(self):
         """solar_radiation=2 应产出 EcomSolarRadiationPressure 配置。"""
         dyb = [0.02] + [0.0] * 8
-        cfg = dfh_perturbation_to_force_config(
-            _on(solar_radiation=2), dyb=dyb
-        )
+        cfg = dfh_perturbation_to_force_config(_on(solar_radiation=2), dyb=dyb)
         (ecom,) = _entries_by_type(cfg, "EcomSolarRadiationPressure")
         assert ecom["params"]["dyb"] == dyb
         assert ecom["params"]["shadow"] is None
