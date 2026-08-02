@@ -93,6 +93,7 @@ def test_ephem_cache_gravity_field_consistency(earth_system):
     enable_ephem_cache(
         [("EARTH", "SOLAR SYSTEM BARYCENTER")],
         [("ITRF93", "J2000")],
+        [],  # sxform_pairs（无 relativity 力时无需缓存 sxform）
         et0,
         et0 + duration,
         600.0,  # 10 分钟网格，pxform 插值精度 ~1e-3 km
@@ -126,6 +127,7 @@ def test_ephem_cache_third_body_consistency(earth_system):
             ("SUN", "EARTH"),
         ],
         [("ITRF93", "J2000")],
+        [],  # sxform_pairs（无 relativity 力时无需缓存 sxform）
         et0,
         et0 + duration,
         1800.0,  # 月球运动较快，30 分钟网格
