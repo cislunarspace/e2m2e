@@ -365,7 +365,5 @@ def test_relativistic_cache_zero_ffi_and_consistency(earth_ephemeris_system):
         disable_ephem_cache()
 
     # 缓存 vs 无缓存一致
-    diff = np.linalg.norm(
-        np.asarray(res_cached["states"][-1]) - np.asarray(res_base["states"][-1])
-    )
+    diff = np.linalg.norm(np.asarray(res_cached["states"][-1]) - np.asarray(res_base["states"][-1]))
     assert diff < 1e-5, f"缓存 vs 无缓存末态差异 {diff:.3e} km 超过 1e-5"
