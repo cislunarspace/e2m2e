@@ -139,7 +139,7 @@ class TransferDesignResult:
     transfer_type: str
     delta_v: float
     trajectory: Any
-    details: dict[str, Any] = field(default_factory=dict)
+    details: HmnTransferDetails | dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
