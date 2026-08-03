@@ -260,7 +260,7 @@ class SpecialPointLaw:
                         state_at_trial[np.newaxis, :], np.array([found_trial[0]])
                     )[0, 3:]
                     g_trial = float(np.linalg.norm(self._constraint(v_syn_trial)))
-                    if g_trial > g_norm:
+                    if g_trial > g_norm:  # noqa: SIM108
                         v0 = v0 + dv * self.damping_factor
                     else:
                         v0 = v_trial

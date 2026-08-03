@@ -20,10 +20,10 @@ _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-import numpy as np
+import numpy as np  # noqa: E402
 
-from e2m2e.algorithm.design.design_orbit import design_orbit
-from e2m2e.algorithm.station_keeping.controller import control_orbit
+from e2m2e.algorithm.design.design_orbit import design_orbit  # noqa: E402
+from e2m2e.algorithm.station_keeping.controller import control_orbit  # noqa: E402
 
 # ─── 轨道与仿真参数 ───────────────────────────────────────────────────────────
 EPOCH = [2024, 1, 1, 0, 0, 0.0]

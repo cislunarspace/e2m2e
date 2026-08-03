@@ -23,6 +23,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from e2m2e.algorithm.design.design_orbit import DesignNotConvergedError, design_orbit
+from e2m2e.algorithm.station_keeping.controller import control_orbit
 from e2m2e.io import (
     format_inputs_control,
     format_inputs_design,
@@ -32,8 +34,6 @@ from e2m2e.io import (
     read_sk_statistic,
     write_inputs_dac,
 )
-from e2m2e.algorithm.design.design_orbit import DesignNotConvergedError, design_orbit
-from e2m2e.algorithm.station_keeping.controller import control_orbit
 
 pytestmark = [pytest.mark.slow, pytest.mark.e2e]
 

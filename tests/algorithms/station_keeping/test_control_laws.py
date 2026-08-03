@@ -200,8 +200,8 @@ class TestSpecialPointLaw:
         """damping_factor < 1 在过冲场景下逐步回溯，收敛到容差内。"""
         t0 = 0.0
         state0 = np.array([0.0, 10.0, 0.0, 0.05, -0.01, 0.0])
-        # v_c=1.0 无过冲，damping 仍生效：第一迭代全步长-0.05过冲到-0.05（g=0.05>g_old=0.05取等不触发）
-        # 第二迭代全步长-0.05→v=0，g=0<tolerance→收敛
+        # v_c=1.0 无过冲，damping 仍生效：第一迭代全步长-0.05
+        # g=0.05>g_old=0.05 取等不触发，第二迭代全步长-0.05→v=0，g=0→收敛
         # 验证 damping 不阻止正常收敛
         law = SpecialPointLaw(
             special_mode=1,
