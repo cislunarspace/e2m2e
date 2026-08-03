@@ -14,6 +14,8 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
+from .lambert import solve_lambert_batch
+
 # 地球引力参数 (km³/s²)，WGS-84
 MU_EARTH: float = 398600.4418
 # 地球赤道半径 (km)，WGS-84
@@ -213,3 +215,54 @@ def hohmann_tof(r1: float, r2: float, mu: float = MU_EARTH) -> float:
     """
     a_t = (r1 + r2) / 2.0
     return math.pi * math.sqrt(a_t**3 / mu)
+
+
+def scan_lambert_delta_v(
+    r0: NDArray[np.float64],
+    v0_park: NDArray[np.float64],
+    r_target: NDArray[np.float64],
+    v_target: NDArray[np.float64],
+    tof_grid: NDArray[np.float64],
+    mu: float = MU_EARTH,
+) -> tuple[float, NDArray[np.float64], NDArray[np.float64]]:
+    """用 Lambert 批量扫描找最优 tof。
+
+    对每个 tof 调用 solve_lambert_batch，计算总
+    Δv = |v0_lambert - v0_park| + |vf_lambert - v_target|，
+    返回 (最优 tof, 最优 v0_lambert, 最优 vf_lambert)。
+
+    Args:
+        r0: 出发位置 (3,) km
+        v0_park: 停泊轨道速度 (3,) km/s
+        r_target: 到达位置 (3,) km
+        v_target: 目标轨道速度 (3,) km/s
+        tof_grid: tof 网格 (M,) 秒
+        mu: 引力参数 (km³/s²)
+
+    Returns:
+        (最优 tof, 最优 v0_lambert, 最优 vf_lambert)
+
+    Raises:
+        ValueError: 所有 tof 均无解。
+    """
+    result = solve_lambert_batch(
+        r0.reshape(1, 3), r_target.reshape(1, 3), tof_grid, mu
+    )  # (1, M, 2, 3)
+
+    total_dv = np.full(tof_grid.shape[0], np.inf)
+    for j in range(tof_grid.shape[0]):
+        v0_lam = result[0, j, 0, :]
+        vf_lam = result[0, j, 1, :]
+        if np.any(np.isnan(v0_lam)) or np.any(np.isnan(vf_lam)):
+            continue
+        total_dv[j] = np.linalg.norm(v0_lam - v0_park) + np.linalg.norm(vf_lam - v_target)
+
+    best_idx = int(np.argmin(total_dv))
+    if np.isinf(total_dv[best_idx]):
+        raise ValueError("scan_lambert_delta_v: 所有 tof 均无解")
+
+    return (
+        float(tof_grid[best_idx]),
+        result[0, best_idx, 0, :].copy(),
+        result[0, best_idx, 1, :].copy(),
+    )

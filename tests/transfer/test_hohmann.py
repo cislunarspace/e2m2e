@@ -21,6 +21,7 @@ from e2m2e.algorithm.transfer.hohmann import (
     hohmann_delta_v,
     hohmann_tof,
     keplerian_to_cartesian,
+    scan_lambert_delta_v,
 )
 
 
@@ -259,3 +260,57 @@ class TestHmnTransferPhysics:
         v_circ2 = math.sqrt(MU_EARTH / r2)
         v2_from_dv = v_circ2 - dv2
         assert abs(v2_vis_viva - v2_from_dv) < 1e-10
+
+
+class TestLambertBatchScan:
+    """Lambert 批量扫描 Δv 测试。"""
+
+    def test_scan_finds_hohmann_tof(self):
+        """对 LEO→月球场景，扫描 [3, 7] 天的 tof 网格，最优 tof 接近 hohmann_tof。"""
+        r1 = R_EARTH + 200.0
+        r2 = 384405.0  # 地月平均距离
+        expected_tof = hohmann_tof(r1, r2)
+
+        # 出发状态：停泊轨道（x 轴方向，圆轨道）
+        r0 = np.array([r1, 0.0, 0.0])
+        v0_park = np.array([0.0, math.sqrt(MU_EARTH / r1), 0.0])
+
+        # 目标位置：负 x 轴（180° 转移角，与霍曼转移几何一致）
+        r_target = np.array([-r2, 0.0, 0.0])
+        # 目标速度：圆轨道近似
+        v_target = np.array([0.0, -math.sqrt(MU_EARTH / r2), 0.0])
+
+        # 扫描 [3, 7] 天的 tof 网格
+        tof_grid = np.linspace(3.0 * 86400.0, 7.0 * 86400.0, 50)
+
+        optimal_tof, _, _ = scan_lambert_delta_v(r0, v0_park, r_target, v_target, tof_grid)
+
+        optimal_tof_days = optimal_tof / 86400.0
+        expected_tof_days = expected_tof / 86400.0
+        assert abs(optimal_tof_days - expected_tof_days) < 0.5
+
+    def test_scan_dv_less_than_fixed(self):
+        """扫描的 Δv ≤ 固定 tof 的 Δv（扫描不会更差）。"""
+        r1 = R_EARTH + 200.0
+        r2 = 384405.0
+
+        r0 = np.array([r1, 0.0, 0.0])
+        v0_park = np.array([0.0, math.sqrt(MU_EARTH / r1), 0.0])
+        r_target = np.array([-r2, 0.0, 0.0])
+        v_target = np.array([0.0, -math.sqrt(MU_EARTH / r2), 0.0])
+
+        # 固定 tof = hohmann_tof
+        fixed_tof = hohmann_tof(r1, r2)
+        fixed_result = scan_lambert_delta_v(r0, v0_park, r_target, v_target, np.array([fixed_tof]))
+        fixed_dv = np.linalg.norm(fixed_result[1] - v0_park) + np.linalg.norm(
+            fixed_result[2] - v_target
+        )
+
+        # 扫描 [3, 7] 天
+        tof_grid = np.linspace(3.0 * 86400.0, 7.0 * 86400.0, 50)
+        optimal_tof, v0_opt, vf_opt = scan_lambert_delta_v(
+            r0, v0_park, r_target, v_target, tof_grid
+        )
+        scan_dv = np.linalg.norm(v0_opt - v0_park) + np.linalg.norm(vf_opt - v_target)
+
+        assert scan_dv <= fixed_dv + 0.01  # 允许网格离散化误差

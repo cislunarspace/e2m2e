@@ -24,7 +24,15 @@ from .config import (
     TransferOptimizationResult,
     TransferSolution,
 )
-from .hohmann import R_EARTH, TliParams, construct_departure_state, hohmann_delta_v, hohmann_tof
+from .hohmann import (
+    MU_EARTH,
+    R_EARTH,
+    TliParams,
+    construct_departure_state,
+    hohmann_delta_v,
+    hohmann_tof,
+    scan_lambert_delta_v,
+)
 from .lambert import LambertSolution, solve_lambert, solve_lambert_batch
 from .low_energy import PatchCandidate, design_low_energy_transfer, patch_manifolds
 from .lowthrust_collocation import LowThrustCollocation
@@ -108,6 +116,7 @@ __all__ = [
     "construct_departure_state",
     "hohmann_delta_v",
     "hohmann_tof",
+    "scan_lambert_delta_v",
     "HmnTransferDetails",
     "transfer_orbit",
 ]
@@ -182,15 +191,20 @@ def transfer_orbit(
         ValueError: HMN 转移缺少必要参数。
     """
     if transfer_type == "HMN":
-        return _transfer_orbit_hmn(tli_params, target_orbit_radius_km)
+        return _transfer_orbit_hmn(tli_params, target_orbit_radius_km, tof_range)
     raise NotImplementedError(f"transfer_orbit('{transfer_type}') 实现未完成（能力在规划中）")
 
 
 def _transfer_orbit_hmn(
     tli_params: TliParams | None,
     target_orbit_radius_km: float | None,
+    tof_range: tuple[float, float] | None = None,
 ) -> TransferDesignResult:
-    """HMN 霍曼转移编排：解析解 + 出发状态构造。"""
+    """HMN 霍曼转移编排：解析解 + 出发状态构造。
+
+    当 ``tof_range`` 提供时，用 Lambert 批量扫描最优 tof；
+    否则用霍曼公式计算固定 tof。
+    """
     if tli_params is None:
         raise ValueError("HMN 转移需要 tli_params")
     if target_orbit_radius_km is None:
@@ -203,6 +217,24 @@ def _transfer_orbit_hmn(
     tof = hohmann_tof(r1, r2)
 
     r0, v0 = construct_departure_state(tli_params)
+
+    if tof_range is not None:
+        tof_min_sec = tof_range[0] * 86400.0
+        tof_max_sec = tof_range[1] * 86400.0
+        tof_grid = np.linspace(tof_min_sec, tof_max_sec, 50)
+
+        # 目标位置：沿 y 轴（与出发 x 轴成 90°，简化共面假设）
+        r_target = np.array([0.0, r2, 0.0])
+        # 目标速度：圆轨道近似，沿 x 轴切向
+        v_target = np.array([np.sqrt(MU_EARTH / r2), 0.0, 0.0])
+
+        optimal_tof, v0_lambert, vf_lambert = scan_lambert_delta_v(
+            r0, v0, r_target, v_target, tof_grid
+        )
+        tof = optimal_tof
+        dv1 = float(np.linalg.norm(v0_lambert - v0))
+        dv2 = float(np.linalg.norm(vf_lambert - v_target))
+
     departure_state = np.concatenate([r0, v0])
 
     details = HmnTransferDetails(
