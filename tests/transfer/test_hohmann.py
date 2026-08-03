@@ -206,3 +206,56 @@ class TestTransferOrbitHmn:
         """transfer_orbit("LGA") 抛出 NotImplementedError。"""
         with pytest.raises(NotImplementedError, match="LGA"):
             transfer_orbit("LGA")
+
+
+class TestHmnTransferPhysics:
+    """霍曼转移物理守恒量验证。"""
+
+    # LEO 300km → GEO 典型场景
+    _r1 = R_EARTH + 300.0
+    _r2 = 42164.0
+
+    def test_transfer_semi_major_axis(self):
+        """转移轨道半长轴 a_t = (r1 + r2) / 2。"""
+        r1, r2 = self._r1, self._r2
+        a_t_expected = (r1 + r2) / 2.0
+        dv1, _ = hohmann_delta_v(r1, r2)
+        v_circ = math.sqrt(MU_EARTH / r1)
+        v1 = v_circ + dv1  # 出发点速度（切向加速后）
+        # 从 vis-viva 反算半长轴: 1/a = 2/r - v²/μ
+        a_t_actual = 1.0 / (2.0 / r1 - v1**2 / MU_EARTH)
+        assert abs(a_t_actual - a_t_expected) / a_t_expected < 0.001
+
+    def test_energy_conservation_on_transfer_ellipse(self):
+        """转移椭圆上出发点和到达点比机械能相等。"""
+        r1, r2 = self._r1, self._r2
+        dv1, _ = hohmann_delta_v(r1, r2)
+        v1 = math.sqrt(MU_EARTH / r1) + dv1  # 出发点速度
+        # 活力公式求到达点速度: v² = 2μ/r2 + v1² - 2μ/r1
+        v2 = math.sqrt(2.0 * MU_EARTH / r2 + v1**2 - 2.0 * MU_EARTH / r1)
+        eps1 = v1**2 / 2.0 - MU_EARTH / r1
+        eps2 = v2**2 / 2.0 - MU_EARTH / r2
+        assert abs(eps1 - eps2) < 1e-6
+
+    def test_angular_momentum_conservation(self):
+        """共面霍曼转移比角动量守恒。"""
+        r1, r2 = self._r1, self._r2
+        dv1, _ = hohmann_delta_v(r1, r2)
+        v1 = math.sqrt(MU_EARTH / r1) + dv1  # 出发点切向速度
+        v2 = math.sqrt(2.0 * MU_EARTH / r2 + v1**2 - 2.0 * MU_EARTH / r1)
+        # 切向速度: |r×v| = r * v
+        h1 = r1 * v1
+        h2 = r2 * v2
+        assert abs(h1 - h2) / h1 < 1e-10
+
+    def test_arrival_velocity_from_vis_viva(self):
+        """活力公式到达速度与 hohmann_delta_v dv2 一致。"""
+        r1, r2 = self._r1, self._r2
+        _, dv2 = hohmann_delta_v(r1, r2)
+        a_t = (r1 + r2) / 2.0
+        # vis-viva: v = sqrt(μ * (2/r - 1/a))
+        v2_vis_viva = math.sqrt(MU_EARTH * (2.0 / r2 - 1.0 / a_t))
+        # 与圆轨道速度 - dv2 比较: dv2 = v_circ2 - v2 => v2 = v_circ2 - dv2
+        v_circ2 = math.sqrt(MU_EARTH / r2)
+        v2_from_dv = v_circ2 - dv2
+        assert abs(v2_vis_viva - v2_from_dv) < 1e-10
