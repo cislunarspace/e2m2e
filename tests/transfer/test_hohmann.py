@@ -18,6 +18,7 @@ from e2m2e.algorithm.transfer.hohmann import (
     TliParams,
     _rotation_matrix,
     construct_departure_state,
+    ephemeris_shoot_transfer,
     hohmann_delta_v,
     hohmann_tof,
     keplerian_to_cartesian,
@@ -314,3 +315,192 @@ class TestLambertBatchScan:
         scan_dv = np.linalg.norm(v0_opt - v0_park) + np.linalg.norm(vf_opt - v_target)
 
         assert scan_dv <= fixed_dv + 0.01  # 允许网格离散化误差
+
+
+# ---------------------------------------------------------------------------
+# TwoBodyDynamics：纯 Python 二体动力学（测试用，不依赖 SPICE）
+# ---------------------------------------------------------------------------
+
+
+class TwoBodyDynamics:
+    """简化的二体动力学（测试用），满足 MultipleShooting 接口。
+
+    实现 RK4 积分 + 42 维增广状态（含 STM 变分方程）。
+    """
+
+    def __init__(self, mu: float = MU_EARTH):
+        self.mu = mu
+
+    def equations_of_motion(self, t: float, state: np.ndarray) -> np.ndarray:
+        """二体运动方程：r' = v, v' = -mu*r/|r|^3。"""
+        r = state[:3]
+        v = state[3:]
+        r_norm = np.linalg.norm(r)
+        a = -self.mu * r / r_norm**3
+        return np.concatenate([v, a])
+
+    def _stm_eom(self, t: float, aug_state: np.ndarray) -> np.ndarray:
+        """42 维增广状态运动方程（含 STM 变分方程）。"""
+        r = aug_state[:3]
+        v = aug_state[3:6]
+        r_norm = np.linalg.norm(r)
+        r3 = r_norm**3
+        r5 = r_norm**5
+
+        # 状态导数
+        dr = v
+        dv = -self.mu * r / r3
+
+        # 状态转移矩阵导数: dPhi = A * Phi
+        # A = [[0, I], [dg/dr, 0]]
+        dg = self.mu * (3.0 * np.outer(r, r) / r5 - np.eye(3) / r3)
+        stm = aug_state[6:].reshape(6, 6)
+        dstm = np.zeros_like(stm)
+        dstm[:3, :] = stm[3:6, :]  # dPhi_r = Phi_v
+        dstm[3:6, :] = dg @ stm[:3, :]  # dPhi_v = dg * Phi_r
+
+        return np.concatenate([dr, dv, dstm.ravel()])
+
+    def propagate(
+        self,
+        state: np.ndarray,
+        t_span: tuple[float, float],
+        with_stm: bool = True,
+    ) -> dict:
+        """RK4 积分传播（含 STM）。"""
+        state = np.asarray(state, dtype=float)
+        if with_stm:
+            stm0 = np.eye(6).ravel()
+            aug0 = np.concatenate([state, stm0])
+            n_total = 42
+        else:
+            aug0 = state.copy()
+            n_total = 6
+
+        # RK4 积分参数
+        t0, tf = t_span
+        n_steps = 200
+        dt = (tf - t0) / n_steps
+
+        times = np.empty(n_steps + 1)
+        states = np.empty((n_steps + 1, n_total))
+        times[0] = t0
+        states[0] = aug0.copy()
+
+        y = aug0.copy()
+        t_cur = t0
+        eom = self._stm_eom if with_stm else self.equations_of_motion
+
+        for i in range(n_steps):
+            k1 = eom(t_cur, y)
+            k2 = eom(t_cur + dt / 2, y + dt / 2 * k1)
+            k3 = eom(t_cur + dt / 2, y + dt / 2 * k2)
+            k4 = eom(t_cur + dt, y + dt * k3)
+            y = y + (dt / 6) * (k1 + 2 * k2 + 2 * k3 + k4)
+            t_cur += dt
+            times[i + 1] = t_cur
+            states[i + 1] = y.copy()
+
+        result: dict = {
+            "time": times,
+            "states": states[:, :6],
+        }
+        if with_stm:
+            result["stm"] = states[:, 6:].reshape(-1, 6, 6)
+        return result
+
+
+class TestEphemerisShooting:
+    """ephemeris_shoot_transfer 打靶收敛测试（二体动力学，纯 Python）。"""
+
+    def _make_lambert_guess(
+        self,
+        r1_km: float,
+        r2_km: float,
+    ) -> tuple[np.ndarray, np.ndarray, float]:
+        """构造 LEO→远轨道的 Lambert 初猜（共面、沿 y 轴出发）。"""
+        r0 = np.array([r1_km, 0.0, 0.0])
+        v_circ = math.sqrt(MU_EARTH / r1_km)
+        dv1, _ = hohmann_delta_v(r1_km, r2_km)
+        v0 = np.array([0.0, v_circ + dv1, 0.0])
+        tof = hohmann_tof(r1_km, r2_km)
+        return r0, v0, tof
+
+    def test_shooting_converges_two_body(self):
+        """TwoBodyDynamics + Lambert 初猜，MultipleShooting 应收敛。"""
+        r1 = R_EARTH + 300.0
+        r2 = R_EARTH + 35786.0  # GEO 转移
+        r0, v0, tof = self._make_lambert_guess(r1, r2)
+
+        dyn = TwoBodyDynamics(mu=MU_EARTH)
+        result = ephemeris_shoot_transfer(
+            dynamics=dyn,
+            t0=0.0,
+            r0=r0,
+            v0=v0,
+            tof=tof,
+            n_patches=5,
+            max_iter=30,
+            tolerance=1e-6,
+        )
+
+        assert result.converged is True
+        assert result.max_residual < 1e-6
+        assert result.outer_iterations <= 30
+
+    def test_shooting_preserves_trajectory_shape(self):
+        """打靶后各 patch point 位置模在合理范围内（r1 到 r2 之间）。"""
+        r1 = R_EARTH + 200.0
+        r2 = R_EARTH + 35786.0  # GEO
+        r0, v0, tof = self._make_lambert_guess(r1, r2)
+
+        dyn = TwoBodyDynamics(mu=MU_EARTH)
+        result = ephemeris_shoot_transfer(
+            dynamics=dyn,
+            t0=0.0,
+            r0=r0,
+            v0=v0,
+            tof=tof,
+            n_patches=5,
+            max_iter=30,
+            tolerance=1e-6,
+        )
+
+        assert result.converged is True
+        radii = np.linalg.norm(result.state_patch[:, :3], axis=1)
+        # 出发点半径应在 LEO 附近
+        assert radii[0] < r1 * 1.5
+        # 所有半径应为正（不应穿入地球中心）
+        assert np.all(radii > 0)
+
+    def test_shooting_insufficient_patches_raises(self):
+        """n_patches < 2 时应抛出 ValueError。"""
+        dyn = TwoBodyDynamics(mu=MU_EARTH)
+        r0 = np.array([R_EARTH + 300.0, 0.0, 0.0])
+        v0 = np.array([0.0, 7.7, 0.0])
+        with pytest.raises(ValueError, match="n_patches must be >= 2"):
+            ephemeris_shoot_transfer(
+                dynamics=dyn,
+                t0=0.0,
+                r0=r0,
+                v0=v0,
+                tof=3600.0,
+                n_patches=1,
+            )
+
+    def test_transfer_orbit_hmn_with_dynamics(self):
+        """transfer_orbit('HMN', dynamics=...) 应返回含 trajectory 的结果。"""
+        dyn = TwoBodyDynamics(mu=MU_EARTH)
+        params = TliParams(parking_alt_km=300.0, inclination_deg=0.0)
+        result = transfer_orbit(
+            "HMN",
+            tli_params=params,
+            target_orbit_radius_km=R_EARTH + 35786.0,
+            dynamics=dyn,
+        )
+        assert isinstance(result, TransferDesignResult)
+        assert result.transfer_type == "HMN"
+        # 打靶成功时 trajectory 应为 (N, 6) 数组
+        assert result.trajectory is not None
+        assert result.trajectory.ndim == 2
+        assert result.trajectory.shape[1] == 6

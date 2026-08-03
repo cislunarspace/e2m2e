@@ -29,6 +29,7 @@ from .hohmann import (
     R_EARTH,
     TliParams,
     construct_departure_state,
+    ephemeris_shoot_transfer,
     hohmann_delta_v,
     hohmann_tof,
     scan_lambert_delta_v,
@@ -117,6 +118,7 @@ __all__ = [
     "hohmann_delta_v",
     "hohmann_tof",
     "scan_lambert_delta_v",
+    "ephemeris_shoot_transfer",
     "HmnTransferDetails",
     "transfer_orbit",
 ]
@@ -171,6 +173,7 @@ def transfer_orbit(
     tli_params: TliParams | None = None,
     tof_range: tuple[float, float] | None = None,
     target_orbit_radius_km: float | None = None,
+    dynamics: Any = None,
     **kwargs,
 ) -> TransferDesignResult:
     """端到端转移轨道设计（编排器）。
@@ -182,6 +185,7 @@ def transfer_orbit(
         tli_params: 地球停泊轨道参数（TLI 高度/倾角/航迹角）。
         tof_range: 飞行时间范围（天）。
         target_orbit_radius_km: 目标轨道半径 (km)，HMN 转移必需。
+        dynamics: 动力学对象（可选），用于 ephemeris 打靶修正。
 
     Returns:
         TransferDesignResult: 转移轨道设计结果。
@@ -191,7 +195,7 @@ def transfer_orbit(
         ValueError: HMN 转移缺少必要参数。
     """
     if transfer_type == "HMN":
-        return _transfer_orbit_hmn(tli_params, target_orbit_radius_km, tof_range)
+        return _transfer_orbit_hmn(tli_params, target_orbit_radius_km, tof_range, dynamics=dynamics)
     raise NotImplementedError(f"transfer_orbit('{transfer_type}') 实现未完成（能力在规划中）")
 
 
@@ -199,11 +203,15 @@ def _transfer_orbit_hmn(
     tli_params: TliParams | None,
     target_orbit_radius_km: float | None,
     tof_range: tuple[float, float] | None = None,
+    dynamics: Any = None,
 ) -> TransferDesignResult:
     """HMN 霍曼转移编排：解析解 + 出发状态构造。
 
     当 ``tof_range`` 提供时，用 Lambert 批量扫描最优 tof；
     否则用霍曼公式计算固定 tof。
+
+    当 ``dynamics`` 提供时，调用 ``ephemeris_shoot_transfer`` 在给定动力学
+    模型下修正 Lambert 初猜（多重打靶收敛）。
     """
     if tli_params is None:
         raise ValueError("HMN 转移需要 tli_params")
@@ -235,7 +243,28 @@ def _transfer_orbit_hmn(
         dv1 = float(np.linalg.norm(v0_lambert - v0))
         dv2 = float(np.linalg.norm(vf_lambert - v_target))
 
-    departure_state = np.concatenate([r0, v0])
+    # 当 dynamics 提供时，用 ephemeris 打靶修正 Lambert 初猜
+    trajectory: Any = None
+    if dynamics is not None:
+        t0 = 0.0  # 动力学模型的时间基准（秒）
+        shoot_result = ephemeris_shoot_transfer(
+            dynamics=dynamics,
+            t0=t0,
+            r0=r0,
+            v0=v0 + np.array([0.0, dv1, 0.0]) if tof_range is None else v0_lambert,
+            tof=tof,
+        )
+        if shoot_result.converged:
+            # 用打靶收敛的出发状态更新 delta_v 和 departure_state
+            v0_shot = shoot_result.state_patch[0, 3:6]
+            dv1 = float(np.linalg.norm(v0_shot - v0))
+            departure_state = shoot_result.state_patch[0].copy()
+            trajectory = shoot_result.state_patch
+        else:
+            departure_state = np.concatenate([r0, v0])
+            trajectory = None
+    else:
+        departure_state = np.concatenate([r0, v0])
 
     details = HmnTransferDetails(
         tli_epoch=tli_params.epoch,
@@ -251,6 +280,6 @@ def _transfer_orbit_hmn(
     return TransferDesignResult(
         transfer_type="HMN",
         delta_v=dv1 + dv2,
-        trajectory=None,
+        trajectory=trajectory,
         details=details,
     )

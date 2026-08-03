@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -265,4 +266,72 @@ def scan_lambert_delta_v(
         float(tof_grid[best_idx]),
         result[0, best_idx, 0, :].copy(),
         result[0, best_idx, 1, :].copy(),
+    )
+
+
+def ephemeris_shoot_transfer(
+    dynamics: Any,
+    t0: float,
+    r0: NDArray[np.float64],
+    v0: NDArray[np.float64],
+    tof: float,
+    n_patches: int = 5,
+    max_iter: int = 30,
+    tolerance: float = 1e-6,
+) -> Any:
+    """用 MultipleShooting 在给定动力学模型下修正 Lambert 初猜。
+
+    步骤：
+    1. 沿 Lambert 初猜弧段均匀采样 ``n_patches`` 个 patch point 时刻。
+    2. 用动力学模型 ``dynamics.propagate`` 从 (r0, v0) 积分整条弧段，
+       在各 patch point 时刻插值取状态作为初猜。
+    3. 调用 ``MultipleShooting.correct()`` 收敛。
+    4. 返回 ``MultipleShootingResult``。
+
+    Args:
+        dynamics: 动力学对象，需提供 ``propagate(state, t_span, with_stm=True)``
+            和 ``equations_of_motion(t, state)`` 接口。
+        t0: 出发时刻（秒，动力学模型的时间基准）。
+        r0: 出发位置 (3,) km。
+        v0: 出发速度 (3,) km/s，Lambert 解。
+        tof: 飞行时间 (秒)。
+        n_patches: patch point 数量，默认 5。
+        max_iter: 多重打靶最大迭代次数，默认 30。
+        tolerance: 收敛容差，默认 1e-6。
+
+    Returns:
+        MultipleShootingResult: 打靶修正结果。
+
+    Raises:
+        ValueError: n_patches < 2。
+    """
+    # 延迟导入，避免循环依赖
+    from ..solver.multiple_shooting import MultipleShooting
+
+    if n_patches < 2:
+        raise ValueError("n_patches must be >= 2")
+
+    # 1. 均匀采样 patch point 时刻
+    t_end = t0 + tof
+    t_patch = np.linspace(t0, t_end, n_patches)
+
+    # 2. 用动力学模型从 (r0, v0) 积分整条弧段，获取初猜状态
+    initial_state = np.concatenate([r0, v0])
+    result = dynamics.propagate(initial_state, (t0, t_end), with_stm=True)
+    states_traj = result["states"]  # (M, 6)
+    time_traj = result["time"]  # (M,)
+
+    # 在各 patch point 时刻线性插值取状态
+    state_patch = np.empty((n_patches, 6))
+    for j in range(6):
+        state_patch[:, j] = np.interp(t_patch, time_traj, states_traj[:, j])
+
+    # 3. 调用 MultipleShooting 收敛
+    ms = MultipleShooting(dynamics=dynamics)
+    return ms.correct(
+        t_patch=t_patch,
+        state_patch=state_patch,
+        var_time=False,
+        max_iter=max_iter,
+        tolerance=tolerance,
     )
