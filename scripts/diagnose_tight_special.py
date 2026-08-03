@@ -73,9 +73,9 @@ def _run_mode(name: str, control_mode: int, **kwargs) -> float:
         **kwargs,
     )
     sk = result.sk_statistic
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  {name}  (control_mode={control_mode})")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  控制节点数: {len(sk.rows)}")
     print(f"  失败样本数: {result.num_failed}")
     # SK_STATISTIC 每行：MJD  Δv_orb(m/s)  Δv_cum(m/s)
@@ -120,9 +120,9 @@ if __name__ == "__main__":
     )
 
     # 汇总
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("  汇总")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  LOOSE  总 Δv: {dv_loose:.4f} m/s")
     print(f"  TIGHT  总 Δv: {dv_tight:.4f} m/s")
     print(f"  SPECIAL 总 Δv: {dv_special:.4f} m/s")
@@ -130,9 +130,9 @@ if __name__ == "__main__":
     # 合理性检查
     issues = []
     if dv_tight < dv_loose * 0.1:
-        issues.append(f"TIGHT 偏低 {dv_loose/max(dv_tight,1e-12):.1f}×（预期与 LOOSE 同阶）")
+        issues.append(f"TIGHT 偏低 {dv_loose / max(dv_tight, 1e-12):.1f}×（预期与 LOOSE 同阶）")
     if dv_special > dv_loose * 10:
-        issues.append(f"SPECIAL 偏高 {dv_special/max(dv_loose,1e-12):.1f}×（预期与 LOOSE 同阶）")
+        issues.append(f"SPECIAL 偏高 {dv_special / max(dv_loose, 1e-12):.1f}×（预期与 LOOSE 同阶）")
     if issues:
         print("\n  ⚠️  发现量级异常：")
         for issue in issues:
