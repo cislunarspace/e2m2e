@@ -1,0 +1,208 @@
+"""HMN 霍曼直接转移测试（ADR 0013 物理定义验证）。"""
+
+from __future__ import annotations
+
+import math
+
+import numpy as np
+import pytest
+
+from e2m2e.algorithm.transfer import (
+    HmnTransferDetails,
+    TransferDesignResult,
+    transfer_orbit,
+)
+from e2m2e.algorithm.transfer.hohmann import (
+    MU_EARTH,
+    R_EARTH,
+    TliParams,
+    _rotation_matrix,
+    construct_departure_state,
+    hohmann_delta_v,
+    hohmann_tof,
+    keplerian_to_cartesian,
+)
+
+
+class TestRotationMatrix:
+    """旋转矩阵单元测试。"""
+
+    def test_identity_when_all_zero(self):
+        """i=0, ω=0, Ω=0 时 R = I。"""
+        r = _rotation_matrix(0.0, 0.0, 0.0)
+        np.testing.assert_allclose(r, np.eye(3), atol=1e-14)
+
+    def test_orthogonal(self):
+        """R 为正交矩阵：R^T R = I, det(R) = 1。"""
+        r = _rotation_matrix(30.0, 45.0, 60.0)
+        np.testing.assert_allclose(r.T @ r, np.eye(3), atol=1e-14)
+        assert abs(np.linalg.det(r) - 1.0) < 1e-14
+
+    def test_90deg_inclination(self):
+        """i=90° 时 z 轴翻转。"""
+        r = _rotation_matrix(90.0, 0.0, 0.0)
+        # R₁(-90°): [1,0,0; 0,0,1; 0,-1,0] 的转置形式
+        expected = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]], dtype=float)
+        np.testing.assert_allclose(r, expected, atol=1e-14)
+
+
+class TestKeplerianToCartesian:
+    """开普勒根数→笛卡尔状态 单元测试。"""
+
+    def test_circular_orbit_speed(self):
+        """圆轨道速度 = √(μ/r)，误差 < 0.01%。"""
+        r_park = R_EARTH + 200.0
+        r_eci, v_eci = keplerian_to_cartesian(
+            a_km=r_park,
+            e=0.0,
+            i_deg=0.0,
+            omega_deg=0.0,
+            raan_deg=0.0,
+            nu_deg=0.0,
+        )
+        expected_v = math.sqrt(MU_EARTH / r_park)
+        v_mag = np.linalg.norm(v_eci)
+        assert abs(v_mag - expected_v) / expected_v < 1e-6
+
+    def test_position_magnitude(self):
+        """位置矢量模 = r (轨道半径)。"""
+        a = 42164.0  # GEO
+        e = 0.0
+        r_eci, _ = keplerian_to_cartesian(a, e, 0.0, 0.0, 0.0, 0.0)
+        assert abs(np.linalg.norm(r_eci) - a) < 1e-6
+
+    def test_elliptic_apogee(self):
+        """椭圆轨道远地点：r = a(1+e)。"""
+        a = 20000.0
+        e = 0.5
+        r_eci, _ = keplerian_to_cartesian(a, e, 0.0, 0.0, 0.0, 180.0)
+        expected_r = a * (1.0 + e)
+        assert abs(np.linalg.norm(r_eci) - expected_r) < 1e-6
+
+    def test_inclination_effect(self):
+        """i=90° 时，速度 z 分量最大；i=0° 时 z 分量为 0。"""
+        r_park = R_EARTH + 200.0
+        _, v0 = keplerian_to_cartesian(r_park, 0.0, 0.0, 0.0, 0.0, 0.0)
+        _, v90 = keplerian_to_cartesian(r_park, 0.0, 90.0, 0.0, 0.0, 0.0)
+        assert abs(v0[2]) < 1e-10
+        assert abs(v90[2]) > 1e-3  # z 分量应显著非零
+
+
+class TestConstructDepartureState:
+    """TLI 出发状态构造测试。"""
+
+    def test_zero_inclination_circular(self):
+        """i=0, γ=0 时：r 在 xy 平面，v 沿 y 方向。"""
+        params = TliParams(parking_alt_km=200.0, inclination_deg=0.0)
+        r, v = construct_departure_state(params)
+        r_park = R_EARTH + 200.0
+        expected_v = math.sqrt(MU_EARTH / r_park)
+        assert abs(np.linalg.norm(r) - r_park) < 1e-6
+        assert abs(np.linalg.norm(v) - expected_v) / expected_v < 1e-6
+        assert abs(r[2]) < 1e-10  # z = 0
+        assert abs(v[0]) < 1e-10  # vx ≈ 0
+
+    def test_inclination_90_deg(self):
+        """i=90° 时，速度有 z 分量。"""
+        params = TliParams(parking_alt_km=200.0, inclination_deg=90.0)
+        r, v = construct_departure_state(params)
+        assert abs(v[2]) > 1e-3  # vz 应显著非零
+
+    def test_speed_preserved_after_rotation(self):
+        """旋转后速度大小不变。"""
+        params = TliParams(parking_alt_km=200.0, inclination_deg=45.0, raan_deg=30.0)
+        r, v = construct_departure_state(params)
+        r_park = R_EARTH + 200.0
+        expected_v = math.sqrt(MU_EARTH / r_park)
+        assert abs(np.linalg.norm(v) - expected_v) / expected_v < 1e-10
+
+
+class TestHohmannDeltaV:
+    """霍曼转移 Δv 验证。"""
+
+    def test_leo_to_geo(self):
+        """LEO 300km -> GEO: Delta-v via Hohmann formula (Curtis Sec.6.1)."""
+        r1 = R_EARTH + 300.0  # 6678.137 km
+        r2 = 42164.0  # GEO
+        dv1, dv2 = hohmann_delta_v(r1, r2)
+        # dv1 = sqrt(mu/r1)*(sqrt(2r2/(r1+r2)) - 1) ~ 2.426 km/s
+        # dv2 = sqrt(mu/r2)*(1 - sqrt(2r1/(r1+r2))) ~ 1.467 km/s
+        assert abs(dv1 - 2.426) < 0.01
+        assert abs(dv2 - 1.467) < 0.01
+
+    def test_leo_to_moon(self):
+        """LEO 200km → 月球轨道：Δv ~ 3.13 / 0.83 km/s。"""
+        r1 = R_EARTH + 200.0
+        r2 = 384405.0  # 地月平均距离
+        dv1, dv2 = hohmann_delta_v(r1, r2)
+        assert abs(dv1 - 3.13) < 0.05
+        assert abs(dv2 - 0.83) < 0.05
+
+    def test_symmetric_circular(self):
+        """相同半径的圆轨道间：Δv = 0。"""
+        dv1, dv2 = hohmann_delta_v(42164.0, 42164.0)
+        assert abs(dv1) < 1e-10
+        assert abs(dv2) < 1e-10
+
+
+class TestHohmannTof:
+    """霍曼转移飞行时间验证。"""
+
+    def test_leo_to_moon_tof(self):
+        """LEO 200km -> Moon (384405 km): TOF ~ 4.98 days."""
+        r1 = R_EARTH + 200.0
+        r2 = 384405.0
+        tof = hohmann_tof(r1, r2)
+        tof_days = tof / 86400.0
+        assert abs(tof_days - 4.98) < 0.1
+
+    def test_leo_to_geo_tof(self):
+        """LEO 300km → GEO：TOF ≈ 5.26 小时。"""
+        r1 = R_EARTH + 300.0
+        r2 = 42164.0
+        tof = hohmann_tof(r1, r2)
+        tof_hours = tof / 3600.0
+        assert abs(tof_hours - 5.26) < 0.1
+
+    def test_half_ellipse_period(self):
+        """TOF = π·√(a_t³/μ)，其中 a_t = (r1+r2)/2。"""
+        r1 = R_EARTH + 200.0
+        r2 = 384405.0
+        a_t = (r1 + r2) / 2.0
+        expected = math.pi * math.sqrt(a_t**3 / MU_EARTH)
+        assert abs(hohmann_tof(r1, r2) - expected) < 1e-6
+
+
+class TestTransferOrbitHmn:
+    """transfer_orbit("HMN") 端到端测试。"""
+
+    def test_returns_transfer_design_result(self):
+        """transfer_orbit("HMN") 返回 TransferDesignResult，transfer_type == "HMN"。"""
+        params = TliParams(parking_alt_km=200.0, inclination_deg=0.0)
+        result = transfer_orbit("HMN", tli_params=params, target_orbit_radius_km=384405.0)
+        assert isinstance(result, TransferDesignResult)
+        assert result.transfer_type == "HMN"
+
+    def test_delta_v_matches_analytical(self):
+        """result.delta_v 与 hohmann_delta_v(r1, r2) 之和一致。"""
+        params = TliParams(parking_alt_km=200.0, inclination_deg=0.0)
+        r2 = 384405.0
+        result = transfer_orbit("HMN", tli_params=params, target_orbit_radius_km=r2)
+        r1 = R_EARTH + 200.0
+        dv1, dv2 = hohmann_delta_v(r1, r2)
+        assert abs(result.delta_v - (dv1 + dv2)) < 1e-10
+
+    def test_tof_in_details(self):
+        """details 中 tof_sec 与 hohmann_tof(r1, r2) 一致。"""
+        params = TliParams(parking_alt_km=200.0, inclination_deg=0.0)
+        r2 = 384405.0
+        result = transfer_orbit("HMN", tli_params=params, target_orbit_radius_km=r2)
+        r1 = R_EARTH + 200.0
+        expected_tof = hohmann_tof(r1, r2)
+        assert isinstance(result.details, HmnTransferDetails)
+        assert abs(result.details.tof_sec - expected_tof) < 1e-10
+
+    def test_unsupported_type_raises(self):
+        """transfer_orbit("LGA") 抛出 NotImplementedError。"""
+        with pytest.raises(NotImplementedError, match="LGA"):
+            transfer_orbit("LGA")
