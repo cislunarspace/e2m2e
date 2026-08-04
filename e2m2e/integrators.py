@@ -101,9 +101,12 @@ except ModuleNotFoundError:
     third_body_acceleration = None  # type: ignore[misc,assignment]
 
 # ---- Python↔Rust ABI 版本校验 ----
-# 与 Rust 侧 RUST_PY_ABI 同语义空间：binary_version >= _MIN_REQUIRED_RUST_ABI
-# 即可；< 则说明 .pyd/.so 过期，需重建。
-_MIN_REQUIRED_RUST_ABI: int = 1  # 同步：改此值时同步 lib.rs RUST_PY_ABI（反之亦然）
+# 单一来源：crates/e2m2e-integrators/abi-version.txt
+# build.rs 在 maturin develop 时生成 e2m2e/_rust_abi.py；未构建时回落到硬编码默认值。
+try:
+    from e2m2e._rust_abi import _ABI_VERSION as _MIN_REQUIRED_RUST_ABI
+except ImportError:
+    _MIN_REQUIRED_RUST_ABI: int = 1  # 构建前/无扩展时的安全默认值
 
 _abi_ok: bool = False  # 进程级一次性缓存
 

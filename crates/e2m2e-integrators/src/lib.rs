@@ -297,13 +297,23 @@ fn cowell_step(
     })
 }
 
-/// Python↔Rust ABI 版本号（单调递增，接口变更时 bump）。
-///
-/// Python 侧 ``e2m2e.integrators._check_rust_abi`` 在首次使用 Rust 扩展时
-/// 比对 ``_MIN_REQUIRED_RUST_ABI``，二进制版本 < 所需即报"请重建"。
-/// 改 ``#[pyfunction]`` 签名、增删函数、改返回 shape 时必须 bump 此常量
-/// 并同步 Python 侧 ``_MIN_REQUIRED_RUST_ABI``（CI 散度测试兜底）。
-const RUST_PY_ABI: u32 = 1;
+/// 解析 abi-version.txt 的纯数字内容为 u32（const fn，编译期求值）。
+const fn parse_abi_version(s: &str) -> u32 {
+    let bytes = s.as_bytes();
+    let mut result: u32 = 0;
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if b >= b'0' && b <= b'9' {
+            result = result * 10 + (b - b'0') as u32;
+        }
+        i += 1;
+    }
+    result
+}
+
+/// 从 abi-version.txt 读取（单一来源），build.rs 同步生成 Python 侧 _rust_abi.py。
+const RUST_PY_ABI: u32 = parse_abi_version(include_str!("../abi-version.txt"));
 
 /// 返回 Rust↔Python ABI 版本号（编译期常量，反映此 .pyd/.so 真实状态）。
 #[pyfunction]

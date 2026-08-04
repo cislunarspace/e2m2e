@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+import types
+
 import pytest
 
 from e2m2e import integrators as gw
@@ -35,16 +37,25 @@ class TestRustAbiVersion:
     def test_divergence_check(self):
         """Rust ABI 版本 >= Python 所需最低版本（防只改一边）。"""
         actual = _py_abi_version()
-        assert actual >= gw._MIN_REQUIRED_RUST_ABI, (
-            f"ABI 散度：Rust 报 v{actual}，Python 要求 >= v{gw._MIN_REQUIRED_RUST_ABI}。"
-            "请同步 bump 两侧常量（见 CONTRIBUTING / docs/plans）。"
+        # 优先使用 build.rs 生成的 _ABI_VERSION，回落到 gw._MIN_REQUIRED_RUST_ABI
+        try:
+            from e2m2e._rust_abi import _ABI_VERSION
+
+            min_required = _ABI_VERSION
+        except ImportError:
+            min_required = gw._MIN_REQUIRED_RUST_ABI
+        assert actual >= min_required, (
+            f"ABI 散度：Rust 报 v{actual}，Python 要求 >= v{min_required}。"
+            "请 bump crates/e2m2e-integrators/abi-version.txt 后重新构建。"
         )
 
-    def test_expected_version_matches(self):
-        """当前版本已知值断言（等值检查，防忘 bump 任一侧）。"""
-        # ── 更新：每次 bump RUST_PY_ABI / _MIN_REQUIRED_RUST_ABI 时同步此处 ──
-        assert _py_abi_version() == 1
-        assert gw._MIN_REQUIRED_RUST_ABI == 1
+    def test_generated_abi_matches_rust(self):
+        """build.rs 生成的 _rust_abi._ABI_VERSION 与 Rust 报告的版本一致。"""
+        try:
+            from e2m2e._rust_abi import _ABI_VERSION
+        except ImportError:
+            pytest.skip("_rust_abi.py not generated (run maturin develop first)")
+        assert _py_abi_version() == _ABI_VERSION
 
     def test_stale_binary_raises_runtime_error(self, monkeypatch):
         """过期二进制（模拟 version < min）→ RuntimeError + maturin 提示。"""
@@ -63,3 +74,19 @@ class TestRustAbiVersion:
         monkeypatch.setattr(gw, "_abi_ok", False)
         gw._check_rust_abi()
         assert gw._abi_ok is True
+
+    def test_import_time_check_catches_stale_binary(self, monkeypatch):
+        """当 _integrators 已加载但版本过期时，__init__ 的 import-time 校验报错。"""
+        import sys
+
+        # Simulate: extension loaded (in sys.modules) with a stale version
+        monkeypatch.setitem(
+            sys.modules,
+            "e2m2e._integrators",
+            types.SimpleNamespace(_py_abi_version=lambda: 0),  # stale
+        )
+        monkeypatch.setattr(gw, "_abi_ok", False)
+        monkeypatch.setattr(gw, "_MIN_REQUIRED_RUST_ABI", 1)
+        # Re-trigger the check logic directly
+        with pytest.raises(RuntimeError, match="maturin"):
+            gw._check_rust_abi()
