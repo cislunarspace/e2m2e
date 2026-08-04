@@ -180,9 +180,7 @@ class TestDpoNotDro:
         d_dpo = CR3BP_Dynamics(orbit.system)
         min_dro, _ = _moon_distance_minmax(d_dro, dro_ref)
         min_dpo, _ = _moon_distance_minmax(d_dpo, orbit)
-        assert min_dpo < min_dro, (
-            f"DPO 近月距 {min_dpo:.4f} DU 应小于 DRO {min_dro:.4f} DU"
-        )
+        assert min_dpo < min_dro, f"DPO 近月距 {min_dpo:.4f} DU 应小于 DRO {min_dro:.4f} DU"
 
     def test_dpo_covers_moon_proximity(self, orbit):
         """DPO 轨道的近月距应显著小于远月距（绕月特征）。"""
