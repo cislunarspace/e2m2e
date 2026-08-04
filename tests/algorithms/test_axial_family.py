@@ -1,6 +1,7 @@
 """Axial 轨道族端到端 + 物理不变量测试。
 
-覆盖 design_axial 收敛性、Jacobi 守恒、x 轴对称、周期闭合、注册表。
+覆盖 design_axial 收敛性、Jacobi 守恒、x 轴对称、周期闭合、注册表，
+以及区分 Axial 与 Vertical Lyapunov 的特征测试。
 """
 
 import numpy as np
@@ -224,3 +225,39 @@ class TestAxialDesignOrbit:
         assert orbit is not None
         assert orbit.period is not None
         assert orbit.period > 0
+
+
+# =============================================================================
+# Axial vs Vertical Lyapunov distinguishing tests
+# =============================================================================
+
+
+class TestAxialNotVerticalLyapunov:
+    """区分真 Axial 轨道与 Vertical Lyapunov 的特征测试。
+
+    Vertical Lyapunov 种子 (x_L, 0, 0, 0, 0, vz0) 紧邻平动点，
+    Jacobi ≈ C_L ≈ 3.19，面内振幅趋零。真 Axial 轨道从 Lyapunov
+    垂直临界轨道分岔，Jacobi ∈ [2.991, 3.021]（Haapala & Howell 2016），
+    面内振幅显著（|y|_max > 1000 km）。
+    """
+
+    def test_axial_jacobi_in_haapala_range(self):
+        """Axial 轨道的 Jacobi 应落在 Haapala 区间 [2.95, 3.05]，
+
+        而非紧邻 C_L1=3.188（Vertical Lyapunov 特征）。"""
+        orbit = design_axial(1, 5000.0)
+        C = float(orbit.system.get_jacobi_constant(orbit.states[0]))
+        assert 2.95 < C < 3.05, f"Axial Jacobi {C:.4f} 不在 Haapala 区间，可能是 Vertical Lyapunov"
+
+    def test_axial_has_nontrivial_inplane_amplitude(self):
+        """Axial 继承 planar Lyapunov 父支的面内振幅，|y|_max 不应趋零。"""
+        orbit = design_axial(1, 5000.0)
+        du = orbit.system.characteristic_length
+        dynamics = CR3BP_Dynamics(orbit.system)
+        result = dynamics.propagate(
+            orbit.states[0],
+            (0, orbit.period),
+            t_eval=np.linspace(0, orbit.period, 1000),
+        )
+        y_max = float(np.max(np.abs(result["states"][:, 1]))) * du  # km
+        assert y_max > 1000.0, f"|y|_max={y_max:.0f} km 过小，可能不是真 Axial"

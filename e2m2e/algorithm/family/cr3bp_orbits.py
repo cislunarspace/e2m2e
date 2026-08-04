@@ -270,7 +270,7 @@ def _correct_axial(
     """
     if guess is None:
         state0, period = compute_axial_initial_guess(
-            dynamics.system,
+            dynamics,
             collinear_point=libration_point,
             vz0=vz0,
         )
