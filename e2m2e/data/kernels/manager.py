@@ -18,6 +18,7 @@ SPICE 内核文件说明：
 
 from __future__ import annotations
 
+import inspect
 import os
 import threading
 from pathlib import Path
@@ -87,6 +88,60 @@ def _find_leapseconds_kernel(search_paths: list[str] | None = None) -> str | Non
                 if f.endswith(".tls"):
                     return os.path.join(root, f)
     return None
+
+
+_STALE_BINARY_HINT = (
+    "e2m2e._integrators 编译产物（.pyd/.so）落后于源码："
+    "Rust 函数 {fn_name!r} 缺少关键字参数 {missing}。"
+    "请重建 Rust 扩展：uv run maturin develop --features spice"
+)
+
+
+def _call_rust_or_compat_error(
+    fn,
+    /,
+    *args,
+    fn_name: str,
+    required_kwargs: tuple[str, ...],
+    **kwargs,
+):
+    """调用 Rust pyfunction，把"编译产物过期"导致的签名漂移转成可操作错误。
+
+    ``.pyd``/``.so`` 落后于源码时，PyO3 在参数绑定阶段抛 ``TypeError``（如
+    ``got an unexpected keyword argument 'sxform_pairs'``），错误信息毫无指向、
+    栈顶远离调用点。本函数先用 :func:`inspect.signature` 主动比对所需
+    keyword-only 参数，缺失即抛带"请重建"提示的 :class:`RuntimeError`；无法
+    内省（无 ``__text_signature__``）时退化为在调用点捕获 ``TypeError``，锚定
+    PyO3 漂移模板（"unexpected keyword argument"）并按参数名命中重映射——仅
+    漂移型错误被重映射，余者原样上抛，避免掩盖真实 bug（如 dt 参数类型错误）。
+
+    与 :meth:`SPICEManager.enable_ephem_cache` 外层的 ``except ImportError``
+    （覆盖"扩展未编译/未开 spice feature"）互补，共同覆盖"扩展存在但过期"
+    这一此前会以裸 ``TypeError`` 冒泡的情形。属靶向加固，非 ABI 版本戳（见
+    ``docs/plans`` 下 #3 计划）。
+    """
+    # 主路径：签名内省预检。
+    try:
+        available = inspect.signature(fn).parameters
+        missing = [k for k in required_kwargs if k not in available]
+    except (ValueError, TypeError):
+        # PyO3 未暴露 __text_signature__ 等情形：交由调用点兜底。
+        missing = []
+    if missing:
+        raise RuntimeError(_STALE_BINARY_HINT.format(fn_name=fn_name, missing=missing))
+
+    try:
+        return fn(*args, **kwargs)
+    except TypeError as exc:
+        # 兜底：内省不可用时的签名漂移。锚定 PyO3 漂移模板
+        # "unexpected keyword argument"，避免把合法类型错误（如 dt 参数类型
+        # 不对 → "must be real number, not str"）误判为编译产物过期。
+        msg = str(exc)
+        if "unexpected keyword argument" in msg and any(name in msg for name in required_kwargs):
+            raise RuntimeError(
+                _STALE_BINARY_HINT.format(fn_name=fn_name, missing=list(required_kwargs))
+            ) from exc
+        raise  # 与漂移无关的 TypeError：原样上抛，不掩盖
 
 
 class SPICEManager(EphemerisProvider):
@@ -225,7 +280,10 @@ class SPICEManager(EphemerisProvider):
 
             frame_pairs = frame_pairs or [(frame, "J2000")]
             sxform_pairs = sxform_pairs or []
-            _rust_enable(
+            # 经守卫转发：编译产物过期（签名缺 dt/sxform_pairs）时抛带"请重建"
+            # 提示的 RuntimeError，而非栈顶深处的裸 TypeError。见函数 docstring。
+            _call_rust_or_compat_error(
+                _rust_enable,
                 [
                     (k, observer.upper())
                     for b, kid in zip(bodies, id_keys, strict=True)
@@ -240,11 +298,15 @@ class SPICEManager(EphemerisProvider):
                 frame_pairs,
                 et_start,
                 et_end,
+                fn_name="enable_ephem_cache",
+                required_kwargs=("dt", "sxform_pairs"),
                 dt=dt,
                 sxform_pairs=sxform_pairs,
             )
         except ImportError:
-            # 非 spice 构建（_integrators 无该函数）：仅 Python 层缓存生效
+            # 非 spice 构建（_integrators 模块/函数缺失）：仅 Python 层缓存生效。
+            # 扩展存在但签名过期（旧 .pyd）的情形已由 _call_rust_or_compat_error
+            # 转为 RuntimeError，不在此兜底——需让用户看到"请重建"。
             pass
 
     def disable_ephem_cache(self) -> None:
