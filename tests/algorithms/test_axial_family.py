@@ -11,6 +11,7 @@ from e2m2e.algorithm.family import registry
 from e2m2e.algorithm.family.cr3bp_orbits import (
     _z_amplitude_max,
     design_axial,
+    earth_moon_system,
 )
 
 CHAR_LENGTH_KM = 384400.0
@@ -146,3 +147,80 @@ class TestPhysicalInvariants:
         assert state_half[1] == pytest.approx(0.0, abs=1e-8)  # y=0
         assert state_half[2] == pytest.approx(0.0, abs=1e-8)  # z=0
         assert state_half[3] == pytest.approx(0.0, abs=1e-8)  # vx=0
+
+
+# =============================================================================
+# design_orbit facade dispatch
+# =============================================================================
+
+
+class TestAxialDesignOrbit:
+    """design_orbit 入口分发 AXIAL。"""
+
+    def test_design_orbit_validates_axial_params(self):
+        """design_orbit("AXIAL", ...) 参数校验先于实现：duration 校验优先。"""
+        from e2m2e.algorithm.design import design_orbit
+
+        with pytest.raises(ValueError, match="duration"):
+            design_orbit("AXIAL", duration=0.0)
+
+    def test_design_orbit_rejects_bad_collinear_point(self):
+        """collinear_point=4 应抛 ValueError。"""
+        from e2m2e.algorithm.design import design_orbit
+
+        with pytest.raises(ValueError, match="collinear_point"):
+            design_orbit("AXIAL", collinear_point=4, duration=0.5)
+
+    def test_design_orbit_rejects_amplitude_out_of_range(self):
+        """|amplitude| > 60000 km 应抛 ValueError。"""
+        from e2m2e.algorithm.design import design_orbit
+
+        with pytest.raises(ValueError, match="amplitude"):
+            design_orbit("AXIAL", amplitude=80000.0, duration=0.5)
+
+    def test_design_orbit_rejects_bad_phase(self):
+        """phase 超界应抛 ValueError。"""
+        from e2m2e.algorithm.design import design_orbit
+
+        with pytest.raises(ValueError, match="phase"):
+            design_orbit("AXIAL", phase=1.5, duration=0.5)
+
+    def test_validate_params_axial_defaults(self):
+        """_validate_params 对 AXIAL 填默认值（collinear_point=2, amplitude=5000, phase=0）。"""
+        from e2m2e.algorithm.design.design_orbit import _validate_params
+
+        params = _validate_params(
+            "AXIAL",
+            amplitude=None,
+            phase=None,
+            collinear_point=None,
+            north_south=None,
+            perilune_height=None,
+            amplitude_in=None,
+            amplitude_out=None,
+            phase_in=None,
+            phase_out=None,
+        )
+        assert params == {"collinear_point": 2, "amplitude": 5000.0, "phase": 0.0}
+
+    def test_cr3bp_orbit_for_axial_end_to_end(self):
+        """_cr3bp_orbit_for("AXIAL", ...) 端到端调用 design_axial 返回 Orbit。"""
+        from e2m2e.algorithm.design.design_orbit import _cr3bp_orbit_for, _validate_params
+
+        params = _validate_params(
+            "AXIAL",
+            amplitude=5000.0,
+            phase=None,
+            collinear_point=1,
+            north_south=None,
+            perilune_height=None,
+            amplitude_in=None,
+            amplitude_out=None,
+            phase_in=None,
+            phase_out=None,
+        )
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+        orbit = _cr3bp_orbit_for("AXIAL", params, dynamics)
+        assert orbit is not None
+        assert orbit.period is not None
+        assert orbit.period > 0
