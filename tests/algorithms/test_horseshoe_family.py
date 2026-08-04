@@ -16,7 +16,6 @@ from e2m2e.algorithm.family import registry
 from e2m2e.algorithm.family.cr3bp_orbits import (
     _l45_distance,
     design_horseshoe,
-    earth_moon_system,
 )
 
 CHAR_LENGTH_KM = 384400.0

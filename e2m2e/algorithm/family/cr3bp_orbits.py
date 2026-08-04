@@ -1057,6 +1057,7 @@ def design_lpo(
 
     # 第 2 步：细网格精化（在最佳候选点 ±2 步长内，15 点）
     dx = (x_hi - x_lo) / 30
+    assert best_x0 is not None  # best_orbit 非空时 best_x0 必非空
     refine_lo = max(x_lo, best_x0 - 2 * dx)
     refine_hi = min(x_hi, best_x0 + 2 * dx)
     rx0, rorb, rerr = _grid_search(refine_lo, refine_hi, 15, best_orbit)
