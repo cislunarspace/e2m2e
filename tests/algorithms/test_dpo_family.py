@@ -15,6 +15,7 @@ from e2m2e.algorithm.family.cr3bp_orbits import (
     design_dro,
     earth_moon_system,
 )
+from e2m2e.data.types.orbit import Orbit
 
 CHAR_LENGTH_KM = 384400.0
 
@@ -34,12 +35,6 @@ def dynamics(orbit):
 def dro_ref():
     """共享一条 design_dro(20000.0) 轨道（DPO vs DRO 对比用）。"""
     return design_dro(20000.0)
-
-
-@pytest.fixture(scope="module")
-def dpo_ref():
-    """共享一条 design_dpo(20000.0) 轨道（与 dro_ref 振幅相同）。"""
-    return design_dpo(20000.0)
 
 
 # =============================================================================
@@ -79,12 +74,12 @@ class TestDesignDpoConvergence:
         assert orbit.period > 0
 
     def test_design_dpo_amplitude_matches_target(self):
-        """振幅（距月 min/max 均值）应接近 20000 km（容差 50 km）。"""
+        """振幅（距月 min/max 均值）应接近 20000 km（容差 25 km，与 design tol 对齐）。"""
         orbit = design_dpo(20000.0)
         dynamics = CR3BP_Dynamics(orbit.system)
         d_min, d_max = _moon_distance_minmax(dynamics, orbit)
         amp_km = 0.5 * (d_min + d_max) * CHAR_LENGTH_KM
-        assert abs(amp_km - 20000.0) < 50.0
+        assert abs(amp_km - 20000.0) < 25.0
 
     def test_design_dpo_state_on_x_axis(self):
         """初始状态应在 xy 平面的 x 轴上：y=0, z=0, vx=0。"""
@@ -98,6 +93,22 @@ class TestDesignDpoConvergence:
         """DPO 初始 vy0 应为负（顺行：旋转坐标系下逆时针）。"""
         orbit = design_dpo(20000.0)
         assert orbit.states[0, 4] < 0.0
+
+    def test_correct_dpo_raises_on_pseudo_solution(self):
+        """_correct_dpo 应在周期跳变超过 2× 时抛 Cr3bpOrbitError。"""
+        from e2m2e.algorithm.family.cr3bp_orbits import Cr3bpOrbitError, _correct_dpo
+
+        dynamics = CR3BP_Dynamics(earth_moon_system())
+        # 构造一个 period 偏小的 orbit 作为 guess，使修正结果超过 2×
+        fake_state = np.array([0.90, 0.0, 0.0, 0.0, -0.25, 0.0])
+        fake = Orbit(
+            states=fake_state.reshape(1, -1),
+            times=np.array([0.0]),
+            system=dynamics.system,
+        )
+        fake.period = 1.0  # 种子 period≈2.50，2.50 > 2×1.0 触发伪解拒绝
+        with pytest.raises(Cr3bpOrbitError, match="DPO"):
+            _correct_dpo(dynamics, 0.90, fake)
 
 
 # =============================================================================
@@ -157,26 +168,26 @@ class TestDpoNotDro:
     DRO 逆行（vy0 > 0）、Jacobi 更低。
     """
 
-    def test_dpo_jacobi_higher_than_dro(self, dro_ref, dpo_ref):
+    def test_dpo_jacobi_higher_than_dro(self, dro_ref, orbit):
         """同振幅下 DPO 的 Jacobi 常数应高于 DRO。"""
         C_dro = float(dro_ref.system.get_jacobi_constant(dro_ref.states[0]))
-        C_dpo = float(dpo_ref.system.get_jacobi_constant(dpo_ref.states[0]))
+        C_dpo = float(orbit.system.get_jacobi_constant(orbit.states[0]))
         assert C_dpo > C_dro, f"DPO C={C_dpo:.4f} 应高于 DRO C={C_dro:.4f}"
 
-    def test_dpo_closer_to_moon_than_dro(self, dro_ref, dpo_ref):
+    def test_dpo_closer_to_moon_than_dro(self, dro_ref, orbit):
         """同振幅下 DPO 的近月距应小于 DRO（DPO 更靠近月球）。"""
         d_dro = CR3BP_Dynamics(dro_ref.system)
-        d_dpo = CR3BP_Dynamics(dpo_ref.system)
+        d_dpo = CR3BP_Dynamics(orbit.system)
         min_dro, _ = _moon_distance_minmax(d_dro, dro_ref)
-        min_dpo, _ = _moon_distance_minmax(d_dpo, dpo_ref)
+        min_dpo, _ = _moon_distance_minmax(d_dpo, orbit)
         assert min_dpo < min_dro, (
             f"DPO 近月距 {min_dpo:.4f} DU 应小于 DRO {min_dro:.4f} DU"
         )
 
-    def test_dpo_covers_moon_proximity(self, dpo_ref):
+    def test_dpo_covers_moon_proximity(self, orbit):
         """DPO 轨道的近月距应显著小于远月距（绕月特征）。"""
-        dynamics = CR3BP_Dynamics(dpo_ref.system)
-        d_min, d_max = _moon_distance_minmax(dynamics, dpo_ref)
+        dynamics = CR3BP_Dynamics(orbit.system)
+        d_min, d_max = _moon_distance_minmax(dynamics, orbit)
         assert d_min < d_max, "DPO 应有明显的近月/远月区分"
         assert d_min < 0.2, f"DPO 近月距 {d_min:.4f} DU 应 < 0.2 DU（绕月轨道）"
 
