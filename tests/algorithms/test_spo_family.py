@@ -19,7 +19,6 @@ from e2m2e.algorithm.family.cr3bp_orbits import (
     design_spo,
     earth_moon_system,
 )
-from e2m2e.data.types.orbit import Orbit
 
 CHAR_LENGTH_KM = 384400.0
 
@@ -76,7 +75,6 @@ class TestRegistry:
         assert callable(registry["L5_SPO"])
 
     def test_l4_spo_same_as_design_spo(self):
-        from e2m2e.algorithm.family.cr3bp_orbits import design_spo
 
         # registry lambda wraps design_spo; test it's callable with right args
         orbit = registry["L4_SPO"](10000.0)
@@ -119,9 +117,6 @@ class TestDesignSpoConvergence:
 
     def test_period_in_synodic_range(self, l4_orbit):
         """周期应在 1 朔望月范围内（27-31 天）。"""
-        # 无量纲周期 → 天：T_nd * T*_days, T* ≈ 4.3423 天/TU
-        T_days = l4_orbit.period * (27.32 * 24 * 3600) / (2 * np.pi * 3600 * 24)
-        # 简化：T_days = T_nd / (2π) * 27.32
         T_days = l4_orbit.period / (2 * np.pi) * 27.32
         assert 27.0 < T_days < 31.0, f"周期 {T_days:.2f} 天不在 27-31 天范围内"
 

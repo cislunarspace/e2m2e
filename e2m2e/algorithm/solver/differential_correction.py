@@ -395,9 +395,9 @@ class DifferentialCorrection:
 
         Note:
             - 自由变量: [y₀, ẋ₀, ẏ₀, T]（4 个）
-            - 目标约束: [Δy=0, Δz=0, Δẋ=0, Δẏ=0]（4 个，全周期闭合）
-            - Δx 约束省略：x₀ 已固定，闭合自然满足
-            - 平面约束：z₀=ż₀=0，z 分量自动为零
+            - 目标约束: [Δy=0, Δẋ=0, Δẏ=0]（3 个，全周期闭合）
+            - Δx/Δz 约束省略：x₀ 已固定（Δx 自动满足），z 方向解耦（Δz 行恒零）
+            - 4 自由 vs 3 约束 → 欠定系统，用 lstsq 求最小范数修正
             - 使用 iterate_full_period_correction 方法（非 iterate_correction）
         """
         from ..family.strategies import spo_fixed_x0

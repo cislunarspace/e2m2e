@@ -797,7 +797,7 @@ def design_spo(
     dynamics: CR3BP_Dynamics | None = None,
     tol_km: float = 20.0,
 ) -> Orbit:
-    """生成指定振幅的 L4/L5 SPO 周期轨道。
+    r"""生成指定振幅的 L4/L5 SPO 周期轨道。
 
     SPO（Short-Period Orbit）是 CR3BP 中围绕三角平动点的短周期族
     成员（Gómez vol II, $\mathcal{L}_s$），周期约 1 朔望月（~28 天），
