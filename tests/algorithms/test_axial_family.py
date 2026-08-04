@@ -1,0 +1,148 @@
+"""Axial 轨道族端到端 + 物理不变量测试。
+
+覆盖 design_axial 收敛性、Jacobi 守恒、x 轴对称、周期闭合、注册表。
+"""
+
+import numpy as np
+import pytest
+
+from e2m2e.algorithm.dynamics import CR3BP_Dynamics
+from e2m2e.algorithm.family import registry
+from e2m2e.algorithm.family.cr3bp_orbits import (
+    _z_amplitude_max,
+    design_axial,
+)
+
+CHAR_LENGTH_KM = 384400.0
+
+
+@pytest.fixture(scope="module")
+def orbit():
+    """共享一条 design_axial(1, 5000.0) 轨道。"""
+    return design_axial(1, 5000.0)
+
+
+@pytest.fixture(scope="module")
+def dynamics(orbit):
+    return CR3BP_Dynamics(orbit.system)
+
+
+# =============================================================================
+# Registry
+# =============================================================================
+
+
+class TestRegistry:
+    """注册表应包含 AXIAL 条目。"""
+
+    def test_axial_in_registry(self):
+        """registry 应包含 'AXIAL' 键。"""
+        assert "AXIAL" in registry
+
+    def test_axial_callable(self):
+        """registry['AXIAL'] 应可调用。"""
+        assert callable(registry["AXIAL"])
+
+    def test_axial_same_as_design_axial(self):
+        """registry['AXIAL'] 应指向 design_axial。"""
+        assert registry["AXIAL"] is design_axial
+
+
+# =============================================================================
+# End-to-end convergence
+# =============================================================================
+
+
+class TestDesignAxialConvergence:
+    """design_axial 端到端收敛测试。"""
+
+    def test_design_axial_l1_5000km_converges(self):
+        """design_axial(1, 5000.0) 应返回收敛的 Orbit。"""
+        orbit = design_axial(1, 5000.0)
+        assert orbit is not None
+        assert orbit.period is not None
+        assert orbit.period > 0
+
+    def test_design_axial_amplitude_matches_target(self):
+        """max|z| 应接近 5000 km（容差 500 km）。"""
+        orbit = design_axial(1, 5000.0)
+        dynamics = CR3BP_Dynamics(orbit.system)
+        z_max = _z_amplitude_max(dynamics, orbit)
+        z_max_km = z_max * CHAR_LENGTH_KM
+        assert abs(z_max_km - 5000.0) < 500.0
+
+    def test_design_axial_state_on_x_axis(self):
+        """初始状态应在 x 轴上：z0=0, y0=0, vx0=0。"""
+        orbit = design_axial(1, 5000.0)
+        s0 = orbit.states[0]
+        assert s0[1] == pytest.approx(0.0, abs=1e-10)  # y=0
+        assert s0[2] == pytest.approx(0.0, abs=1e-10)  # z=0
+        assert s0[3] == pytest.approx(0.0, abs=1e-10)  # vx=0
+
+    def test_design_axial_vz0_nonzero(self):
+        """初始 z 方向速度应非零（Type B 特征）。"""
+        orbit = design_axial(1, 5000.0)
+        s0 = orbit.states[0]
+        assert abs(s0[5]) > 1e-6
+
+
+# =============================================================================
+# Physical invariants
+# =============================================================================
+
+
+class TestPhysicalInvariants:
+    """收敛轨道的物理不变量检验。"""
+
+    def test_jacobi_conservation(self, orbit, dynamics):
+        """Jacobi 常数在一个周期内漂移 < 1e-10。"""
+        T = orbit.period
+        result = dynamics.propagate(
+            orbit.states[0],
+            (0, T),
+            t_eval=np.linspace(0, T, 1000),
+            with_jacobi=True,
+        )
+        jacobi = result["jacobi"]
+        drift = abs(jacobi[-1] - jacobi[0])
+        assert drift < 1e-10
+
+    def test_periodic_closure(self, orbit, dynamics):
+        """全周期闭合误差 < 1e-6。"""
+        T = orbit.period
+        result = dynamics.propagate(orbit.states[0], (0, T), t_eval=np.linspace(0, T, 1000))
+        closure = np.linalg.norm(result["states"][-1] - orbit.states[0])
+        assert closure < 1e-6
+
+    def test_x_axis_symmetry(self, orbit, dynamics):
+        """x 轴对称：state(t) = Sigma(state(T-t))，
+        Sigma = (x,-y,-z,-vx,vy,vz)（旋转 π + 时间反演）。"""
+        T = orbit.period
+        result = dynamics.propagate(orbit.states[0], (0, T), t_eval=np.linspace(0, T, 500))
+        states = result["states"]
+        n = len(states)
+        max_err = 0.0
+        for i in range(n):
+            j = n - 1 - i
+            reflected = np.array(
+                [
+                    states[j, 0],
+                    -states[j, 1],
+                    -states[j, 2],
+                    -states[j, 3],
+                    states[j, 4],
+                    states[j, 5],
+                ]
+            )
+            err = np.linalg.norm(states[i] - reflected)
+            max_err = max(max_err, err)
+        assert max_err < 1e-6
+
+    def test_half_period_on_x_axis(self, orbit, dynamics):
+        """半周期处状态应在 x 轴上：y=0, z=0, vx=0。"""
+        T = orbit.period
+        result = dynamics.propagate(orbit.states[0], (0, T / 2), t_eval=[T / 2])
+        state_half = result["states"][-1]
+        assert state_half[1] == pytest.approx(0.0, abs=1e-8)  # y=0
+        assert state_half[2] == pytest.approx(0.0, abs=1e-8)  # z=0
+        assert state_half[3] == pytest.approx(0.0, abs=1e-8)  # vx=0
