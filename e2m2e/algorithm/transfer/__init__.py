@@ -208,7 +208,7 @@ class WsbTransferDetails:
     perilune_alt_km: float
     perilune_vel_km_s: float
     perilune_state: np.ndarray
-    h2_energy: float
+    h2_kepler: float
     dv_departure_km_s: float
     dv_arrival_km_s: float
     n_candidates_searched: int
@@ -226,6 +226,7 @@ def transfer_orbit(
     target_orbit_radius_km: float | None = None,
     dynamics: Any = None,
     lga_search_params: LgaSearchParams | None = None,
+    wsb_search_params: WsbSearchParams | None = None,
     **kwargs,
 ) -> TransferDesignResult:
     """端到端转移轨道设计（编排器）。
@@ -239,6 +240,7 @@ def transfer_orbit(
         target_orbit_radius_km: 目标轨道半径 (km)，HMN 转移必需。
         dynamics: 动力学对象（可选），用于 ephemeris 打靶修正。
         lga_search_params: LGA 搜索参数（可选）。
+        wsb_search_params: WSB 搜索参数（可选）。
 
     Returns:
         TransferDesignResult: 转移轨道设计结果。
@@ -263,7 +265,6 @@ def transfer_orbit(
             dynamics=dynamics,
         )
     if transfer_type == "WSB":
-        wsb_search_params = kwargs.get("wsb_search_params")
         return _transfer_orbit_wsb(
             tli_params=tli_params,
             target_ephemeris=target_ephemeris,
@@ -465,7 +466,7 @@ def _transfer_orbit_wsb(
             perilune_alt_km=0.0,
             perilune_vel_km_s=0.0,
             perilune_state=np.zeros(6),
-            h2_energy=0.0,
+            h2_kepler=0.0,
             dv_departure_km_s=0.0,
             dv_arrival_km_s=float("inf"),
             n_candidates_searched=n_searched,
@@ -498,7 +499,7 @@ def _transfer_orbit_wsb(
         perilune_alt_km=refined.perilune_alt_km,
         perilune_vel_km_s=perilune_vel,
         perilune_state=perilune_phys,
-        h2_energy=refined.h2_energy,
+        h2_kepler=refined.h2_kepler,
         dv_departure_km_s=refined.dv_departure,
         dv_arrival_km_s=refined.dv_arrival,
         n_candidates_searched=n_searched,

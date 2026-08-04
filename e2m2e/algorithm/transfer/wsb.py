@@ -1,9 +1,9 @@
 """WSB 太阳引力辅助间接转移：BCR4BP 弹道搜索 + 到达段精化。
 
 弱稳定边界（Weak Stability Boundary）转移利用地月 BCR4BP 动力学中的
-太阳引力摄动，在近月点附近使航天器获得足够能量（H2 > 0，相对月球
-超逃逸速度），自然脱离地月系进入日心转移轨道。总 Δv 仅来自出发脉冲
-和到达脉冲，月球飞越段 Δv = 0（与 LGA 同构）。
+太阳引力摄动，在近月点附近使航天器的相对月球 Kepler 能量 H₂ < 0
+（弹道捕获判据——无需制动脉冲即被月球束缚），自然被月球捕获后可由
+小量圆化脉冲稳定。总 Δv 仅来自出发脉冲和到达脉冲。
 
 搜索空间：sun_phase × departure_phase × tof 三维网格。
 并行化：ProcessPoolExecutor，每个 (sun_phase, tof) 独立。
@@ -39,32 +39,50 @@ class WsbSearchParams:
 
     搜索空间：太阳相位角 × 出发相位角 × 飞行时间（TOF）。
     近月点高度由传播自然决定，不作为独立搜索变量。
+    弹道捕获由 H₂ < 0 判定（Belbruno & Miller 1993）。
 
     Attributes:
         sun_phase_range: 太阳相位角范围 (min, max)，弧度，[0, 2pi)
         n_sun_phase: 太阳相位角网格点数
         departure_phase_range: 出发相位角范围 (min, max)，弧度，[0, 2pi)
         n_departure_phase: 出发相位角网格点数
-        tof_range: 飞行时间范围 (min, max)，天
+        tof_range: 飞行时间范围 (min, max)，天（WSB 典型 90-150 天）
         n_tof: TOF 网格点数
         perilune_alt_min: 近月点高度下限 (km)
         perilune_alt_max: 近月点高度上限 (km)
         max_total_dv: 最大总 Δv 筛选阈值 (km/s)
-        h2_energy_threshold: H2 能量阈值（无量纲），H2 > 此值的候选保留
+        h2_energy_threshold: H₂ 能量阈值（无量纲），H₂ < 此值的候选保留（弹道捕获）
         n_propagation_samples: 传播采样点数
     """
 
     sun_phase_range: tuple[float, float] = (0.0, 2.0 * math.pi)
-    n_sun_phase: int = 8
+    n_sun_phase: int = 50
     departure_phase_range: tuple[float, float] = (0.0, 2.0 * math.pi)
     n_departure_phase: int = 50
-    tof_range: tuple[float, float] = (5.0, 45.0)
+    tof_range: tuple[float, float] = (90.0, 150.0)
     n_tof: int = 50
     perilune_alt_min: float = 100.0
     perilune_alt_max: float = 10000.0
-    max_total_dv: float = 25.0
+    max_total_dv: float = 5.0
     h2_energy_threshold: float = 0.0
     n_propagation_samples: int = 500
+
+    def __post_init__(self) -> None:
+        """验证参数范围。"""
+        for name, range_val in [
+            ("sun_phase_range", self.sun_phase_range),
+            ("departure_phase_range", self.departure_phase_range),
+        ]:
+            lo, hi = range_val
+            if lo < 0.0 or hi > 2.0 * math.pi:
+                raise ValueError(f"{name} 必须在 [0, 2π) 内，得到 ({lo}, {hi})")
+        if self.tof_range[0] >= self.tof_range[1]:
+            raise ValueError(f"tof_range[0] < tof_range[1] 必须成立，得到 {self.tof_range}")
+        if self.perilune_alt_min >= self.perilune_alt_max:
+            raise ValueError(
+                f"perilune_alt_min < perilune_alt_max 必须成立，"
+                f"得到 ({self.perilune_alt_min}, {self.perilune_alt_max})"
+            )
 
 
 @dataclass
@@ -82,7 +100,7 @@ class WsbCandidate:
     perilune_alt_km: float
     perilune_time_dim: float
     arrival_state: np.ndarray
-    h2_energy: float
+    h2_kepler: float
     dv_departure: float
     dv_arrival: float
     total_dv: float
@@ -96,9 +114,12 @@ def compute_kepler_energy_moon(state: np.ndarray, mu: float) -> float:
     速度从旋转系转换到惯性系并减去月球惯性速度，得到相对月球的速度：
         v_rel = (vx - y, vy + x - (1-μ), vz)
 
-    H2 = 0.5 * |v_rel|² - μ / |r - r_moon|
+    H₂ = 0.5 * |v_rel|² - μ / |r - r_moon|
 
-    H2 > 0 表示航天器相对月球为超逃逸速度（WSB 条件）。
+    符号约定（Belbruno 2010 Eq 2.8）：
+        H₂ < 0: 弹道捕获（束缚轨道，无需制动脉冲即被月球束缚）
+        H₂ = 0: WSB 边界（抛物线）
+        H₂ > 0: 双曲飞越（超逃逸速度）
 
     Args:
         state: 旋转系无量纲状态 (6,)，[x, y, z, vx, vy, vz]
@@ -136,7 +157,7 @@ def search_wsb_trajectories(
     1. 构造 BCR4BP 系统（sun_phase0 = sun_phase）
     2. 从停泊轨道出发，沿 departure_phase 方向施加 TLI 脉冲
     3. BCR4BP 前向传播 tof 时间，检测近月点
-    4. 计算 H2（相对月球开普勒能量），H2 > threshold 的保留
+    4. 计算 H₂（相对月球开普勒能量），H₂ < threshold 的保留（弹道捕获候选）
     5. Δv_dep + Δv_arr < max_total_dv 的保留为候选
 
     Args:
@@ -286,7 +307,7 @@ def _wsb_worker(
             continue
 
         h2 = compute_kepler_energy_moon(state_peri, mu)
-        if h2 <= params.h2_energy_threshold:
+        if h2 >= params.h2_energy_threshold:
             continue
 
         # 检测到达目标轨道距离的时刻
@@ -322,7 +343,7 @@ def _wsb_worker(
                 perilune_alt_km=alt_km,
                 perilune_time_dim=float(t_peri),
                 arrival_state=arrival_state.copy(),
-                h2_energy=h2,
+                h2_kepler=h2,
                 dv_departure=dv_dep,
                 dv_arrival=dv_arr,
                 total_dv=total_dv,
@@ -386,7 +407,7 @@ def _refine_wsb_candidate(
                 perilune_alt_km=candidate.perilune_alt_km,
                 perilune_time_dim=candidate.perilune_time_dim,
                 arrival_state=candidate.arrival_state,
-                h2_energy=candidate.h2_energy,
+                h2_kepler=candidate.h2_kepler,
                 dv_departure=candidate.dv_departure,
                 dv_arrival=dv_arr,
                 total_dv=candidate.dv_departure + dv_arr,
@@ -405,7 +426,7 @@ def _refine_wsb_candidate(
         perilune_alt_km=candidate.perilune_alt_km,
         perilune_time_dim=candidate.perilune_time_dim,
         arrival_state=candidate.arrival_state,
-        h2_energy=candidate.h2_energy,
+        h2_kepler=candidate.h2_kepler,
         dv_departure=candidate.dv_departure,
         dv_arrival=candidate.dv_arrival,
         total_dv=candidate.total_dv,
