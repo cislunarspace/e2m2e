@@ -202,8 +202,10 @@ class SPICEManager(EphemerisProvider):
         # 此处为内核加载的跨层桥接（ADR 0012 的 data/ → 仅外部库例外，
         # 迁移期保留，第 5 批评估归属）。
         try:
-            from e2m2e._integrators import spice_poc_furnsh  # noqa: F401
+            from e2m2e.integrators import spice_poc_furnsh  # noqa: F401
 
+            if spice_poc_furnsh is None:
+                raise ImportError
             spice_poc_furnsh(path)
         except ImportError:
             pass
@@ -267,8 +269,10 @@ class SPICEManager(EphemerisProvider):
         # 与 GravityField 查询（用名字）都命中。Rust 采样同样走 cspice，
         # 之后积分查表。
         try:
-            from e2m2e._integrators import enable_ephem_cache as _rust_enable
+            from e2m2e.integrators import enable_ephem_cache as _rust_enable
 
+            if _rust_enable is None:
+                raise ImportError  # extension absent or not built with spice
             # 天体名 → NAIF-ID 字符串（与 third_body_gravity.py 的
             # _name_or_id 一致；失败保留名字）
             try:
@@ -313,8 +317,10 @@ class SPICEManager(EphemerisProvider):
         """关闭预插值星历缓存（Python 层 + Rust 层），回退到逐步 SPICE 查询。"""
         self._ephem_cache = None
         try:
-            from e2m2e._integrators import disable_ephem_cache as _rust_disable
+            from e2m2e.integrators import disable_ephem_cache as _rust_disable
 
+            if _rust_disable is None:
+                raise ImportError
             _rust_disable()
         except ImportError:
             pass

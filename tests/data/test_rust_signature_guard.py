@@ -13,8 +13,6 @@ argument 'sxform_pairs'"），栈顶远离调用点，用户无从得知只需�
 from __future__ import annotations
 
 import inspect
-import sys
-import types
 
 import pytest
 
@@ -182,13 +180,11 @@ class TestEnableEphemCacheWiring:
 
     def test_stale_binary_raises_runtime_error(self, monkeypatch):
         """过期二进制下，方法抛 RuntimeError 并提示 maturin 重建。"""
-        stale_mod = types.ModuleType("e2m2e._integrators")
 
         def _stale_enable(targets, frame_pairs, et_start, et_end, dt=3600.0):
             raise AssertionError("过期函数不应被调用")
 
-        stale_mod.enable_ephem_cache = _stale_enable
-        monkeypatch.setitem(sys.modules, "e2m2e._integrators", stale_mod)
+        monkeypatch.setattr("e2m2e.integrators.enable_ephem_cache", _stale_enable)
 
         spice = SPICEManager()
         with pytest.raises(RuntimeError, match="maturin"):
@@ -196,8 +192,7 @@ class TestEnableEphemCacheWiring:
 
     def test_absent_extension_still_degrades_silently(self, monkeypatch):
         """扩展根本不存在时，仍走原 ImportError 容错（仅 Python 层缓存生效）。"""
-        # sys.modules[name] = None 使 import name 抛 ImportError
-        monkeypatch.setitem(sys.modules, "e2m2e._integrators", None)
+        monkeypatch.setattr("e2m2e.integrators.enable_ephem_cache", None)
 
         spice = SPICEManager()
         # 不应抛异常——静默降级（与历史行为一致，未被守卫破坏）

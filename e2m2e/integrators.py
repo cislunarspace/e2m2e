@@ -14,13 +14,56 @@ try:
         MultistepMethod,
         MultistepResult,
         RkMethod,
+        build_cr3bp_hamiltonian_py,
+        hello_integrators,
         lambert_batch_py,
         lambert_izzo_py,
+        pole_tide,
+        project_hamiltonian_qf_py,
+        solid_tide_step1,
+        solid_tide_step2,
         solve_ivp_events_py,
+        spherical_harmonic_accel,
     )
     from e2m2e._integrators import cowell_step as _cowell_step
     from e2m2e._integrators import multistep_step as _multistep_step
     from e2m2e._integrators import rk_step as _rk_step
+
+    # Spice-gated symbols: absent when extension built without --features spice.
+    try:
+        from e2m2e._integrators import (
+            augmented_eom_7d_py,
+            disable_ephem_cache,
+            enable_ephem_cache,
+            ephem_ffi_call_count,
+            indirect_term_acceleration,
+            multiple_shooting_correct_py,
+            propagate_compiled,
+            propagate_compiled_lowthrust,
+            propagate_compiled_lowthrust_sensitivity,
+            propagate_compiled_stm_py,
+            propagate_with_stm_py,
+            reset_ephem_ffi_call_count,
+            segmented_shooting_correct_py,
+            spice_poc_furnsh,
+            third_body_acceleration,
+        )
+    except ImportError:
+        augmented_eom_7d_py = None  # type: ignore[misc,assignment]
+        disable_ephem_cache = None  # type: ignore[misc,assignment]
+        enable_ephem_cache = None  # type: ignore[misc,assignment]
+        ephem_ffi_call_count = None  # type: ignore[misc,assignment]
+        indirect_term_acceleration = None  # type: ignore[misc,assignment]
+        multiple_shooting_correct_py = None  # type: ignore[misc,assignment]
+        propagate_compiled = None  # type: ignore[misc,assignment]
+        propagate_compiled_lowthrust = None  # type: ignore[misc,assignment]
+        propagate_compiled_lowthrust_sensitivity = None  # type: ignore[misc,assignment]
+        propagate_compiled_stm_py = None  # type: ignore[misc,assignment]
+        propagate_with_stm_py = None  # type: ignore[misc,assignment]
+        reset_ephem_ffi_call_count = None  # type: ignore[misc,assignment]
+        segmented_shooting_correct_py = None  # type: ignore[misc,assignment]
+        spice_poc_furnsh = None  # type: ignore[misc,assignment]
+        third_body_acceleration = None  # type: ignore[misc,assignment]
 except ModuleNotFoundError:
     # _integrators is a compiled Rust extension; allow import for doc builds
     # where the extension is not built.
@@ -28,12 +71,34 @@ except ModuleNotFoundError:
     MultistepMethod = None  # type: ignore[misc,assignment]
     MultistepResult = None  # type: ignore[misc,assignment]
     RkMethod = None  # type: ignore[misc,assignment]
+    build_cr3bp_hamiltonian_py = None  # type: ignore[misc,assignment]
+    hello_integrators = None  # type: ignore[misc,assignment]
     lambert_batch_py = None  # type: ignore[misc,assignment]
     lambert_izzo_py = None  # type: ignore[misc,assignment]
+    pole_tide = None  # type: ignore[misc,assignment]
+    project_hamiltonian_qf_py = None  # type: ignore[misc,assignment]
+    solid_tide_step1 = None  # type: ignore[misc,assignment]
+    solid_tide_step2 = None  # type: ignore[misc,assignment]
     solve_ivp_events_py = None  # type: ignore[misc,assignment]
+    spherical_harmonic_accel = None  # type: ignore[misc,assignment]
     _cowell_step = None  # type: ignore[misc,assignment]
     _multistep_step = None  # type: ignore[misc,assignment]
     _rk_step = None  # type: ignore[misc,assignment]
+    augmented_eom_7d_py = None  # type: ignore[misc,assignment]
+    disable_ephem_cache = None  # type: ignore[misc,assignment]
+    enable_ephem_cache = None  # type: ignore[misc,assignment]
+    ephem_ffi_call_count = None  # type: ignore[misc,assignment]
+    indirect_term_acceleration = None  # type: ignore[misc,assignment]
+    multiple_shooting_correct_py = None  # type: ignore[misc,assignment]
+    propagate_compiled = None  # type: ignore[misc,assignment]
+    propagate_compiled_lowthrust = None  # type: ignore[misc,assignment]
+    propagate_compiled_lowthrust_sensitivity = None  # type: ignore[misc,assignment]
+    propagate_compiled_stm_py = None  # type: ignore[misc,assignment]
+    propagate_with_stm_py = None  # type: ignore[misc,assignment]
+    reset_ephem_ffi_call_count = None  # type: ignore[misc,assignment]
+    segmented_shooting_correct_py = None  # type: ignore[misc,assignment]
+    spice_poc_furnsh = None  # type: ignore[misc,assignment]
+    third_body_acceleration = None  # type: ignore[misc,assignment]
 
 # ---- Python↔Rust ABI 版本校验 ----
 # 与 Rust 侧 RUST_PY_ABI 同语义空间：binary_version >= _MIN_REQUIRED_RUST_ABI
@@ -67,18 +132,41 @@ def _check_rust_abi() -> None:
 
 
 __all__ = [
-    "rk_step",
-    "RkMethod",
-    "multistep_step",
+    "augmented_eom_7d_py",
+    "build_cr3bp_hamiltonian_py",
+    "CowellResult",
+    "cowell_step",
+    "disable_ephem_cache",
+    "enable_ephem_cache",
+    "ephem_ffi_call_count",
+    "hello_integrators",
+    "indirect_term_acceleration",
+    "initialize_abm_history",
+    "initialize_cowell_history",
+    "lambert_batch_py",
+    "lambert_izzo_py",
     "MultistepMethod",
     "MultistepResult",
-    "initialize_abm_history",
-    "cowell_step",
-    "CowellResult",
-    "initialize_cowell_history",
-    "lambert_izzo_py",
-    "lambert_batch_py",
+    "multistep_step",
+    "multiple_shooting_correct_py",
+    "pole_tide",
+    "project_hamiltonian_qf_py",
+    "propagate_compiled",
+    "propagate_compiled_lowthrust",
+    "propagate_compiled_lowthrust_sensitivity",
+    "propagate_compiled_stm_py",
+    "propagate_with_stm_py",
+    "reset_ephem_ffi_call_count",
+    "rk_step",
+    "RkMethod",
+    "segmented_shooting_correct_py",
+    "solid_tide_step1",
+    "solid_tide_step2",
     "solve_ivp_events",
+    "solve_ivp_events_py",
+    "spice_poc_furnsh",
+    "spherical_harmonic_accel",
+    "third_body_acceleration",
 ]
 
 
