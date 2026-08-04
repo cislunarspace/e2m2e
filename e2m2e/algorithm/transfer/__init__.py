@@ -137,6 +137,7 @@ __all__ = [
 
 
 _DEFAULT_TOF_GRID_POINTS: int = 50
+_G0: float = 9.81  # m/s², standard gravity (Tsiolkovsky equation)
 
 
 @dataclass
@@ -235,7 +236,7 @@ def _equivalent_delta_v(m0: float, mf: float, isp: float) -> float:
     Returns:
         等效 Δv (km/s)。
     """
-    return isp * 9.81 * math.log(m0 / mf) / 1000.0
+    return isp * _G0 * math.log(m0 / mf) / 1000.0
 
 
 @dataclass
@@ -295,6 +296,10 @@ def transfer_orbit(
     target_oe: tuple[float, float, float] | None = None,
     solver_method: str = "shooting",
     duration_days: float = 30.0,
+    departure_state: NDArray[np.float64] | None = None,
+    target_state: NDArray[np.float64] | None = None,
+    system: Any = None,
+    forces: Any = None,
     **kwargs,
 ) -> TransferDesignResult:
     """端到端转移轨道设计（编排器）。
@@ -315,6 +320,10 @@ def transfer_orbit(
         target_oe: Q-law 目标 ``(a_T, e_T, i_T)``（小推力可选）。
         solver_method: 求解方法 ``"shooting"`` / ``"collocation"``（小推力，默认 ``"shooting"``）。
         duration_days: 飞行时间（天）（小推力，默认 30.0）。
+        departure_state: 小推力出发状态 ``[r, v]`` (6,)，km / km/s（小推力可选）。
+        target_state: 小推力目标末态 ``[r, v]`` (6,)，km / km/s（小推力可选）。
+        system: 动力学系统（小推力可选，默认纯二体）。
+        forces: 非推力力模型列表（小推力可选）。
 
     Returns:
         TransferDesignResult: 转移轨道设计结果。
@@ -358,10 +367,10 @@ def transfer_orbit(
             target_oe=target_oe,
             solver_method=solver_method,
             duration_days=duration_days,
-            departure_state=kwargs.get("departure_state"),
-            target_state=kwargs.get("target_state"),
-            system=kwargs.get("system"),
-            forces=kwargs.get("forces"),
+            departure_state=departure_state,
+            target_state=target_state,
+            system=system,
+            forces=forces,
         )
     raise NotImplementedError(f"transfer_orbit('{transfer_type}') 实现未完成（能力在规划中）")
 
@@ -647,13 +656,11 @@ def _transfer_orbit_low_thrust(
         departure_state: 出发状态 ``[r, v]`` (6,)，km / km/s。优先于 tli_params。
         target_state: 目标末态 ``[r, v]`` (6,)，km / km/s。优先于 target_ephemeris。
         system: 动力学系统。默认纯二体 ``SimpleNamespace(origin="EARTH")``。
-        forces: 非推力力模型列表。默认 ``[PointMassGravity("EARTH", mu=398600.435507)]``。
+        forces: 非推力力模型列表。默认 ``[PointMassGravity("EARTH", mu=MU_EARTH)]``。
 
     Returns:
         TransferDesignResult: 转移轨道设计结果，携带 ``LowThrustTransferDetails``。
     """
-    _MU_EARTH = 398600.435507  # km³/s²
-
     # 1. 出发状态
     if departure_state is not None:
         r0 = departure_state[:3]
@@ -676,7 +683,7 @@ def _transfer_orbit_low_thrust(
     if system is None:
         system = SimpleNamespace(origin="EARTH")
     if forces is None:
-        forces = [PointMassGravity("EARTH", mu=_MU_EARTH)]
+        forces = [PointMassGravity("EARTH", mu=MU_EARTH)]
 
     # 4. 时间基准
     has_spice = hasattr(system, "spice") and system.spice is not None
@@ -687,8 +694,8 @@ def _transfer_orbit_low_thrust(
     if target_oe is None:
         r_target_norm = float(np.linalg.norm(r_target))
         v_target_norm = float(np.linalg.norm(v_target))
-        energy = v_target_norm**2 / 2.0 - _MU_EARTH / r_target_norm
-        a_target = -_MU_EARTH / (2.0 * energy)
+        energy = v_target_norm**2 / 2.0 - MU_EARTH / r_target_norm
+        a_target = -MU_EARTH / (2.0 * energy)
         target_oe = (a_target, 0.0, 0.0)
 
     # 6. 构造求解器
