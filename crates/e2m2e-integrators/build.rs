@@ -17,9 +17,7 @@ fn main() {
     let version_str = match fs::read_to_string(&version_file) {
         Ok(s) => s.trim().to_string(),
         Err(e) => {
-            println!(
-                "cargo:warning=build.rs: cannot read abi-version.txt: {e}"
-            );
+            println!("cargo:warning=build.rs: cannot read abi-version.txt: {e}");
             return;
         }
     };
@@ -34,8 +32,8 @@ fn main() {
 
     // 输出路径：相对于 CARGO_MANIFEST_DIR 往上两级到仓库根的 e2m2e/ 目录
     let out_path = manifest_dir
-        .parent()  // crates/
-        .and_then(|p| p.parent())  // repo root
+        .parent() // crates/
+        .and_then(|p| p.parent()) // repo root
         .map(|p| p.join("e2m2e").join("_rust_abi.py"));
 
     let out_path = match out_path {

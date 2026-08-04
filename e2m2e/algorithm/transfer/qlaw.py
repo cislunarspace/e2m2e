@@ -367,7 +367,7 @@ def qlaw_guess(
         # 不越过 tf
         if t + h > tf:
             h = tf - t
-        res = rk_step(RkMethod.PD45, t, state.tolist(), h, tol, eom, state_error_dim=6)
+        res = rk_step(RkMethod.PD45, t, state.tolist(), h, tol, eom, state_error_dim=6)  # type: ignore[arg-type]  # qlaw eom 签名 vs integrators wrapper 类型标注（预存）
         if res.error <= tol:
             t += h
             state = np.asarray(res.y_new, dtype=float)

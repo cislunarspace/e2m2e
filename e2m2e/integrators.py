@@ -106,7 +106,7 @@ except ModuleNotFoundError:
 try:
     from e2m2e._rust_abi import _ABI_VERSION as _MIN_REQUIRED_RUST_ABI
 except ImportError:
-    _MIN_REQUIRED_RUST_ABI: int = 1  # 构建前/无扩展时的安全默认值
+    _MIN_REQUIRED_RUST_ABI: int = 1  # type: ignore[no-redef]  # 构建前/无扩展时的安全默认值
 
 _abi_ok: bool = False  # 进程级一次性缓存
 
