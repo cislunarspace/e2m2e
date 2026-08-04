@@ -951,15 +951,13 @@ def _correct_lpo(
     orbit = corrector.iterate_full_period_correction(seed, verbose=False)
     if orbit is None:
         raise Cr3bpOrbitError(
-            f"LPO(L{libration_point}, x0={x0:.6f}) 全周期修正未收敛: "
-            f"{corrector.termination_reason}"
+            f"LPO(L{libration_point}, x0={x0:.6f}) 全周期修正未收敛: {corrector.termination_reason}"
         )
     assert orbit.period is not None
     # LPO 周期范围：极限 21.07 nd（~91 天），大振幅可到 ~30+ nd
     if orbit.period < 10.0 or orbit.period > 50.0:
         raise Cr3bpOrbitError(
-            f"LPO(L{libration_point}, x0={x0:.6f}) 周期异常"
-            f"（T={orbit.period:.3f}，预期 10.0-50.0）"
+            f"LPO(L{libration_point}, x0={x0:.6f}) 周期异常（T={orbit.period:.3f}，预期 10.0-50.0）"
         )
     return orbit
 
@@ -1049,8 +1047,7 @@ def design_lpo(
 
     if best_orbit is None:
         raise Cr3bpOrbitError(
-            f"LPO(L{libration_point}, amp={amplitude_km:.0f} km) "
-            f"网格搜索无收敛轨道"
+            f"LPO(L{libration_point}, amp={amplitude_km:.0f} km) 网格搜索无收敛轨道"
         )
     if best_err <= tol_du:
         return best_orbit
@@ -1075,9 +1072,7 @@ def design_lpo(
         for _ in range(10):
             x_mid = 0.5 * (refine_lo + refine_hi)
             try:
-                orbit_mid = _correct_lpo(
-                    dynamics, x_mid, libration_point, seed_orbit
-                )
+                orbit_mid = _correct_lpo(dynamics, x_mid, libration_point, seed_orbit)
             except Cr3bpOrbitError:
                 break
             amp_mid = measure(orbit_mid)
