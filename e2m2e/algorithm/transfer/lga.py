@@ -50,6 +50,7 @@ class LgaSearchParams:
     perilune_alt_min: float = 100.0
     perilune_alt_max: float = 10000.0
     max_total_dv: float = 25.0
+    n_propagation_samples: int = 500
 
 
 @dataclass
@@ -70,6 +71,7 @@ class LgaCandidate:
     total_dv: float
     jacobi_departure: float
     jacobi_arrival: float
+    arrival_time_dim: float
     converged: bool
 
 
@@ -87,69 +89,6 @@ def _compute_jacobi(state: np.ndarray, mu: float) -> float:
     return float(2.0 * u - v2)
 
 
-def _propagate_with_periapsis_refinement(
-    dynamics: CR3BP_Dynamics,
-    x0: np.ndarray,
-    t_span: tuple[float, float],
-    section: PoincareSection,
-    n_samples: int = 500,
-) -> dict:
-    """传播并在近月点附近加密采样。
-
-    1. 粗传播（n_samples/5 步）定位近月点区间
-    2. 近月点区间 ±0.1 无量纲时间内加密到 n_samples 步
-    3. 返回完整轨迹 + 近月点状态
-
-    Returns:
-        dict with keys: 'times', 'states', 'perilune_time', 'perilune_state',
-        'perilune_detected' (bool). 如果未检测到近月点则 perilune_detected=False。
-    """
-    # 粗传播定位近月点区间
-    n_coarse = max(n_samples // 5, 50)
-    t_eval_coarse = np.linspace(t_span[0], t_span[1], n_coarse)
-    result_coarse = dynamics.propagate(x0, t_span, t_eval=t_eval_coarse)
-    times_c = result_coarse["time"]
-    states_c = result_coarse["states"]
-
-    crossings = detect_crossings(times_c, states_c, section)
-    if not crossings:
-        return {
-            "times": times_c,
-            "states": states_c,
-            "perilune_time": None,
-            "perilune_state": None,
-            "perilune_detected": False,
-        }
-
-    # 取首次近月点
-    t_peri, state_peri, idx = crossings[0]
-
-    # 在近月点附近加密
-    dt_window = 0.1  # 无量纲时间
-    t_fine_start = max(t_span[0], t_peri - dt_window)
-    t_fine_end = min(t_span[1], t_peri + dt_window)
-    n_fine = max(n_samples // 2, 100)
-    t_eval_fine = np.linspace(t_fine_start, t_fine_end, n_fine)
-    result_fine = dynamics.propagate(x0, (t_fine_start, t_fine_end), t_eval=t_eval_fine)
-    times_f = result_fine["time"]
-    states_f = result_fine["states"]
-
-    # 在精细传播结果上重新检测近月点
-    crossings_fine = detect_crossings(times_f, states_f, section)
-    if crossings_fine:
-        t_peri, state_peri, _ = crossings_fine[0]
-
-    # 合并粗传播 + 精细传播（去重、排序）
-    # 使用粗传播的完整轨迹 + 精细传播补充
-    return {
-        "times": times_c,
-        "states": states_c,
-        "perilune_time": t_peri,
-        "perilune_state": state_peri,
-        "perilune_detected": True,
-    }
-
-
 def search_lga_trajectories(
     departure_state: np.ndarray,
     target_state: np.ndarray,
@@ -159,12 +98,12 @@ def search_lga_trajectories(
 ) -> list[LgaCandidate]:
     """LGA 弹道网格搜索。
 
-    搜索空间：出发速度方向角。
+    搜索空间：出发速度方向角 x 飞行时间（TOF）二维网格。
 
-    出发态为 LEO 停泊轨道（圆轨道速度）。对每个 angle：
+    出发态为 LEO 停泊轨道（圆轨道速度）。对每个 (angle, tof) 组合：
     1. 从停泊轨道出发，沿 angle 方向施加逃逸速度级的 TLI 脉冲
-       （v_tli = v_escape * 1.01，方向由 angle 参数化）
-    2. CR3BP 前向传播，检测近月点（PoincareSection.periapsis("moon")）
+       （v_tli = v_escape * 1.01，方向由 angle 参数化，确保超逃逸速度）
+    2. CR3BP 前向传播 tof 时间，检测近月点（PoincareSection.periapsis("moon")）
     3. 近月点高度在 perilune_alt_range 内的保留
     4. 继续传播，检测轨迹首次到达目标轨道距离（r_target）的时刻
     5. Δv_dep = |v_departure - v_parking|
@@ -179,7 +118,7 @@ def search_lga_trajectories(
         target_state: CR3BP 无量纲目标态 (6,)
         system: CR3BP 系统
         dynamics: CR3BP 动力学
-        params: 搜索参数（tof_range 用于控制最大传播时间）
+        params: 搜索参数
 
     Returns:
         按 total_dv 升序排列的候选列表
@@ -188,9 +127,11 @@ def search_lga_trajectories(
         params = LgaSearchParams()
     mu = system.mu
     du_km = system.characteristic_length
-    assert du_km is not None, "system.characteristic_length must be set"
+    if du_km is None:
+        raise ValueError("system.characteristic_length must be set")
     char_time = system.characteristic_time
-    assert char_time is not None, "system.characteristic_time must be set"
+    if char_time is None:
+        raise ValueError("system.characteristic_time must be set")
     periapsis_section = PoincareSection.periapsis("moon", system)
 
     # 月球在 CR3BP 旋转系中的位置
@@ -206,7 +147,7 @@ def search_lga_trajectories(
 
     # 逃逸速度（无量纲）：v_esc = sqrt(2*mu_primary / r)
     v_esc = math.sqrt(2.0 * (1.0 - mu) / r0_norm)
-    # TLI 速度：略高于逃逸速度，确保能到达月球
+    # TLI 速度：略高于逃逸速度（+1%），确保超逃逸速度
     v_tli = v_esc * 1.01
 
     # 出发速度方向角网格
@@ -216,8 +157,12 @@ def search_lga_trajectories(
         params.n_departure_phase,
         endpoint=False,
     )
-    # 最大传播时间（无量纲）
-    tof_max_dim = params.tof_range[1] * 86400.0 / char_time
+    # TOF 网格（无量纲时间）
+    tof_grid_dim = np.linspace(
+        params.tof_range[0] * 86400.0 / char_time,
+        params.tof_range[1] * 86400.0 / char_time,
+        params.n_tof,
+    )
 
     # 停泊轨道速度单位向量（切向方向）
     v_park_norm = np.linalg.norm(v_park)
@@ -225,6 +170,7 @@ def search_lga_trajectories(
 
     r_hat = r0 / r0_norm if r0_norm > 1e-12 else np.array([1.0, 0.0, 0.0])
 
+    n_samples = params.n_propagation_samples
     candidates: list[LgaCandidate] = []
 
     for angle in angle_grid:
@@ -234,79 +180,77 @@ def search_lga_trajectories(
         x0 = np.concatenate([r0, v_dep])
         dv_dep = float(np.linalg.norm(v_dep - v_park))
 
-        # 1. 检测近月点
-        n_samples = 500
-        t_eval = np.linspace(0.0, tof_max_dim, n_samples)
-        try:
-            result = dynamics.propagate(x0, (0.0, tof_max_dim), t_eval=t_eval)
-        except Exception:
-            continue
+        for tof_dim in tof_grid_dim:
+            # 1. 传播 tof 时间，检测近月点
+            t_eval = np.linspace(0.0, tof_dim, n_samples)
+            try:
+                result = dynamics.propagate(x0, (0.0, tof_dim), t_eval=t_eval)
+            except (RuntimeError, ValueError, np.linalg.LinAlgError):
+                logger.debug("传播失败：angle=%.3f rad, tof=%.2f", angle, tof_dim)
+                continue
 
-        times = result["time"]
-        states = result["states"]
+            times = result["time"]
+            states = result["states"]
 
-        crossings = detect_crossings(times, states, periapsis_section)
-        if not crossings:
-            continue
+            crossings = detect_crossings(times, states, periapsis_section)
+            if not crossings:
+                continue
 
-        # 取首次近月点
-        t_peri, state_peri, idx_peri = crossings[0]
-        r_peri_rel = np.linalg.norm(state_peri[:3] - moon_pos)
-        alt_km = float(r_peri_rel * du_km - R_MOON_KM)
+            # 取首次近月点
+            t_peri, state_peri, idx_peri = crossings[0]
+            r_peri_rel = np.linalg.norm(state_peri[:3] - moon_pos)
+            alt_km = float(r_peri_rel * du_km - R_MOON_KM)
 
-        if alt_km < params.perilune_alt_min or alt_km > params.perilune_alt_max:
-            continue
+            if alt_km < params.perilune_alt_min or alt_km > params.perilune_alt_max:
+                continue
 
-        # 2. 检测轨迹到达目标轨道距离的时刻
-        # 从近月点之后开始搜索（r > r_target 的首次穿越）
-        r_traj = np.linalg.norm(states[:, :3], axis=1)
-        # 在近月点之后，找到 r 首次等于 r_target 的点
-        # 从近月点索引开始
-        arrival_state = None
-        tof_sec = 0.0
-        for k in range(idx_peri, len(r_traj) - 1):
-            r1, r2 = r_traj[k], r_traj[k + 1]
-            # 检测 r 从 r_target 上方穿越（到达时r从大变小，经过目标距离）
-            # 或从下方穿越（r增大到目标距离）
-            if (r1 <= r_target <= r2) or (r2 <= r_target <= r1):
-                # 线性插值找精确穿越时刻
-                frac = (r_target - r1) / (r2 - r1) if abs(r2 - r1) > 1e-12 else 0.5
-                arrival_state = states[k] + frac * (states[k + 1] - states[k])
-                tof_sec = float((times[k] + frac * (times[k + 1] - times[k])) * char_time)
-                break
+            # 2. 检测轨迹到达目标轨道距离的时刻
+            #    从近月点之后开始搜索
+            r_traj = np.linalg.norm(states[:, :3], axis=1)
+            arrival_state = None
+            arrival_time_dim = tof_dim
+            for k in range(idx_peri, len(r_traj) - 1):
+                r1, r2 = r_traj[k], r_traj[k + 1]
+                if (r1 <= r_target <= r2) or (r2 <= r_target <= r1):
+                    frac = (r_target - r1) / (r2 - r1) if abs(r2 - r1) > 1e-12 else 0.5
+                    arrival_state = states[k] + frac * (states[k + 1] - states[k])
+                    arrival_time_dim = times[k] + frac * (times[k + 1] - times[k])
+                    break
 
-        if arrival_state is None:
-            # 未到达目标距离：用轨迹末态作为近似
-            arrival_state = states[-1]
-            tof_sec = float(tof_max_dim * char_time)
+            if arrival_state is None:
+                # 未到达目标距离：用轨迹末态作为近似
+                arrival_state = states[-1]
 
-        # Δv 计算
-        dv_arr = float(np.linalg.norm(arrival_state[3:] - target_state[3:]))
-        total_dv = dv_dep + dv_arr
+            tof_sec = float(arrival_time_dim * char_time)
 
-        if total_dv > params.max_total_dv:
-            continue
+            # Δv 计算
+            dv_arr = float(np.linalg.norm(arrival_state[3:] - target_state[3:]))
+            total_dv = dv_dep + dv_arr
 
-        # Jacobi 常数
-        jac_dep = _compute_jacobi(state_peri, mu)
-        jac_arr = _compute_jacobi(arrival_state, mu)
+            if total_dv > params.max_total_dv:
+                continue
 
-        candidates.append(
-            LgaCandidate(
-                departure_phase=float(angle),
-                tof_sec=tof_sec,
-                departure_state=x0.copy(),
-                perilune_state=state_peri.copy(),
-                perilune_alt_km=alt_km,
-                arrival_state=arrival_state.copy(),
-                dv_departure=dv_dep,
-                dv_arrival=dv_arr,
-                total_dv=total_dv,
-                jacobi_departure=jac_dep,
-                jacobi_arrival=jac_arr,
-                converged=True,
+            # Jacobi 常数
+            jac_dep = _compute_jacobi(x0, mu)
+            jac_arr = _compute_jacobi(arrival_state, mu)
+
+            candidates.append(
+                LgaCandidate(
+                    departure_phase=float(angle),
+                    tof_sec=tof_sec,
+                    departure_state=x0.copy(),
+                    perilune_state=state_peri.copy(),
+                    perilune_alt_km=alt_km,
+                    arrival_state=arrival_state.copy(),
+                    dv_departure=dv_dep,
+                    dv_arrival=dv_arr,
+                    total_dv=total_dv,
+                    jacobi_departure=jac_dep,
+                    jacobi_arrival=jac_arr,
+                    arrival_time_dim=arrival_time_dim,
+                    converged=True,
+                )
             )
-        )
 
     candidates.sort(key=lambda c: c.total_dv)
     return candidates
@@ -329,12 +273,16 @@ def _refine_lga_candidate(
     from .terminal import StateTerminal
     from .three_body_lambert import ThreeBodyLambert
 
+    char_time = system.characteristic_time
+    if char_time is None:
+        raise ValueError("system.characteristic_time must be set")
+
     try:
         shooter = ThreeBodyLambert(dynamics)
 
         peri_phys = system.dimensionless_to_physical(candidate.perilune_state)
-        # 到达段的 tof
-        tof_arrival = candidate.tof_sec * 0.3  # 近月点到目标约占总 tof 30%
+        # 到达段的 tof：从传播结果计算实际到达时间
+        tof_arrival = candidate.arrival_time_dim * char_time
 
         target_phys = system.dimensionless_to_physical(target_state)
 
@@ -363,9 +311,10 @@ def _refine_lga_candidate(
                 total_dv=candidate.dv_departure + dv_arr,
                 jacobi_departure=candidate.jacobi_departure,
                 jacobi_arrival=candidate.jacobi_arrival,
+                arrival_time_dim=candidate.arrival_time_dim,
                 converged=True,
             )
-    except Exception:
+    except (RuntimeError, ValueError, np.linalg.LinAlgError):
         logger.debug("ThreeBodyLambert 打靶失败，保留原始候选", exc_info=True)
 
     # 打靶失败，返回原始候选
@@ -381,5 +330,6 @@ def _refine_lga_candidate(
         total_dv=candidate.total_dv,
         jacobi_departure=candidate.jacobi_departure,
         jacobi_arrival=candidate.jacobi_arrival,
+        arrival_time_dim=candidate.arrival_time_dim,
         converged=False,
     )

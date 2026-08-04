@@ -23,7 +23,6 @@ from e2m2e.algorithm.transfer.hohmann import TliParams, construct_departure_stat
 from e2m2e.algorithm.transfer.lga import (
     R_MOON_KM,
     _compute_jacobi,
-    _propagate_with_periapsis_refinement,
     search_lga_trajectories,
 )
 
@@ -237,36 +236,21 @@ class TestLgaPhysics:
             f"Jacobi 常数在长时间传播中变化过大：max-min={c_max - c_min:.2e}"
         )
 
-    def test_propagate_with_periapsis_refinement(self, cr3bp_setup):
-        """_propagate_with_periapsis_refinement 检测到近月点或返回正确标志。"""
-        system, dynamics, dep_state, _ = cr3bp_setup
-        from e2m2e.algorithm.manifold.sections import PoincareSection
+    def test_search_detects_perilune_within_range(self, cr3bp_setup):
+        """search_lga_trajectories 2D 搜索检测到的近月点高度在 perilune_alt_range 内。"""
+        system, dynamics, dep_state, tgt_state = cr3bp_setup
 
-        section = PoincareSection.periapsis("moon", system)
-        # 用 TLI 状态（近径向出发 ~85°）以确保轨迹经过月球附近
-        mu = system.mu
-        r0 = dep_state[:3]
-        v_park = dep_state[3:]
-        r0_norm = np.linalg.norm(r0)
-        v_esc = math.sqrt(2.0 * (1 - mu) / r0_norm)
-        v_tli = v_esc * 1.02
-        v_hat = v_park / np.linalg.norm(v_park)
-        r_hat = r0 / r0_norm
-        angle = math.radians(85.0)
-        v_dir = math.cos(angle) * v_hat + math.sin(angle) * r_hat
-        x0 = np.concatenate([r0, v_dir * v_tli])
-
-        t_span = (0.0, 45.0 * 86400.0 / system.characteristic_time)
-        result = _propagate_with_periapsis_refinement(
-            dynamics, x0, t_span, section, n_samples=200
+        candidates = search_lga_trajectories(
+            dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS
         )
-        assert "times" in result
-        assert "states" in result
-        assert "perilune_detected" in result
-        if result["perilune_detected"]:
-            assert result["perilune_state"] is not None
-            assert result["perilune_state"].shape == (6,)
-            assert np.all(np.isfinite(result["perilune_state"]))
+        if not candidates:
+            pytest.skip("无可行候选，跳过近月点检测验证")
+
+        for c in candidates:
+            assert c.perilune_state.shape == (6,)
+            assert np.all(np.isfinite(c.perilune_state))
+            assert c.perilune_alt_km >= _SEARCH_PARAMS.perilune_alt_min
+            assert c.perilune_alt_km <= _SEARCH_PARAMS.perilune_alt_max
 
 
 # ---------------------------------------------------------------------------
