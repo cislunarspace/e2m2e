@@ -724,7 +724,9 @@ def design_axial(
 
 
 def _correct_spo(
-    dynamics: CR3BP_Dynamics, x0: float, libration_point: int,
+    dynamics: CR3BP_Dynamics,
+    x0: float,
+    libration_point: int,
     guess: Orbit | None,
 ) -> Orbit:
     """在 x₀ 处修正 SPO（通用平面周期修正，无对称性假设）。
@@ -738,7 +740,9 @@ def _correct_spo(
     if guess is None:
         # 从线性化短周期模态构造初猜（小振幅初猜对 Newton 收敛足够近）
         state, period = compute_spo_initial_guess(
-            dynamics.system, libration_point, amplitude_km=1000.0,
+            dynamics.system,
+            libration_point,
+            amplitude_km=1000.0,
         )
         # 覆盖 x₀ 到族参数指定值
         state[0] = x0
@@ -753,7 +757,8 @@ def _correct_spo(
     corrector = DifferentialCorrection(dynamics)
     corrector.setup_spo_fixed_x0(x0=x0, libration_point=libration_point)
     seed = Orbit(
-        states=state.reshape(1, -1), times=np.array([0.0]),
+        states=state.reshape(1, -1),
+        times=np.array([0.0]),
         system=dynamics.system,
     )
     seed.period = period
@@ -761,20 +766,20 @@ def _correct_spo(
     orbit = corrector.iterate_full_period_correction(seed, verbose=False)
     if orbit is None:
         raise Cr3bpOrbitError(
-            f"SPO(L{libration_point}, x0={x0:.6f}) 全周期修正未收敛: "
-            f"{corrector.termination_reason}"
+            f"SPO(L{libration_point}, x0={x0:.6f}) 全周期修正未收敛: {corrector.termination_reason}"
         )
     assert orbit.period is not None
     if orbit.period < 1.0 or orbit.period > 15.0:
         raise Cr3bpOrbitError(
-            f"SPO(L{libration_point}, x0={x0:.6f}) 周期异常"
-            f"（T={orbit.period:.3f}，预期 1.0-15.0）"
+            f"SPO(L{libration_point}, x0={x0:.6f}) 周期异常（T={orbit.period:.3f}，预期 1.0-15.0）"
         )
     return orbit
 
 
 def _l45_distance(
-    dynamics: CR3BP_Dynamics, orbit: Orbit, point: int,
+    dynamics: CR3BP_Dynamics,
+    orbit: Orbit,
+    point: int,
     n_points: int = 2000,
 ) -> tuple[float, float]:
     """传播一个周期，返回距 L4/L5 径向距离的最小/最大值（无量纲）。"""

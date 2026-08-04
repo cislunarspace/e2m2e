@@ -145,18 +145,14 @@ class TestPhysicalInvariants:
     def test_periodic_closure(self, l4_orbit, dynamics):
         """全周期闭合误差 < 1e-6。"""
         T = l4_orbit.period
-        result = dynamics.propagate(
-            l4_orbit.states[0], (0, T), t_eval=np.linspace(0, T, 1000)
-        )
+        result = dynamics.propagate(l4_orbit.states[0], (0, T), t_eval=np.linspace(0, T, 1000))
         closure = np.linalg.norm(result["states"][-1] - l4_orbit.states[0])
         assert closure < 1e-6
 
     def test_xy_plane_constraint(self, l4_orbit, dynamics):
         """SPO 为 xy 平面轨道：整个周期内 z≈0。"""
         T = l4_orbit.period
-        result = dynamics.propagate(
-            l4_orbit.states[0], (0, T), t_eval=np.linspace(0, T, 500)
-        )
+        result = dynamics.propagate(l4_orbit.states[0], (0, T), t_eval=np.linspace(0, T, 500))
         z_max = np.max(np.abs(result["states"][:, 2]))
         assert z_max < 1e-8
 

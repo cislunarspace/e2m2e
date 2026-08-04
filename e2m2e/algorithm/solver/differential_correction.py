@@ -791,10 +791,18 @@ class DifferentialCorrection:
         if verbose:
             logger.info("=" * 60)
             logger.info("开始全周期闭合修正迭代...")
-            logger.info("初始状态: x=%.6f, y=%.6f, z=%.6f",
-                        current_state[0], current_state[1], current_state[2])
-            logger.info("         ẋ=%.6f, ẏ=%.6f, ż=%.6f",
-                        current_state[3], current_state[4], current_state[5])
+            logger.info(
+                "初始状态: x=%.6f, y=%.6f, z=%.6f",
+                current_state[0],
+                current_state[1],
+                current_state[2],
+            )
+            logger.info(
+                "         ẋ=%.6f, ẏ=%.6f, ż=%.6f",
+                current_state[3],
+                current_state[4],
+                current_state[5],
+            )
             logger.info("初始周期: T=%.6f", current_period)
             logger.info("=" * 60)
 
@@ -821,19 +829,20 @@ class DifferentialCorrection:
 
             # 2. 计算闭合残差：state(T) - state(0) 在约束分量上
             error_vector = np.array(
-                [final_state[idx] - current_state[idx]
-                 for idx in self.constraint_indices]
+                [final_state[idx] - current_state[idx] for idx in self.constraint_indices]
             )
             current_error = np.linalg.norm(error_vector)
 
             self.error_history.append(current_error)
-            self.convergence_history.append({
-                "iteration": iteration + 1,
-                "error": current_error,
-                "state": current_state.copy(),
-                "time": current_period,
-                "final_state": final_state.copy(),
-            })
+            self.convergence_history.append(
+                {
+                    "iteration": iteration + 1,
+                    "error": current_error,
+                    "state": current_state.copy(),
+                    "time": current_period,
+                    "final_state": final_state.copy(),
+                }
+            )
 
             if verbose:
                 logger.info("迭代 %d: 闭合残差范数 = %.2e", iteration + 1, current_error)
@@ -859,9 +868,7 @@ class DifferentialCorrection:
             #   状态变量 (var_idx < 6): ∂final/∂var = STM[c_idx, var_idx],
             #     若 var_idx == c_idx 则还需 -1（∂(-initial)/∂var = -δ）
             #   时间变量 (var_idx == 6): ∂final/∂T = dstate/dt(T)
-            state_derivative = self.dynamics.equations_of_motion(
-                current_period, final_state
-            )
+            state_derivative = self.dynamics.equations_of_motion(current_period, final_state)
 
             n_constraints = len(self.constraint_indices)
             n_variables = len(self.free_variable_indices)

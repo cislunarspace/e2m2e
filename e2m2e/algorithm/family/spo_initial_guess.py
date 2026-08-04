@@ -53,9 +53,7 @@ def compute_spo_initial_guess(
     alpha_s = float((amplitude_km / l_c) / np.linalg.norm(v_s[:3]))
 
     phi = 0.0  # 初始相位
-    mode_contrib = alpha_s * (
-        np.real(v_s) * np.cos(phi) - np.imag(v_s) * np.sin(phi)
-    )
+    mode_contrib = alpha_s * (np.real(v_s) * np.cos(phi) - np.imag(v_s) * np.sin(phi))
 
     state0 = np.zeros(6)
     state0[:3] = x_L
