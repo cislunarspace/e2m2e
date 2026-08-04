@@ -13,15 +13,13 @@ import pytest
 
 from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.transfer import (
-    LgaCandidate,
     LgaSearchParams,
     LgaTransferDetails,
     TransferDesignResult,
     transfer_orbit,
 )
-from e2m2e.algorithm.transfer.hohmann import TliParams, construct_departure_state
+from e2m2e.algorithm.transfer.hohmann import TliParams
 from e2m2e.algorithm.transfer.lga import (
-    R_MOON_KM,
     _compute_jacobi,
     search_lga_trajectories,
 )
@@ -130,17 +128,13 @@ class TestLgaSearch:
     def test_search_returns_candidates(self, cr3bp_setup):
         """给定典型 LEO→月球参数，搜索应返回非空候选列表。"""
         system, dynamics, dep_state, tgt_state = cr3bp_setup
-        candidates = search_lga_trajectories(
-            dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS
-        )
+        candidates = search_lga_trajectories(dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS)
         assert len(candidates) > 0, "LGA 搜索应返回至少一个候选"
 
     def test_candidates_sorted_by_dv(self, cr3bp_setup):
         """候选按 total_dv 升序排列。"""
         system, dynamics, dep_state, tgt_state = cr3bp_setup
-        candidates = search_lga_trajectories(
-            dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS
-        )
+        candidates = search_lga_trajectories(dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS)
         if len(candidates) >= 2:
             dvs = [c.total_dv for c in candidates]
             assert dvs == sorted(dvs), "候选应按 total_dv 升序排列"
@@ -148,9 +142,7 @@ class TestLgaSearch:
     def test_periapsis_detected_within_range(self, cr3bp_setup):
         """可行候选的近月点高度在 perilune_alt_range 内。"""
         system, dynamics, dep_state, tgt_state = cr3bp_setup
-        candidates = search_lga_trajectories(
-            dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS
-        )
+        candidates = search_lga_trajectories(dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS)
         for c in candidates:
             assert c.perilune_alt_km >= _SEARCH_PARAMS.perilune_alt_min
             assert c.perilune_alt_km <= _SEARCH_PARAMS.perilune_alt_max
@@ -193,9 +185,7 @@ class TestLgaPhysics:
         mu = system.mu
         vu_km_s = system.characteristic_velocity
 
-        candidates = search_lga_trajectories(
-            dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS
-        )
+        candidates = search_lga_trajectories(dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS)
         if not candidates:
             pytest.skip("无可行候选，跳过逃逸速度验证")
 
@@ -240,9 +230,7 @@ class TestLgaPhysics:
         """search_lga_trajectories 2D 搜索检测到的近月点高度在 perilune_alt_range 内。"""
         system, dynamics, dep_state, tgt_state = cr3bp_setup
 
-        candidates = search_lga_trajectories(
-            dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS
-        )
+        candidates = search_lga_trajectories(dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS)
         if not candidates:
             pytest.skip("无可行候选，跳过近月点检测验证")
 
@@ -266,14 +254,16 @@ class TestLgaTransferOrbit:
         target_state = _make_target_state(system)
         du = system.characteristic_length
         vu = system.characteristic_velocity
-        target_phys = np.array([
-            target_state[0] * du,
-            target_state[1] * du,
-            target_state[2] * du,
-            target_state[3] * vu,
-            target_state[4] * vu,
-            target_state[5] * vu,
-        ])
+        target_phys = np.array(
+            [
+                target_state[0] * du,
+                target_state[1] * du,
+                target_state[2] * du,
+                target_state[3] * vu,
+                target_state[4] * vu,
+                target_state[5] * vu,
+            ]
+        )
         return target_phys.reshape(1, 6)
 
     def test_returns_transfer_design_result(self):
