@@ -297,6 +297,20 @@ fn cowell_step(
     })
 }
 
+/// Python↔Rust ABI 版本号（单调递增，接口变更时 bump）。
+///
+/// Python 侧 ``e2m2e.integrators._check_rust_abi`` 在首次使用 Rust 扩展时
+/// 比对 ``_MIN_REQUIRED_RUST_ABI``，二进制版本 < 所需即报"请重建"。
+/// 改 ``#[pyfunction]`` 签名、增删函数、改返回 shape 时必须 bump 此常量
+/// 并同步 Python 侧 ``_MIN_REQUIRED_RUST_ABI``（CI 散度测试兜底）。
+const RUST_PY_ABI: u32 = 1;
+
+/// 返回 Rust↔Python ABI 版本号（编译期常量，反映此 .pyd/.so 真实状态）。
+#[pyfunction]
+fn _py_abi_version() -> u32 {
+    RUST_PY_ABI
+}
+
 /// 占位函数，用于验证 FFI 路径端到端通畅。
 #[pyfunction]
 fn hello_integrators() -> PyResult<String> {
@@ -1931,6 +1945,7 @@ fn augmented_eom_7d_py(
 
 #[pymodule]
 fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(_py_abi_version, m)?)?;
     m.add_function(wrap_pyfunction!(hello_integrators, m)?)?;
     m.add_function(wrap_pyfunction!(normal_form::project_hamiltonian_qf_py, m)?)?;
     m.add_function(wrap_pyfunction!(

@@ -35,6 +35,37 @@ except ModuleNotFoundError:
     _multistep_step = None  # type: ignore[misc,assignment]
     _rk_step = None  # type: ignore[misc,assignment]
 
+# ---- Python↔Rust ABI 版本校验 ----
+# 与 Rust 侧 RUST_PY_ABI 同语义空间：binary_version >= _MIN_REQUIRED_RUST_ABI
+# 即可；< 则说明 .pyd/.so 过期，需重建。
+_MIN_REQUIRED_RUST_ABI: int = 1  # 同步：改此值时同步 lib.rs RUST_PY_ABI（反之亦然）
+
+_abi_ok: bool = False  # 进程级一次性缓存
+
+
+def _check_rust_abi() -> None:
+    """校验 Rust 扩展 ABI 版本；过期即报，缺失则静默跳过。
+
+    在首次使用 Rust 扩展符号时调用（惰性），结果缓存。扩展不存在时（
+    ``ImportError``）保留原有静默降级路径（doc build / 无 spice 构建合法）。
+    """
+    global _abi_ok
+    if _abi_ok:
+        return
+    try:
+        from e2m2e._integrators import _py_abi_version
+    except ImportError:
+        _abi_ok = True  # 无扩展 → 保留降级，不报
+        return
+    actual = _py_abi_version()
+    if actual < _MIN_REQUIRED_RUST_ABI:
+        raise RuntimeError(
+            f"e2m2e._integrators 编译产物过期（ABI v{actual} < 所需 v{_MIN_REQUIRED_RUST_ABI}）。"
+            "请重建 Rust 扩展：uv run maturin develop --features spice"
+        )
+    _abi_ok = True
+
+
 __all__ = [
     "rk_step",
     "RkMethod",
@@ -68,6 +99,8 @@ def rk_step(
     ``state_error_dim``：步长误差控制只统计前 N 维（``None`` 时统计全部）。
     STM 增广传播时传 6，让状态转移矩阵的 36 个分量不主导步长控制。
     """
+    if CowellResult is not None:
+        _check_rust_abi()
     y = np.asarray(y, dtype=float)
 
     def _adapt(t_i: float, y_i: list[float]) -> list[float]:
@@ -97,6 +130,8 @@ def multistep_step(
     The step size is assumed fixed; changing ``h`` requires re-initialising the
     history (see :func:`initialize_abm_history`).
     """
+    if CowellResult is not None:
+        _check_rust_abi()
     y = np.asarray(y, dtype=float)
 
     def _adapt(t_i: float, y_i: list[float]) -> list[float]:
@@ -122,6 +157,8 @@ def initialize_abm_history(
     ``n_stages=3`` this returns ``(t0 + 3h, y(3h), [f_0, f_1, f_2, f_3])``.
     The returned history is ready to feed into :func:`multistep_step`.
     """
+    if CowellResult is not None:
+        _check_rust_abi()
     y = np.asarray(y0, dtype=float).copy()
     t = float(t0)
     history: list[list[float]] = [np.asarray(f(t, y), dtype=float).tolist()]
@@ -149,6 +186,8 @@ def cowell_step(
 
     Returns a ``CowellResult`` with ``x_new``, ``error``, ``h_next``, ``history``.
     """
+    if CowellResult is not None:
+        _check_rust_abi()
     hist_lists = [np.asarray(hi, dtype=float).tolist() for hi in history]
 
     def _adapt(t_i: float, x_i: list[float]) -> list[float]:
@@ -176,6 +215,8 @@ def initialize_cowell_history(
     the 8 most recent acceleration samples are available; with the default
     ``n_startup=7`` the state advances to ``t0 + 7h``.
     """
+    if CowellResult is not None:
+        _check_rust_abi()
     if n_startup < 7:
         raise ValueError(
             f"8th-order Cowell needs n_startup >= 7 (8 acceleration samples), got {n_startup}"
@@ -241,6 +282,8 @@ def solve_ivp_events(
         事件点）、``t_events``/``y_events``（逐事件的触发时刻与状态列表）、
         ``terminal_event``（触发终止的事件索引或 None）、``n_steps``。
     """
+    if CowellResult is not None:
+        _check_rust_abi()
     y0_arr = np.asarray(y0, dtype=float)
 
     def _adapt_rhs(t_i: float, y_i: list[float]) -> list[float]:
