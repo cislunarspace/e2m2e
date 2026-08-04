@@ -6,7 +6,6 @@ EphemerisTable。单文件模块（不是目录）。
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
 import numpy as np
@@ -14,6 +13,10 @@ import numpy as np
 from ..data.types import EphemerisTable
 
 __all__ = ["propagate_orbit"]
+
+#: J2000 历元的 TDB 儒略日（SPICE ET 定义为相对此历元的 TDB 秒）
+_J2000_JD_TDB = 2451545.0
+_SECONDS_PER_DAY = 86400.0
 
 #: 默认三体力模型（地月日点质量引力）
 _DEFAULT_FORCE_CONFIG: dict[str, Any] = {
@@ -81,7 +84,9 @@ def propagate_orbit(
     from .forces import ForceModel
 
     spice = SPICEManager()
-    _load_propagation_kernels(spice, kwargs.get("kernel_dir"))
+    from .design.design_orbit import load_design_kernels
+
+    load_design_kernels(spice, kwargs.get("kernel_dir"))
 
     if force_config is None:
         force_config = _DEFAULT_FORCE_CONFIG
@@ -144,6 +149,7 @@ def propagate_orbit(
         position_km=states[:, :3].copy(),
         velocity_mps=states[:, 3:6].copy() * 1000.0,
         synodic_position=np.zeros((n, 3)),
+        times_jd_tdb=(_J2000_JD_TDB + times / _SECONDS_PER_DAY).copy(),
     )
 
 
@@ -159,53 +165,6 @@ def _extract_bodies(force_config: dict[str, Any]) -> list[str]:
                 seen.add(name)
                 bodies.append(name)
     return bodies
-
-
-def _load_propagation_kernels(spice: Any, kernel_dir: str | None = None) -> list[str]:
-    """加载传播所需内核：行星历 + body-fixed 帧内核，注册行星名。"""
-    from ..data.kernels._spice_loader import get_spiceypy
-
-    _BODY_ID_ALIASES = [
-        ("MERCURY", 1),
-        ("VENUS", 2),
-        ("EARTH", 399),
-        ("MARS", 4),
-        ("JUPITER", 5),
-        ("SATURN", 6),
-        ("URANUS", 7),
-        ("NEPTUNE", 8),
-        ("MOON", 301),
-        ("SUN", 10),
-    ]
-    _BODY_FIXED_KERNELS = [
-        "earth_latest_high_prec.bpc",
-        "pck00010.tpc",
-        "SPICELunaCurrentKernel.bpc",
-        "SPICELunaFrameKernel.tf",
-    ]
-
-    if kernel_dir is None:
-        from .design.design_orbit import default_kernel_dir
-
-        kernel_dir = default_kernel_dir()
-
-    for name, naif_id in _BODY_ID_ALIASES:
-        get_spiceypy().boddef(name, naif_id)
-    loaded: list[str] = []
-    for name in ["de440s.bsp", "de430.bsp"]:
-        path = os.path.join(kernel_dir, name)
-        if os.path.exists(path):
-            spice.load_kernel(path)
-            loaded.append(path)
-            break
-    else:
-        raise FileNotFoundError(f"行星历内核不存在（de440s/de430）: {kernel_dir}")
-    for name in _BODY_FIXED_KERNELS:
-        path = os.path.join(kernel_dir, name)
-        if os.path.exists(path):
-            spice.load_kernel(path)
-            loaded.append(path)
-    return loaded
 
 
 def _parse_utc_calendar(utc_str: str) -> tuple[int, int, int, int, int, float]:

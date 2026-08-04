@@ -76,12 +76,13 @@ class TestPropagationRequest:
             )
 
     def test_invalid_state_shape(self):
-        # Pydantic 只校验 list[float]；算法层会校验长度 6
-        PropagationRequest(
-            initial_state=[0.0] * 5,
-            epoch="2025-06-21T11:00:00",
-            duration=3600.0,
-        )
+        # Pydantic 在 API 边界强制长度为 6
+        with pytest.raises(ValidationError):
+            PropagationRequest(
+                initial_state=[0.0] * 5,
+                epoch="2025-06-21T11:00:00",
+                duration=3600.0,
+            )
 
 
 class TestSpacetimeTransformRequest:
@@ -182,7 +183,7 @@ class TestFacadeCallChain:
 
     def test_transfer_design_invalid_type_call_chain(self):
         facade = Facade()
-        with pytest.raises(OrbitError, match="TRANSFER_FAILED"):
+        with pytest.raises(OrbitError, match="NOT_IMPLEMENTED"):
             facade.transfer_design(
                 transfer_type="UNKNOWN_TYPE",
                 tli_epoch="2025-06-21T11:00:00",

@@ -122,7 +122,7 @@ class TransferDesignRequest(_ApiModel):
     tli_epoch: Any = Field(description="TLI 历元（UTC ISO 字符串或 JD_TDB 浮点数）")
     parking_alt_km: float = Field(default=200.0, gt=0.0, description="地球停泊轨道高度 (km)")
     incl_deg: float = Field(default=28.5, ge=0.0, le=180.0, description="轨道倾角 (度)")
-    flight_path_deg: float = Field(default=0.0, ge=0.0, le=360.0, description="航迹角 (度)")
+    flight_path_deg: float = Field(default=0.0, ge=0.0, le=0.0, description="航迹角 (度，仅支持 0)")
     target_ephemeris: Any = Field(
         default=None, description="目标星历（EphemerisTable/NominalOrbit/ndarray）"
     )
@@ -146,7 +146,9 @@ class TransferDesignResponse(_ApiModel):
 class PropagationRequest(_ApiModel):
     """轨道预报输入（对齐 algorithm/propagation 的 propagate_orbit 参数）。"""
 
-    initial_state: list[float] = Field(description="初值（GCRS，km, km/s，长度 6）")
+    initial_state: list[float] = Field(
+        min_length=6, max_length=6, description="初值（GCRS，km, km/s，长度 6）"
+    )
     epoch: Any = Field(description="起始历元 UTC（ISO 字符串或 [年,月,日,时,分,秒]）")
     duration: float = Field(gt=0.0, description="预报时长（秒）")
     force_config: dict[str, Any] | None = Field(
@@ -161,9 +163,12 @@ class PropagationResponse(_ApiModel):
     epoch_utc: str
     duration_sec: float
     output_step: float
+    n_points: int
     time_sec: list[float]
+    times_jd_tdb: list[float]
     position_km: list[list[float]]
-    velocity_mps: list[list[float]]
+    velocity_km_s: list[list[float]]
+    final_state: list[float]
 
 
 class SpacetimeTransformRequest(_ApiModel):

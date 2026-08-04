@@ -217,6 +217,8 @@ class Facade:
             raise
         except (ValueError, TypeError) as exc:
             raise OrbitError("INVALID_PARAMS", str(exc)) from exc
+        except NotImplementedError as exc:
+            raise OrbitError("NOT_IMPLEMENTED", str(exc)) from exc
         except Exception as exc:
             raise OrbitError("TRANSFER_FAILED", str(exc)) from exc
 
@@ -239,18 +241,26 @@ class Facade:
                 output_step=request.output_step,
                 kernel_dir=self._config.kernel_dir,
             )
+            times_jd = result.times_jd_tdb
+            assert times_jd is not None  # propagate_orbit 始终填充
+            vel_km_s = result.velocity_mps / 1000.0
             return PropagationResponse(
                 epoch_utc=str(request.epoch) if isinstance(request.epoch, str) else "",
                 duration_sec=float(request.duration),
                 output_step=float(request.output_step),
-                time_sec=[float(t) for t in range(len(result.year))],
+                n_points=len(result.year),
+                time_sec=((times_jd - times_jd[0]) * 86400.0).tolist(),
+                times_jd_tdb=times_jd.tolist(),
                 position_km=result.position_km.tolist(),
-                velocity_mps=result.velocity_mps.tolist(),
+                velocity_km_s=vel_km_s.tolist(),
+                final_state=result.position_km[-1].tolist() + vel_km_s[-1].tolist(),
             )
         except OrbitError:
             raise
         except (ValueError, TypeError) as exc:
             raise OrbitError("INVALID_PARAMS", str(exc)) from exc
+        except NotImplementedError as exc:
+            raise OrbitError("NOT_IMPLEMENTED", str(exc)) from exc
         except Exception as exc:
             raise OrbitError("PROPAGATION_FAILED", str(exc)) from exc
 
@@ -277,6 +287,7 @@ class Facade:
                     float(t),
                     et0_jd=request.et0_jd,
                     ephemeris_path=request.ephemeris_path,
+                    kernel_dir=self._config.kernel_dir,
                 )
                 converted_states.append(result["state"].tolist())
                 converted_times.append(float(result["time"]))
@@ -294,6 +305,8 @@ class Facade:
             raise
         except (ValueError, TypeError) as exc:
             raise OrbitError("INVALID_PARAMS", str(exc)) from exc
+        except NotImplementedError as exc:
+            raise OrbitError("NOT_IMPLEMENTED", str(exc)) from exc
         except Exception as exc:
             raise OrbitError("TRANSFORM_FAILED", str(exc)) from exc
 
