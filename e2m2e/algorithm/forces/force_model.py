@@ -253,9 +253,7 @@ class ForceModel:
                 continue
             jac = entry.force.compute_jacobian(t, state, self.system)
             if jac is None:
-                dadr, dadv = self._finite_diff_jacobians(
-                    entry.force, t, state, delta_r, delta_v
-                )
+                dadr, dadv = self._finite_diff_jacobians(entry.force, t, state, delta_r, delta_v)
             else:
                 dadr = jac
                 dadv = np.zeros((3, 3), dtype=float)

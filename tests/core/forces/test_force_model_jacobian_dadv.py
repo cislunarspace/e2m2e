@@ -191,9 +191,7 @@ class TestStmPropagationUsesDadv:
         fm.atol = 1e-12
 
         state0 = np.array([1.0, 0.0, 0.0, 1.0, 0.0, 0.0])
-        stm = fm.propagate(
-            state0, (0.0, 1.0), with_stm=True, initial_step=0.05
-        )["stm"][-1]
+        stm = fm.propagate(state0, (0.0, 1.0), with_stm=True, initial_step=0.05)["stm"][-1]
 
         block_vv = stm[3:6, 3:6]
         assert not np.allclose(block_vv, np.eye(3), atol=1e-3), (
@@ -220,9 +218,7 @@ class TestStmPropagationUsesDadv:
         fm.atol = 1e-12
 
         state0 = np.array([1.0, 0.0, 0.0, 1.0, 0.0, 0.0])
-        stm = fm.propagate(
-            state0, (0.0, 1.0), with_stm=True, initial_step=0.05
-        )["stm"][-1]
+        stm = fm.propagate(state0, (0.0, 1.0), with_stm=True, initial_step=0.05)["stm"][-1]
 
         # 恒力：δv(t)=δv0（速度不演化），故 Φ[3:,3:]=I、Φ[3:,:3]=0
         assert_allclose(stm[3:6, 3:6], np.eye(3), atol=1e-9, err_msg="恒力 Φ[3:,3:] 应 = I")
