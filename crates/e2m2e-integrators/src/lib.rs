@@ -1063,6 +1063,11 @@ pub(crate) fn parse_force_tuple(
 
 /// `propagate_compiled` 主循环（释 GIL 段）的输出：time / states / 步数统计。
 /// 独立成 type alias 修 clippy `type_complexity`（与 `AccelJacobiResult` 同法）。
+///
+/// 与唯一使用者 `propagate_compiled` 同步 cfg：无 spice feature 时该函数被
+/// 编译期剔除，alias 须一并剔除，否则 `cargo clippy --workspace`（默认无 spice）
+/// 报 dead_code（#318 CI）。
+#[cfg(feature = "spice")]
 type CompiledPropResult = (Vec<f64>, Vec<Vec<f64>>, usize, usize, usize);
 
 /// 全 Rust 力模型传播器（消除 Python↔Rust 跨界）。
