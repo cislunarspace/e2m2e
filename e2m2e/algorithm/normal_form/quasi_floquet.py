@@ -549,7 +549,8 @@ def _solve_qf_segmented(
     段边界为 ``segment`` 的整数倍（夹在 ``[t_arr[0], t_arr[-1]]`` 之间）。
     每段独立 DOP853 积分，段末用 :func:`symplectic_project` 把 ``B`` 拉回
     辛群，抑制 ``e^(λt)`` 增长导致的辛误差累积。段内对 ``t_arr`` 的采样点
-    用 ``dense_output`` 取值，保持采样点不偏移。
+    用段积分的 ``t_eval`` 直接输出（Rust ``solve_ivp_py`` 无稠密输出插值器，
+    故把采样点并入段 ``t_eval`` 网格，而非事后插值）。
     """
     from ._solve_ivp_rust import solve_ivp_rust
 
