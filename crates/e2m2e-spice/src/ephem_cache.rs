@@ -66,6 +66,23 @@ impl From<CacheMissError> for cspice::Error {
     }
 }
 
+/// 采样体状态向量（位置 + 速度，共 6 个分量）。
+type BodySample = [f64; 6];
+/// 3×3 旋转矩阵。
+type FrameMatrix = [[f64; 3]; 3];
+/// 6×6 状态变换矩阵。
+type SxformMatrix = [[f64; 6]; 6];
+
+/// (key, 采样数据) 类型别名（Vec，用于 build 内部暂存）。
+type BodyGrids = Vec<((String, String), Vec<BodySample>)>;
+type FrameGrids = Vec<((String, String), Vec<FrameMatrix>)>;
+type SxformGrids = Vec<((String, String), Vec<SxformMatrix>)>;
+
+/// 单个采样点类型（用于公共 API 参数切片）。
+type BodyEntry = ((String, String), Vec<BodySample>);
+type FrameEntry = ((String, String), Vec<FrameMatrix>);
+type SxformEntry = ((String, String), Vec<SxformMatrix>);
+
 /// 自然三次样条：预解二阶导数，查询 O(log N) 二分定位 + O(1) 求值。
 ///
 /// 构造时用追赶法解三对角系统求各节点二阶导数 `m`（自然边界 m₀=mₙ=0）。
@@ -226,12 +243,10 @@ impl EphemCache {
         let t_grid: Vec<f64> = (0..n).map(|i| t0 + i as f64 * dt).collect();
 
         // ── 采集 body 原始网格 ──
-        let mut body_grids: Vec<((String, String), Vec<[f64; 6]>)> =
-            Vec::with_capacity(bodies.len());
+        let mut body_grids: BodyGrids = Vec::with_capacity(bodies.len());
         for (target, observer) in bodies {
             let mut states = Vec::with_capacity(n);
-            for i in 0..n {
-                let et = t_grid[i];
+            for &et in &t_grid {
                 let et_tdb = Et::from(et);
                 let (state, _lt) = easier_reader(
                     target,
@@ -254,24 +269,22 @@ impl EphemCache {
         }
 
         // ── 采集 frame 原始网格 ──
-        let mut frame_grids: Vec<((String, String), Vec<[[f64; 3]; 3]>)> =
-            Vec::with_capacity(frames.len());
+        let mut frame_grids: FrameGrids = Vec::with_capacity(frames.len());
         for (from, to) in frames {
             let mut mats = Vec::with_capacity(n);
-            for i in 0..n {
-                let r = pxform(from, to, t_grid[i])?;
+            for &et in &t_grid {
+                let r = pxform(from, to, et)?;
                 mats.push(r);
             }
             frame_grids.push(((from.clone(), to.clone()), mats));
         }
 
         // ── 采集 sxform 原始网格 ──
-        let mut sx_grids: Vec<((String, String), Vec<[[f64; 6]; 6]>)> =
-            Vec::with_capacity(sxform_pairs.len());
+        let mut sx_grids: SxformGrids = Vec::with_capacity(sxform_pairs.len());
         for (from, to) in sxform_pairs {
             let mut mats = Vec::with_capacity(n);
-            for i in 0..n {
-                let m = crate::spice_ffi::sxform(from, to, t_grid[i])?;
+            for &et in &t_grid {
+                let m = crate::spice_ffi::sxform(from, to, et)?;
                 mats.push(m);
             }
             sx_grids.push(((from.clone(), to.clone()), mats));
@@ -294,9 +307,9 @@ impl EphemCache {
     /// 各 body/frame/sxform 序列长度须等于 `t_grid.len()`。
     pub fn from_raw_grids(
         t_grid: &[f64],
-        bodies: &[((String, String), Vec<[f64; 6]>)],
-        frames: &[((String, String), Vec<[[f64; 3]; 3]>)],
-        sxforms: &[((String, String), Vec<[[f64; 6]; 6]>)],
+        bodies: &[BodyEntry],
+        frames: &[FrameEntry],
+        sxforms: &[SxformEntry],
     ) -> Result<Self, SpiceFfiError> {
         let n = t_grid.len();
         if n < 2 {
