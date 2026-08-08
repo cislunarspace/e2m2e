@@ -6,7 +6,7 @@ inputs-dac.txt（第 9~17 行 + 阶次/DYB 行）的力模型是"地球+月球�
 ``ForceModel.from_config`` 可直接消费的配置字典，保证"同款力模型"两侧
 可复现。
 
-对应关系（地心 GCRS 传播，对应关系如下）：
+对应关系（地心 GCRS 传播）如下：
 
 - 基础模型（常开）：地球质点 ``PointMassGravity(EARTH)``（状态以地心为
   原点，中心项模型适用）；月球质点 ``ThirdBodyGravity(MOON)``——地心
