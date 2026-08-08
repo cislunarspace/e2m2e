@@ -801,7 +801,7 @@ def run_monte_carlo(
     Args:
         nominal_ephemeris: 标称轨道星历（FR1 ``design_orbit`` 产物）
         spice: SPICE 管理器（``n_workers>1`` 时仅用于构造标称视图）
-        system: 星历动力学系统（地心 ICRF，见 tests/dfh 的 system fixture）
+        system: 星历动力学系统（地心 ICRF）
         force_config_ctrl: 控制（理论）力模型配置（表 5-3 左列）
         force_config_true: 真实（实际）力模型配置（表 5-3 右列）
         control_mode: 1=目标点宽松、2=目标点严格、3=特征点
