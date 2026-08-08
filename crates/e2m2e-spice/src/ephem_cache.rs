@@ -300,9 +300,7 @@ impl EphemCache {
     ) -> Result<Self, SpiceFfiError> {
         let n = t_grid.len();
         if n < 2 {
-            return Err(SpiceFfiError::Failed(
-                "t_grid 至少需要 2 个采样点".into(),
-            ));
+            return Err(SpiceFfiError::Failed("t_grid 至少需要 2 个采样点".into()));
         }
         if !t_grid.windows(2).all(|w| w[0] < w[1]) {
             return Err(SpiceFfiError::Failed("t_grid 必须严格递增".into()));

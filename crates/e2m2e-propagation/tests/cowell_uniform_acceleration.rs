@@ -20,9 +20,8 @@ use e2m2e_propagation::cowell::{cowell_step, COWELL_HISTORY_LEN};
 #[test]
 fn test_constant_acceleration_exact_reproduction() {
     let a0 = 5.0; // constant acceleration (m/s²)
-    let accel = |_t: f64, _x: &[f64]| -> Result<Vec<f64>, std::convert::Infallible> {
-        Ok(vec![a0])
-    };
+    let accel =
+        |_t: f64, _x: &[f64]| -> Result<Vec<f64>, std::convert::Infallible> { Ok(vec![a0]) };
 
     let x0 = 3.0;
     let v0 = 2.0;
@@ -59,15 +58,16 @@ fn test_constant_acceleration_exact_reproduction() {
 #[test]
 fn test_3d_constant_acceleration_exact_reproduction() {
     let a0 = [1.0, -2.0, 3.0];
-    let accel = |_t: f64, _x: &[f64]| -> Result<Vec<f64>, std::convert::Infallible> {
-        Ok(a0.to_vec())
-    };
+    let accel =
+        |_t: f64, _x: &[f64]| -> Result<Vec<f64>, std::convert::Infallible> { Ok(a0.to_vec()) };
 
     let x0 = [1.0, 2.0, 3.0];
     let v0 = [0.5, -0.3, 1.2];
     let h: f64 = 0.005;
 
-    let x_neg_h: Vec<f64> = (0..3).map(|i| x0[i] - v0[i] * h + 0.5 * a0[i] * h * h).collect();
+    let x_neg_h: Vec<f64> = (0..3)
+        .map(|i| x0[i] - v0[i] * h + 0.5 * a0[i] * h * h)
+        .collect();
     let mut history: Vec<Vec<f64>> = vec![x_neg_h, x0.to_vec()];
     for _ in 0..COWELL_HISTORY_LEN - 2 {
         history.push(a0.to_vec());
@@ -96,5 +96,8 @@ fn test_3d_constant_acceleration_exact_reproduction() {
 /// Cowell 历史缓冲长度常量检验：确保 8 个加速度采样 + 2 个位置采样 = 10。
 #[test]
 fn test_cowell_history_len_constant() {
-    assert_eq!(COWELL_HISTORY_LEN, 10, "Cowell 历史缓冲长度应为 10（2 pos + 8 accel）");
+    assert_eq!(
+        COWELL_HISTORY_LEN, 10,
+        "Cowell 历史缓冲长度应为 10（2 pos + 8 accel）"
+    );
 }

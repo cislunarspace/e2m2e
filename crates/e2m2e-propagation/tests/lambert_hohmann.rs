@@ -19,8 +19,8 @@
 //!
 //! 所有断言基于二体理论公式（物理定义），不依赖黄金样本或外部软件。
 
-use std::f64::consts::PI;
 use e2m2e_propagation::lambert::{lambert_izzo, TransferDirection};
+use std::f64::consts::PI;
 
 const MU: f64 = 398600.4418; // Earth GM (km³/s²)
 
@@ -63,7 +63,11 @@ fn propagate_ellipse(r0: &[f64; 3], v0: &[f64; 3], tof: f64, mu: f64) -> [f64; 3
     let d_e = ecc - e0;
     let f = 1.0 + a * (d_e.cos() - 1.0) / r0n;
     let gg = tof - (d_e - d_e.sin()) / n;
-    [f * r0[0] + gg * v0[0], f * r0[1] + gg * v0[1], f * r0[2] + gg * v0[2]]
+    [
+        f * r0[0] + gg * v0[0],
+        f * r0[1] + gg * v0[1],
+        f * r0[2] + gg * v0[2],
+    ]
 }
 
 fn assert_close(a: &[f64; 3], b: &[f64; 3], tol: f64) {
@@ -80,7 +84,8 @@ fn assert_round_trip(r0: &[f64; 3], rf: &[f64; 3], tof: f64, v0: &[f64; 3]) {
         assert!(
             (r_end[i] - rf[i]).abs() < 1e-7 * rn,
             "Lambert 传播落点分量 {i}: {} vs {}",
-            r_end[i], rf[i]
+            r_end[i],
+            rf[i]
         );
     }
 }

@@ -18,7 +18,10 @@ struct Circ {
 impl Circ {
     fn new(r: f64, mu: f64) -> Self {
         let v = (mu / r).sqrt();
-        Self { r0: r, omega: v / r }
+        Self {
+            r0: r,
+            omega: v / r,
+        }
     }
     fn state(&self, t: f64) -> [f64; 6] {
         let c = (self.omega * t).cos();
@@ -37,7 +40,11 @@ fn rhs(gm: f64) -> impl Fn(f64, &[f64]) -> Result<Vec<f64>, std::convert::Infall
 }
 
 fn l2(a: &[f64], b: &[f64]) -> f64 {
-    a.iter().zip(b.iter()).map(|(x, y)| (x - y).powi(2)).sum::<f64>().sqrt()
+    a.iter()
+        .zip(b.iter())
+        .map(|(x, y)| (x - y).powi(2))
+        .sum::<f64>()
+        .sqrt()
 }
 
 // ── test 1: 真实二体圆轨道 — 小步长单步精度合理 ──────────────────────
@@ -71,7 +78,13 @@ fn test_error_decreases_with_h() {
         n: usize,
     }
 
-    fn go(table: &e2m2e_propagation::butcher::ButcherTable, gm: f64, h: f64, n: usize, orbit: &Circ) -> f64 {
+    fn go(
+        table: &e2m2e_propagation::butcher::ButcherTable,
+        gm: f64,
+        h: f64,
+        n: usize,
+        orbit: &Circ,
+    ) -> f64 {
         let mut y = orbit.state(0.0).to_vec();
         let mut t = 0.0;
         let f = rhs(gm);
@@ -84,12 +97,36 @@ fn test_error_decreases_with_h() {
     }
 
     let cases = [
-        Case { method: RkMethod::Pd45, h: 0.4, n: 40 },
-        Case { method: RkMethod::Pd45, h: 0.2, n: 80 },
-        Case { method: RkMethod::Pd78, h: 0.4, n: 40 },
-        Case { method: RkMethod::Pd78, h: 0.2, n: 80 },
-        Case { method: RkMethod::Rk89, h: 0.4, n: 40 },
-        Case { method: RkMethod::Rk89, h: 0.2, n: 80 },
+        Case {
+            method: RkMethod::Pd45,
+            h: 0.4,
+            n: 40,
+        },
+        Case {
+            method: RkMethod::Pd45,
+            h: 0.2,
+            n: 80,
+        },
+        Case {
+            method: RkMethod::Pd78,
+            h: 0.4,
+            n: 40,
+        },
+        Case {
+            method: RkMethod::Pd78,
+            h: 0.2,
+            n: 80,
+        },
+        Case {
+            method: RkMethod::Rk89,
+            h: 0.4,
+            n: 40,
+        },
+        Case {
+            method: RkMethod::Rk89,
+            h: 0.2,
+            n: 80,
+        },
     ];
 
     for w in cases.chunks(2) {
@@ -103,7 +140,11 @@ fn test_error_decreases_with_h() {
         assert!(
             ratio > 8.0,
             "{:?} h={} err {:.2e} → h={} err {:.2e}, ratio {ratio:.1} ≤ 8",
-            c1.method, c1.h, e1, c2.h, e2
+            c1.method,
+            c1.h,
+            e1,
+            c2.h,
+            e2
         );
     }
 }

@@ -17,8 +17,10 @@
 //! 所有断言基于数学恒等式（插值误差理论 + 正交矩阵定义），不依赖内核文件、
 //! golden 文件或外部软件。
 
+use e2m2e_spice::ephem_cache::{
+    disable, enable, lookup_body_position, lookup_frame_matrix, EphemCache,
+};
 use std::f64::consts::PI;
-use e2m2e_spice::ephem_cache::{EphemCache, enable, disable, lookup_body_position, lookup_frame_matrix};
 
 /// 自然三次样条内部子区间的误差理论界：|f−s| ≤ (5/384)·h⁴·max|f⁽⁴⁾|。
 ///
@@ -254,7 +256,11 @@ fn test_frame_orthogonality_at_nodes() {
     let t_grid: Vec<f64> = (0..=10).map(|i| i as f64).collect();
     let mat_fn = |t: f64| -> [[f64; 3]; 3] {
         let a = PI * t / 5.0;
-        [[a.cos(), -a.sin(), 0.0], [a.sin(), a.cos(), 0.0], [0.0, 0.0, 1.0]]
+        [
+            [a.cos(), -a.sin(), 0.0],
+            [a.sin(), a.cos(), 0.0],
+            [0.0, 0.0, 1.0],
+        ]
     };
     let cache = build_frame_cache(&t_grid, &mat_fn);
     enable(cache);
@@ -298,7 +304,11 @@ fn test_frame_orthogonality_off_grid_bounded() {
     let t_grid: Vec<f64> = (0..=10).map(|i| i as f64).collect();
     let mat_fn = |t: f64| -> [[f64; 3]; 3] {
         let a = PI * t / 5.0;
-        [[a.cos(), -a.sin(), 0.0], [a.sin(), a.cos(), 0.0], [0.0, 0.0, 1.0]]
+        [
+            [a.cos(), -a.sin(), 0.0],
+            [a.sin(), a.cos(), 0.0],
+            [0.0, 0.0, 1.0],
+        ]
     };
     let cache = build_frame_cache(&t_grid, &mat_fn);
     enable(cache);
