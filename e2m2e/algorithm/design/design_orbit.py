@@ -88,9 +88,6 @@ DEFAULT_DESIGN_PERTURBATION: dict[str, int] = {
     "coupling": 0,
 }
 
-#: 维持时间年→天折算
-DAYS_PER_YEAR = 365.25
-
 #: 星历修正的默认收敛容差（km，6 维状态 max 范数：位置 km + 速度 km/s）。
 #:
 #: 取 2e-2（20 m）。地月尺度（特征长度 3.84e5 km）下 10 m 已属高精度、
