@@ -324,6 +324,8 @@ const fn parse_abi_version(s: &str) -> u32 {
 ///   纯状态 Rust 路径）。
 /// - **v3**（ff63403）：新增 ``transfer_grid_search_serial_py`` +
 ///   ``TransferPointResult`` pyclass（转移网格搜索串行评估）。
+/// - **v4**（#334）：新增 ``spice_spkezr`` + ``spice_pxform``（Rust CSPICE
+///   实例诊断查询 API）。
 ///
 /// 「1→3 跳号」实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -674,6 +676,42 @@ fn spice_furnsh(path: &str) -> PyResult<()> {
     REGISTERED.call_once(e2m2e_spice::spice_ffi::register_bodies);
     cspice::data::furnish(path)
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("furnsh failed: {:?}", e)))
+}
+
+/// 诊断用：在 Rust CSPICE 实例上查 spkezr（与 spiceypy.spkezr 同名函数对齐）。
+///
+/// 用于对比 Python（spiceypy）与 Rust（cspice-sys）两个独立 CSPICE 实例的
+/// 查询结果，排查内核加载 / boddef 同步问题。常规查询仍走
+/// ``SPICEManager`` / spiceypy。返回 ``(state[6], lt)``。
+#[cfg(feature = "spice")]
+#[pyfunction]
+fn spice_spkezr(
+    target: &str,
+    et: f64,
+    frame: &str,
+    abcorr: &str,
+    observer: &str,
+) -> PyResult<(Vec<f64>, f64)> {
+    static REGISTERED: std::sync::Once = std::sync::Once::new();
+    REGISTERED.call_once(e2m2e_spice::spice_ffi::register_bodies);
+    let (state, lt) = e2m2e_spice::spice_ffi::spkezr(target, et, frame, abcorr, observer)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("{e}")))?;
+    Ok((state.to_vec(), lt))
+}
+
+/// 诊断用：在 Rust CSPICE 实例上查 pxform（与 spiceypy.pxform 同名函数对齐）。
+///
+/// 用于对比 Python（spiceypy）与 Rust（cspice-sys）两个独立 CSPICE 实例的
+/// 帧旋转查询，排查内核加载同步问题。常规查询仍走 ``SPICEManager`` /
+/// spiceypy。返回 3×3 行优先矩阵。
+#[cfg(feature = "spice")]
+#[pyfunction]
+fn spice_pxform(from: &str, to: &str, et: f64) -> PyResult<Vec<Vec<f64>>> {
+    static REGISTERED: std::sync::Once = std::sync::Once::new();
+    REGISTERED.call_once(e2m2e_spice::spice_ffi::register_bodies);
+    let m = e2m2e_spice::spice_ffi::pxform(from, to, et)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("{e}")))?;
+    Ok(m.iter().map(|row| row.to_vec()).collect())
 }
 
 /// 第三体摄动加速度（含直接项 + 间接项）。
@@ -2873,6 +2911,10 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(spice_poc_body_position, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(spice_furnsh, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(spice_spkezr, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(spice_pxform, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(third_body_acceleration, m)?)?;
     #[cfg(feature = "spice")]
