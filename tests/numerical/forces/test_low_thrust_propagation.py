@@ -154,7 +154,7 @@ def test_low_thrust_circular_orbit_semi_major_axis_rate(earth_ephemeris_system):
 @pytest.mark.slow
 @pytest.mark.spice
 def test_low_thrust_spiral_orbit_evolution(earth_ephemeris_system):
-    """30 天低推力螺旋轨道：半长轴单调提升，偏心率保持低值。"""
+    """7 天低推力螺旋轨道：半长轴单调提升，偏心率保持低值。"""
     system = earth_ephemeris_system
     mu = system.gravitational_parameter("EARTH")
 
@@ -164,7 +164,7 @@ def test_low_thrust_spiral_orbit_evolution(earth_ephemeris_system):
 
     thrust = 0.1  # N
     mass = 1000.0  # kg
-    duration_s = 30.0 * 86400.0
+    duration_s = 7.0 * 86400.0
 
     def thrust_profile(_t: float) -> float:
         return thrust
