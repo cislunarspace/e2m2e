@@ -659,6 +659,14 @@ fn spice_poc_body_position(et: f64, target: &str, observer: &str) -> PyResult<Ve
     Ok(vec![state.position.x, state.position.y, state.position.z])
 }
 
+/// 首次调用时经 Once 触发 Rust CSPICE 实例的行星名别名注册（对称 Python
+/// 侧 SPICEManager.load_kernel 的 boddef）。幂等。
+#[cfg(feature = "spice")]
+fn ensure_bodies_registered() {
+    static REGISTERED: std::sync::Once = std::sync::Once::new();
+    REGISTERED.call_once(e2m2e_spice::spice_ffi::register_bodies);
+}
+
 /// 在 Rust cspice 内核池加载一个内核文件。
 ///
 /// Rust cspice 与 Python spiceypy 是**独立的 CSPICE 实例**（静态链接，全局状态
@@ -667,13 +675,12 @@ fn spice_poc_body_position(et: f64, target: &str, observer: &str) -> PyResult<Ve
 ///
 /// 同时在首次加载时把行星名注册到质心/本体 ID（`register_bodies`），使本
 /// 实例对 "MARS"/"JUPITER" 等的解析与 Python spiceypy 实例（那边在
-/// `design_orbit` 里 boddef）以及 DFH 一致——否则 CSPICE 默认表会把
+/// manager.load_kernel 里 boddef）以及 DFH 一致——否则 CSPICE 默认表会把
 /// "MARS" 解析成不存在的本体 499。
 #[cfg(feature = "spice")]
 #[pyfunction]
 fn spice_furnsh(path: &str) -> PyResult<()> {
-    static REGISTERED: std::sync::Once = std::sync::Once::new();
-    REGISTERED.call_once(e2m2e_spice::spice_ffi::register_bodies);
+    ensure_bodies_registered();
     cspice::data::furnish(path)
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("furnsh failed: {:?}", e)))
 }
@@ -692,8 +699,7 @@ fn spice_spkezr(
     abcorr: &str,
     observer: &str,
 ) -> PyResult<(Vec<f64>, f64)> {
-    static REGISTERED: std::sync::Once = std::sync::Once::new();
-    REGISTERED.call_once(e2m2e_spice::spice_ffi::register_bodies);
+    ensure_bodies_registered();
     let (state, lt) = e2m2e_spice::spice_ffi::spkezr(target, et, frame, abcorr, observer)
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("{e}")))?;
     Ok((state.to_vec(), lt))
@@ -707,8 +713,7 @@ fn spice_spkezr(
 #[cfg(feature = "spice")]
 #[pyfunction]
 fn spice_pxform(from: &str, to: &str, et: f64) -> PyResult<Vec<Vec<f64>>> {
-    static REGISTERED: std::sync::Once = std::sync::Once::new();
-    REGISTERED.call_once(e2m2e_spice::spice_ffi::register_bodies);
+    ensure_bodies_registered();
     let m = e2m2e_spice::spice_ffi::pxform(from, to, et)
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("{e}")))?;
     Ok(m.iter().map(|row| row.to_vec()).collect())

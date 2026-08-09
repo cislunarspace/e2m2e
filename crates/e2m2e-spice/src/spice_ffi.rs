@@ -139,7 +139,7 @@ fn to_cstring(s: &str) -> CString {
 }
 
 /// 行星名→NAIF ID 别名表，与 Python 侧
-/// `e2m2e/dfh/design_orbit.py:_BODY_ID_ALIASES` 保持一致。
+/// `e2m2e/data/kernels/manager.py:_BODY_ID_ALIASES` 保持一致。
 ///
 /// 背景：de440s/de430/de440 全本只含行星**质心**段（水~海王 ID 1~8）+
 /// 地球族本体（199/299/399）+ 月球（301）+ 太阳（10），**不含**行星本体段
@@ -147,7 +147,7 @@ fn to_cstring(s: &str) -> CString {
 /// BARYCENTER" 解析成 4。DFH（qiao 版 README:308-321）与天体力学惯例对
 /// 大行星第三体摄动一律用**质心**（含卫星总质量）；e2m2e 所有非 STM 路径
 /// 与 GM 值也已统一用质心。本表把这些名字注册到质心/本体 ID，使本（Rust）
-/// CSPICE 实例的解析与 Python spiceypy 实例（那边在 design_orbit 里做同样
+/// CSPICE 实例的解析与 Python spiceypy 实例（那边在 manager.load_kernel 里做同样
 /// 的 boddef）以及与 DFH 一致。
 const BODY_ALIASES: &[(&str, SpiceInt)] = &[
     ("MERCURY", 1),
