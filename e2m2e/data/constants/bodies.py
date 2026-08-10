@@ -5,13 +5,83 @@
 - ``mean_radius_km``：平均/赤道半径，用于阴影、SRP、相对论等几何计算；
 - ``gravity_ref_radius_km``：重力场参考半径，来自系数文件头，用于球谐、
   固潮等重力模型。
+
+数值由仓库根 ``constants.toml`` 单一来源加载。
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
+
+import tomllib
 
 from .sources import ConstantSource
+
+
+def _load_bodies() -> dict[str, dict[str, object]]:
+    """从仓库根 constants.toml 加载 [body.*] 段。"""
+    path = Path(__file__).resolve().parents[3] / "constants.toml"
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"物理常数单一来源文件缺失：{path}\n"
+            f"请确认仓库根存在 constants.toml，它是 Python/Rust 物理常数的唯一来源。"
+        )
+    with path.open("rb") as f:
+        data = tomllib.load(f)
+    return data["body"]
+
+
+_BODIES = _load_bodies()
+
+
+def _scalar(section: dict[str, object], key: str) -> float | None:
+    entry = section.get(key)
+    if entry is None:
+        return None
+    if isinstance(entry, dict):
+        return float(entry["value"])  # type: ignore[arg-type]
+    return float(entry)  # type: ignore[arg-type]
+
+
+def _source(section: dict[str, object], key: str) -> ConstantSource | None:
+    entry = section.get(key)
+    if entry is None:
+        return None
+    if isinstance(entry, dict):
+        return ConstantSource(entry.get("source", "SI"))
+    return ConstantSource.SI
+
+
+def _int_value(section: dict[str, object], key: str) -> int | None:
+    entry = section.get(key)
+    if entry is None:
+        return None
+    if isinstance(entry, dict):
+        return int(entry["value"])  # type: ignore[call-overload]
+    return int(entry)  # type: ignore[call-overload]
+
+
+def _gm_table(section: dict[str, object]) -> dict[str, float]:
+    gm = section.get("gm")
+    if not isinstance(gm, dict):
+        return {}
+    return {
+        datum: float(entry["value"]) if isinstance(entry, dict) else float(entry)
+        for datum, entry in gm.items()
+    }
+
+
+def _gm_sources(section: dict[str, object]) -> dict[str, ConstantSource]:
+    gm = section.get("gm")
+    if not isinstance(gm, dict):
+        return {}
+    return {
+        datum: ConstantSource(entry.get("source", datum))
+        if isinstance(entry, dict)
+        else ConstantSource(datum)
+        for datum, entry in gm.items()
+    }
 
 
 @dataclass(frozen=True)
@@ -26,6 +96,7 @@ class Body:
 
     name: str
     gm_by_datum: dict[str, float] = field(default_factory=dict)
+    gm_sources: dict[str, ConstantSource] = field(default_factory=dict)
     mean_radius_km: float | None = None
     mean_radius_source: ConstantSource | None = None
     gravity_ref_radius_km: float | None = None
@@ -39,115 +110,58 @@ class Body:
     rotation_rate_gmat_source: ConstantSource | None = None
 
 
+def _build_body(name: str) -> Body:
+    section = _BODIES.get(name, {})
+    return Body(
+        name=name,
+        gm_by_datum=_gm_table(section),
+        gm_sources=_gm_sources(section),
+        mean_radius_km=_scalar(section, "mean_radius_km"),
+        mean_radius_source=_source(section, "mean_radius_km"),
+        gravity_ref_radius_km=_scalar(section, "gravity_ref_radius_km"),
+        gravity_ref_radius_source=_source(section, "gravity_ref_radius_km"),
+        flattening=_scalar(section, "flattening"),
+        flattening_source=_source(section, "flattening"),
+        naif_id=_int_value(section, "naif_id"),
+        rotation_rate_iers_rad_s=_scalar(section, "rotation_rate_iers_rad_s"),
+        rotation_rate_iers_source=_source(section, "rotation_rate_iers_rad_s"),
+        rotation_rate_gmat_rad_s=_scalar(section, "rotation_rate_gmat_rad_s"),
+        rotation_rate_gmat_source=_source(section, "rotation_rate_gmat_rad_s"),
+    )
+
+
 #: 太阳。
-SUN = Body(
-    name="SUN",
-    gm_by_datum={
-        "DE421": 1.32712428e11,
-        "DE440": 1.32712440018e11,
-    },
-    mean_radius_km=696000.0,
-    mean_radius_source=ConstantSource.LITERATURE,
-    naif_id=10,
-)
+SUN = _build_body("SUN")
 
 #: 地球。
-EARTH = Body(
-    name="EARTH",
-    gm_by_datum={
-        "DE421": 398600.4415,
-        "DE440": 398600.435507,
-        "WGS84": 398600.4418,
-    },
-    mean_radius_km=6378.137,
-    mean_radius_source=ConstantSource.WGS84,
-    gravity_ref_radius_km=6378.1363,
-    gravity_ref_radius_source=ConstantSource.GMAT,
-    flattening=1.0 / 298.257223563,
-    flattening_source=ConstantSource.WGS84,
-    naif_id=399,
-    rotation_rate_iers_rad_s=7.292115146706979e-5,
-    rotation_rate_iers_source=ConstantSource.IERS,
-    rotation_rate_gmat_rad_s=7.29211585530e-5,
-    rotation_rate_gmat_source=ConstantSource.GMAT,
-)
+EARTH = _build_body("EARTH")
 
 #: 月球。
-MOON = Body(
-    name="MOON",
-    gm_by_datum={
-        "DE421": 4902.8005821478,
-        "DE440": 4902.800118,
-    },
-    mean_radius_km=1737.4,
-    mean_radius_source=ConstantSource.IAU2015,
-    gravity_ref_radius_km=1738.0,
-    gravity_ref_radius_source=ConstantSource.GMAT,
-    naif_id=301,
-)
+MOON = _build_body("MOON")
 
 #: 地月系质心（Earth-Moon Barycenter）。
-EMB = Body(
-    name="EMB",
-    gm_by_datum={
-        "DE421": 403503.242083,
-        "DE440": 403503.235502,
-    },
-    naif_id=3,
-)
+EMB = _build_body("EMB")
 
 #: 水星。
-MERCURY = Body(
-    name="MERCURY",
-    gm_by_datum={},
-    naif_id=199,
-)
+MERCURY = _build_body("MERCURY")
 
 #: 金星。
-VENUS = Body(
-    name="VENUS",
-    gm_by_datum={},
-    naif_id=299,
-)
+VENUS = _build_body("VENUS")
 
 #: 火星。
-MARS = Body(
-    name="MARS",
-    gm_by_datum={},
-    naif_id=499,
-)
+MARS = _build_body("MARS")
 
 #: 木星。
-JUPITER = Body(
-    name="JUPITER",
-    gm_by_datum={},
-    naif_id=599,
-)
+JUPITER = _build_body("JUPITER")
 
 #: 土星。
-SATURN = Body(
-    name="SATURN",
-    gm_by_datum={},
-    naif_id=699,
-)
+SATURN = _build_body("SATURN")
 
 #: 天王星。
-URANUS = Body(
-    name="URANUS",
-    gm_by_datum={},
-    naif_id=799,
-)
+URANUS = _build_body("URANUS")
 
 #: 海王星。
-NEPTUNE = Body(
-    name="NEPTUNE",
-    gm_by_datum={},
-    naif_id=899,
-)
+NEPTUNE = _build_body("NEPTUNE")
 
 #: 冥王星。
-PLUTO = Body(
-    name="PLUTO",
-    gm_by_datum={},
-    naif_id=999,
-)
+PLUTO = _build_body("PLUTO")

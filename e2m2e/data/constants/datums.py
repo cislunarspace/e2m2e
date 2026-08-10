@@ -1,16 +1,58 @@
 """基准集定义。
 
 以"基准（datum）"为一等概念，每套基准内部 GM、μ、特征长度、特征时间
-来自同一来源，保持自洽。阶段 1 先包含 DE421、DE440、WGS-84 三套现成
-数据；后续阶段再补充 DE430、IAU2015 等基准。
+来自同一来源，保持自洽。数值由仓库根 ``constants.toml`` 加载。
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
+
+import tomllib
 
 from .sources import ConstantSource
 from .universal import SECONDS_PER_DAY
+
+
+def _load_datums() -> dict[str, dict[str, dict[str, object]]]:
+    """从仓库根 constants.toml 加载 [datum.*] 段。"""
+    path = Path(__file__).resolve().parents[3] / "constants.toml"
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"物理常数单一来源文件缺失：{path}\n"
+            f"请确认仓库根存在 constants.toml，它是 Python/Rust 物理常数的唯一来源。"
+        )
+    with path.open("rb") as f:
+        data = tomllib.load(f)
+    return data["datum"]
+
+
+_DATUMS = _load_datums()
+
+
+def _datum_value(datum: str, key: str) -> float | None:
+    section = _DATUMS.get(datum)
+    if section is None:
+        return None
+    entry = section.get(key)
+    if entry is None:
+        return None
+    if isinstance(entry, dict):
+        return float(entry["value"])  # type: ignore[arg-type]
+    return float(entry)  # type: ignore[arg-type]
+
+
+def _datum_source(datum: str, key: str) -> ConstantSource | None:
+    section = _DATUMS.get(datum)
+    if section is None:
+        return None
+    entry = section.get(key)
+    if entry is None:
+        return None
+    if isinstance(entry, dict):
+        return ConstantSource(entry.get("source", datum))
+    return ConstantSource(datum)
 
 
 @dataclass(frozen=True)
@@ -78,21 +120,21 @@ class Datum(metaclass=_DatumEnumMeta):
     # 来源：Folta 2022 Table 2；NASA JPL DE421。
     DE421 = _DatumSpec(
         source=ConstantSource.DE421,
-        mu=0.012150585350562453,
-        char_length_km=384400.0,
-        char_time_s=375190.2588926273,
-        earth_gm=398600.4415,
-        moon_gm=4902.8005821478,
-        sun_gm=1.32712428e11,
-        emb_gm=403503.242083,
+        mu=_datum_value("DE421", "mu"),
+        char_length_km=_datum_value("DE421", "char_length_km"),
+        char_time_s=_datum_value("DE421", "char_time_s"),
+        earth_gm=_datum_value("DE421", "earth_gm"),
+        moon_gm=_datum_value("DE421", "moon_gm"),
+        sun_gm=_datum_value("DE421", "sun_gm"),
+        emb_gm=_datum_value("DE421", "emb_gm"),
         field_sources={
-            "mu": ConstantSource.DE421,
-            "char_length_km": ConstantSource.LITERATURE,
-            "char_time_s": ConstantSource.LITERATURE,
-            "earth_gm": ConstantSource.DE421,
-            "moon_gm": ConstantSource.DE421,
-            "sun_gm": ConstantSource.DE421,
-            "emb_gm": ConstantSource.DE421,
+            "mu": _datum_source("DE421", "mu") or ConstantSource.DE421,
+            "char_length_km": _datum_source("DE421", "char_length_km") or ConstantSource.LITERATURE,
+            "char_time_s": _datum_source("DE421", "char_time_s") or ConstantSource.LITERATURE,
+            "earth_gm": _datum_source("DE421", "earth_gm") or ConstantSource.DE421,
+            "moon_gm": _datum_source("DE421", "moon_gm") or ConstantSource.DE421,
+            "sun_gm": _datum_source("DE421", "sun_gm") or ConstantSource.DE421,
+            "emb_gm": _datum_source("DE421", "emb_gm") or ConstantSource.DE421,
         },
     )
 
@@ -100,30 +142,30 @@ class Datum(metaclass=_DatumEnumMeta):
     # 特征长度/特征时间由 GM 与星历历元推导，当前阶段未提供，避免编造。
     DE440 = _DatumSpec(
         source=ConstantSource.DE440,
-        mu=0.012150584394709708,
-        earth_gm=398600.435507,
-        moon_gm=4902.800118,
-        sun_gm=1.32712440018e11,
-        emb_gm=403503.235502,
+        mu=_datum_value("DE440", "mu"),
+        earth_gm=_datum_value("DE440", "earth_gm"),
+        moon_gm=_datum_value("DE440", "moon_gm"),
+        sun_gm=_datum_value("DE440", "sun_gm"),
+        emb_gm=_datum_value("DE440", "emb_gm"),
         field_sources={
-            "mu": ConstantSource.DE440,
-            "earth_gm": ConstantSource.DE440,
-            "moon_gm": ConstantSource.DE440,
-            "sun_gm": ConstantSource.DE440,
-            "emb_gm": ConstantSource.DE440,
+            "mu": _datum_source("DE440", "mu") or ConstantSource.DE440,
+            "earth_gm": _datum_source("DE440", "earth_gm") or ConstantSource.DE440,
+            "moon_gm": _datum_source("DE440", "moon_gm") or ConstantSource.DE440,
+            "sun_gm": _datum_source("DE440", "sun_gm") or ConstantSource.DE440,
+            "emb_gm": _datum_source("DE440", "emb_gm") or ConstantSource.DE440,
         },
     )
 
     # 来源：WGS-84 / GMAT R2026a 默认地球形状模型。
     WGS84 = _DatumSpec(
         source=ConstantSource.WGS84,
-        earth_gm=398600.4418,
-        earth_radius_km=6378.137,
-        earth_flattening=1.0 / 298.257223563,
+        earth_gm=_datum_value("WGS84", "earth_gm"),
+        earth_radius_km=_datum_value("WGS84", "earth_radius_km"),
+        earth_flattening=_datum_value("WGS84", "earth_flattening"),
         field_sources={
-            "earth_gm": ConstantSource.WGS84,
-            "earth_radius_km": ConstantSource.WGS84,
-            "earth_flattening": ConstantSource.WGS84,
+            "earth_gm": _datum_source("WGS84", "earth_gm") or ConstantSource.WGS84,
+            "earth_radius_km": _datum_source("WGS84", "earth_radius_km") or ConstantSource.WGS84,
+            "earth_flattening": _datum_source("WGS84", "earth_flattening") or ConstantSource.WGS84,
         },
     )
 

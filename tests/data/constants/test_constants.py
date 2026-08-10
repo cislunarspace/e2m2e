@@ -24,6 +24,71 @@ from e2m2e.data.constants import (
 pytestmark = pytest.mark.data
 
 
+class TestRustPythonConsistency:
+    """Rust 与 Python 从同一 constants.toml 加载的常量必须逐位一致。"""
+
+    @pytest.fixture(scope="class")
+    def rust(self):
+        from e2m2e._integrators import _propagation_constants
+
+        return _propagation_constants.constant_value_py
+
+    def test_universal_constants_match_rust(self, rust):
+        assert rust("universal.speed_of_light_kms") == SPEED_OF_LIGHT_KMS
+        assert rust("universal.gravitational_constant") == GRAVITATIONAL_CONSTANT
+        assert rust("universal.au_km") == AU_KM
+        assert rust("universal.seconds_per_day") == SECONDS_PER_DAY
+        assert rust("universal.days_per_julian_year") == 365.25
+        assert rust("universal.days_per_julian_century") == 36525.0
+        assert rust("universal.km_to_m") == KM_TO_M
+        assert rust("universal.solar_flux_w_m2") == SOLAR_FLUX_W_M2
+        assert rust("universal.solar_flux_tsi_w_m2") == SOLAR_FLUX_TSI_W_M2
+        assert rust("universal.solar_pressure_1au") == pytest.approx(SOLAR_PRESSURE_1AU)
+
+    def test_datum_constants_match_rust(self, rust):
+        assert rust("datum.DE421.mu") == Datum.DE421.mu
+        assert rust("datum.DE421.earth_gm") == Datum.DE421.earth_gm
+        assert rust("datum.DE421.moon_gm") == Datum.DE421.moon_gm
+        assert rust("datum.DE421.sun_gm") == Datum.DE421.sun_gm
+        assert rust("datum.DE421.emb_gm") == Datum.DE421.emb_gm
+        assert rust("datum.DE421.char_length_km") == Datum.DE421.char_length_km
+        assert rust("datum.DE421.char_time_s") == Datum.DE421.char_time_s
+
+        assert rust("datum.DE440.mu") == Datum.DE440.mu
+        assert rust("datum.DE440.earth_gm") == Datum.DE440.earth_gm
+        assert rust("datum.DE440.moon_gm") == Datum.DE440.moon_gm
+        assert rust("datum.DE440.sun_gm") == Datum.DE440.sun_gm
+        assert rust("datum.DE440.emb_gm") == Datum.DE440.emb_gm
+
+        assert rust("datum.WGS84.earth_gm") == Datum.WGS84.earth_gm
+        assert rust("datum.WGS84.earth_radius_km") == Datum.WGS84.earth_radius_km
+        assert rust("datum.WGS84.earth_flattening") == Datum.WGS84.earth_flattening
+
+    def test_body_constants_match_rust(self, rust):
+        assert rust("body.SUN.mean_radius_km") == SUN.mean_radius_km
+        assert rust("body.SUN.naif_id") == SUN.naif_id
+
+        assert rust("body.EARTH.mean_radius_km") == EARTH.mean_radius_km
+        assert rust("body.EARTH.gravity_ref_radius_km") == EARTH.gravity_ref_radius_km
+        assert rust("body.EARTH.flattening") == EARTH.flattening
+        assert rust("body.EARTH.naif_id") == EARTH.naif_id
+        assert rust("body.EARTH.rotation_rate_iers_rad_s") == EARTH.rotation_rate_iers_rad_s
+        assert rust("body.EARTH.rotation_rate_gmat_rad_s") == EARTH.rotation_rate_gmat_rad_s
+        assert rust("body.EARTH.gm.DE421") == EARTH.gm_by_datum["DE421"]
+        assert rust("body.EARTH.gm.DE440") == EARTH.gm_by_datum["DE440"]
+        assert rust("body.EARTH.gm.WGS84") == EARTH.gm_by_datum["WGS84"]
+
+        assert rust("body.MOON.mean_radius_km") == MOON.mean_radius_km
+        assert rust("body.MOON.gravity_ref_radius_km") == MOON.gravity_ref_radius_km
+        assert rust("body.MOON.naif_id") == MOON.naif_id
+        assert rust("body.MOON.gm.DE421") == MOON.gm_by_datum["DE421"]
+        assert rust("body.MOON.gm.DE440") == MOON.gm_by_datum["DE440"]
+
+        assert rust("body.EMB.naif_id") == EMB.naif_id
+        assert rust("body.EMB.gm.DE421") == EMB.gm_by_datum["DE421"]
+        assert rust("body.EMB.gm.DE440") == EMB.gm_by_datum["DE440"]
+
+
 class TestUniversalConstants:
     def test_speed_of_light(self):
         assert SPEED_OF_LIGHT_KMS == 299792.458
