@@ -10,13 +10,13 @@ from typing import Any
 
 import numpy as np
 
+from ..data.constants import SECONDS_PER_DAY
 from ..data.types import EphemerisTable
 
 __all__ = ["propagate_orbit"]
 
 #: J2000 历元的 TDB 儒略日（SPICE ET 定义为相对此历元的 TDB 秒）
 _J2000_JD_TDB = 2451545.0
-_SECONDS_PER_DAY = 86400.0
 
 #: 默认三体力模型（地球点质量引力 + 月球/太阳第三体引力）
 #:
@@ -153,7 +153,7 @@ def propagate_orbit(
         position_km=states[:, :3].copy(),
         velocity_mps=states[:, 3:6].copy() * 1000.0,
         synodic_position=np.zeros((n, 3)),
-        times_jd_tdb=(_J2000_JD_TDB + times / _SECONDS_PER_DAY).copy(),
+        times_jd_tdb=(_J2000_JD_TDB + times / SECONDS_PER_DAY).copy(),
     )
 
 

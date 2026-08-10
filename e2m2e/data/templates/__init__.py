@@ -10,6 +10,24 @@
 - ``enums.py``：领域枚举（源 ``core/enums.py`` + ``mbse/data/enums.py``）。
 """
 
+from e2m2e.data.constants import (
+    AU_KM as AU,
+)
+from e2m2e.data.constants import (
+    EARTH_MOON_DISTANCE_KM,
+    KM_TO_M,
+)
+from e2m2e.data.constants import (
+    GRAVITATIONAL_CONSTANT as G,
+)
+from e2m2e.data.constants import (
+    SECONDS_PER_DAY as DAY,
+)
+from e2m2e.data.constants import (
+    SECONDS_PER_JULIAN_YEAR as YEAR,
+)
+from e2m2e.data.constants.bodies import EARTH
+
 from .enums import (
     BifurcationLabel,
     BoundaryMode,
@@ -30,7 +48,8 @@ from .seed import (
     EARTH_MOON_MU,
     MOON_RADIUS_KM,
 )
-from .systems import AU, DAY, EARTH_MOON_DISTANCE_KM, KM_TO_M, R_EARTH, YEAR, G
+
+R_EARTH: float = EARTH.gravity_ref_radius_km  # type: ignore[assignment]
 
 __all__ = [
     "AU",

@@ -29,6 +29,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
+from ...data.constants import SECONDS_PER_DAY
 from ...data.types import EphemerisTable, ManeuverTable, SKStatistic
 from ..coordinate.coordinate_system import CoordinateSystem
 from ..coordinate.standard_axes import ICRSAxes
@@ -53,7 +54,6 @@ __all__ = [
     "run_monte_carlo",
 ]
 
-_SECONDS_PER_DAY = 86400.0
 
 #: 地月系统质量参数与特征尺度（与 e2m2e/dfh/cr3bp_orbits.py 的
 #: earth_moon_system 一致，保证会合系转换与 design 链路同约定）
@@ -339,7 +339,7 @@ class MonteCarloResult:
     def maneuver_table(self) -> ManeuverTable:
         """组装 MANEUVERS 表（MJD(TDB) = 51544.5 + et/86400，SPICE et 原点为
         J2000 历元 JD 2451545.0，即 MJD 51544.5）。"""
-        mjd = 51544.5 + self.maneuvers[:, 0] / _SECONDS_PER_DAY
+        mjd = 51544.5 + self.maneuvers[:, 0] / SECONDS_PER_DAY
         return ManeuverTable(mjd_tdb=mjd, delta_v_mps=self.maneuvers[:, 1])
 
 
@@ -723,14 +723,14 @@ def _build_simulation(
             spec["special_mode"],
             spec["special_crossings"],
             spec["feedback_arc_days"],
-            spec["control_interval_days"] * _SECONDS_PER_DAY,
+            spec["control_interval_days"] * SECONDS_PER_DAY,
             spice,
             nominal.t_start,
             tight_tolerance_km=spec.get("tight_tolerance_km", 0.1),
             tight_max_iter=spec.get("tight_max_iter", 6),
             special_damping_factor=spec.get("special_damping_factor", 1.0),
         ),
-        control_interval_sec=spec["control_interval_days"] * _SECONDS_PER_DAY,
+        control_interval_sec=spec["control_interval_days"] * SECONDS_PER_DAY,
         num_controls=spec["num_controls"],
         output_step_sec=spec["output_step_sec"],
         nav_error=NavigationErrorModel(
@@ -853,7 +853,7 @@ def run_monte_carlo(
         "force_config_true": force_config_true,
         "observer": observer,
         "engine_layout": engine_layout,
-        "momentum_interval_sec": momentum_interval_days * _SECONDS_PER_DAY,
+        "momentum_interval_sec": momentum_interval_days * SECONDS_PER_DAY,
         "srp_offset_m": np.asarray(srp_offset_m, dtype=float) if srp_offset_m is not None else None,
         "spacecraft_mass_kg": spacecraft_mass_kg,
         "srp_torque_nm": (

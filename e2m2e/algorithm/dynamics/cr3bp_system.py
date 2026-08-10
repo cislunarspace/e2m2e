@@ -14,22 +14,22 @@ import numpy as np
 import numpy.typing as npt
 from scipy.optimize import fsolve
 
-from ...data.templates.enums import ReferenceFrame, UnitSystem
-from ...data.templates.systems import (
-    AU as _AU_KM,
+from ...data.constants import (
+    AU_KM as _AU_KM,
 )
-from ...data.templates.systems import (
-    DAY as _SYSTEM_DAY,
-)
-from ...data.templates.systems import (
+from ...data.constants import (
     EARTH_MOON_DISTANCE_KM as _SYSTEM_EM_DISTANCE,
 )
-from ...data.templates.systems import (
-    YEAR as _SYSTEM_YEAR,
+from ...data.constants import (
+    GRAVITATIONAL_CONSTANT as _SYSTEM_G,
 )
-from ...data.templates.systems import (
-    G as _SYSTEM_G,
+from ...data.constants import (
+    SECONDS_PER_DAY as _SYSTEM_DAY,
 )
+from ...data.constants import (
+    SECONDS_PER_JULIAN_YEAR as _SYSTEM_YEAR,
+)
+from ...data.templates.enums import ReferenceFrame, UnitSystem
 from .potential import pseudo_potential_hessian
 from .system import System
 

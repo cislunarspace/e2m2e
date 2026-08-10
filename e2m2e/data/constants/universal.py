@@ -75,6 +75,10 @@ DAYS_PER_JULIAN_CENTURY_SOURCE: ConstantSource = _source("days_per_julian_centur
 # 儒略年的秒数。由定义派生。
 SECONDS_PER_JULIAN_YEAR: float = DAYS_PER_JULIAN_YEAR * SECONDS_PER_DAY
 
+# 地月平均距离（km）。Cui et al. 2025。
+EARTH_MOON_DISTANCE_KM: float = _value("earth_moon_distance_km")
+EARTH_MOON_DISTANCE_KM_SOURCE: ConstantSource = _source("earth_moon_distance_km")
+
 # 千米 → 米换算因子。定义值。
 KM_TO_M: float = _value("km_to_m")
 KM_TO_M_SOURCE: ConstantSource = _source("km_to_m")

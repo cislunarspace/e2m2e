@@ -14,7 +14,7 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
-from ...data.templates.systems import AU as _AU_KM
+from ...data.constants import AU_KM as _AU_KM
 from .cr3bp_system import CR3BP_System
 
 

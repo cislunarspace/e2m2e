@@ -6,13 +6,16 @@
 
 from __future__ import annotations
 
+from e2m2e.data.constants import SECONDS_PER_DAY
+from e2m2e.data.constants.bodies import MOON
+
 #: 地月 CR3BP 参数（与 examples/、tests/conftest.py 的标准系统一致）
 EARTH_MOON_MU = 0.0121506683
 CHAR_LENGTH_KM = 384400.0
-CHAR_PERIOD_SEC = 27.32 * 86400.0
+CHAR_PERIOD_SEC = 27.32 * SECONDS_PER_DAY
 
 #: 月球平均半径（km），NRHO 近月点高度的起算面
-MOON_RADIUS_KM = 1737.4
+MOON_RADIUS_KM: float = MOON.mean_radius_km  # type: ignore[assignment]
 
 #: DRO 族标准种子（examples/main_design.py 等验证过的初值）
 _DRO_SEED_X0 = 0.79188556619742

@@ -15,6 +15,7 @@ speed_of_light_kms = { value = 299792.458, source = "SI" }
 gravitational_constant = { value = 6.67430e-20, source = "CODATA2018" }
 au_km = { value = 149597870.7, source = "IAU2012" }
 seconds_per_day = { value = 86400.0, source = "SI" }
+earth_moon_distance_km = { value = 384405.0, source = "Cui2025" }
 days_per_julian_year = { value = 365.25, source = "SI" }
 days_per_julian_century = { value = 36525.0, source = "SI" }
 km_to_m = { value = 1000.0, source = "SI" }
