@@ -674,6 +674,7 @@ class CR3BP_Dynamics(Dynamics):
 
         Raises:
             ValueError: 轨道无状态或周期无效
+            RuntimeError: 重传播未返回状态
         """
         if orbit.states.shape[0] < 1:
             raise ValueError("轨道无状态")
@@ -698,15 +699,7 @@ class CR3BP_Dynamics(Dynamics):
         states = result["states"]
         if len(states) > 0:
             return np.asarray(states[-1], dtype=float)
-        # 传播塌缩（Rust 步长塌缩在 _propagate_state_only 被转成空 states）：
-        # 退回轨道自身采样数据在目标相位的插值。周期轨道的 states/times
-        # 是其相位的权威表达，动态重传播只为提高精度；传播失败时插值是
-        # 合理降级——对齐 scipy 时代"重传播失败也总有可用状态"的语义。
-        t_target = t0 + t_rel
-        return np.asarray(
-            [np.interp(t_target, orbit.times, orbit.states[:, i]) for i in range(6)],
-            dtype=float,
-        )
+        raise RuntimeError("CR3BP 轨道状态传播失败：未返回状态；Rust 积分器可能发生步长塌缩")
 
     def compute_state_transition_matrix(
         self, initial_state: npt.ArrayLike, t: float

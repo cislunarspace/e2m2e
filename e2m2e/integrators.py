@@ -1,4 +1,4 @@
-"""Public Python shim for the Rust integrator extension."""
+"""Rust 积分器扩展的公共 Python 适配层。"""
 # ruff: noqa: F821, F822
 
 from __future__ import annotations
@@ -13,55 +13,6 @@ import numpy.typing as npt
 from e2m2e.exceptions import RustExtensionUnavailableError
 
 # 扩展符号在运行时逐个装载；静态类型检查将其视为动态对象。
-_RUST_NAMES = [
-    "CowellResult",
-    "MultistepMethod",
-    "MultistepResult",
-    "RkMethod",
-    "TransferPointResult",
-    "_cowell_step",
-    "_multistep_step",
-    "_rk_step",
-    "augmented_eom_7d_py",
-    "build_cr3bp_hamiltonian_py",
-    "check_collision_py",
-    "compute_distance_series_py",
-    "compute_min_distance_py",
-    "detect_intersection_py",
-    "detect_local_minimum_py",
-    "disable_ephem_cache",
-    "enable_ephem_cache",
-    "ephem_ffi_call_count",
-    "hello_integrators",
-    "indirect_term_acceleration",
-    "lambert_batch_py",
-    "lambert_izzo_py",
-    "multiple_shooting_correct_py",
-    "pole_tide",
-    "project_hamiltonian_qf_py",
-    "propagate_bcr4bp_py",
-    "propagate_bcr4bp_stm_py",
-    "propagate_compiled",
-    "propagate_compiled_lowthrust",
-    "propagate_compiled_lowthrust_sensitivity",
-    "propagate_compiled_stm_py",
-    "propagate_cr3bp_py",
-    "propagate_cr3bp_stm_py",
-    "propagate_with_state_py",
-    "propagate_with_stm_py",
-    "reset_ephem_ffi_call_count",
-    "segmented_shooting_correct_py",
-    "solid_tide_step1",
-    "solid_tide_step2",
-    "solve_ivp_events_py",
-    "spice_furnsh",
-    "spice_pxform",
-    "spice_spkezr",
-    "spherical_harmonic_accel",
-    "third_body_acceleration",
-    "transfer_grid_search_py",
-    "transfer_grid_search_serial_py",
-]
 if TYPE_CHECKING:
     augmented_eom_7d_py: Any
     build_cr3bp_hamiltonian_py: Any
@@ -295,10 +246,10 @@ def rk_step(
     f: Callable[[float, npt.NDArray[np.floating]], npt.NDArray[np.floating]],
     state_error_dim: int | None = None,
 ):
-    """Take a single Runge-Kutta step using the Rust integrator core.
+    """使用 Rust 积分器内核执行单个 Runge-Kutta 步。
 
-    The callback ``f`` receives a NumPy ndarray and must return one of the same
-    length. Returns a ``StepResult`` with ``y_new``, ``error``, ``h_next``.
+    回调 ``f`` 接收 NumPy ndarray，并须返回同长度数组。返回的 ``StepResult``
+    包含 ``y_new``、``error``、``h_next``。
 
     ``state_error_dim``：步长误差控制只统计前 N 维（``None`` 时统计全部）。
     STM 增广传播时传 6，让状态转移矩阵的 36 个分量不主导步长控制。
@@ -323,15 +274,14 @@ def multistep_step(
     f: Callable[[float, npt.NDArray[np.floating]], npt.NDArray[np.floating]],
     history: list[npt.ArrayLike],
 ):
-    """Take a single multistep predictor-corrector step.
+    """执行单个多步预测-校正步。
 
-    ``history`` must hold ``method.steps()`` derivative samples (oldest first),
-    each the same length as ``y``, at equal spacing ``h``. The callback ``f``
-    has the same signature as for :func:`rk_step`. Returns a
-    ``MultistepResult`` whose ``history`` is the rolled buffer for the next step.
+    ``history`` 须按从旧到新的顺序保存 ``method.steps()`` 个导数样本，每个样本
+    与 ``y`` 等长，间隔均为 ``h``。回调 ``f`` 的签名与 :func:`rk_step` 相同。
+    返回 ``MultistepResult``，其 ``history`` 是供下一步使用的滚动缓冲区。
 
-    The step size is assumed fixed; changing ``h`` requires re-initialising the
-    history (see :func:`initialize_abm_history`).
+    假定步长固定；改变 ``h`` 后须重新初始化 history（见
+    :func:`initialize_abm_history`）。
     """
     require_rust_extension("_multistep_step", "MultistepMethod")
     y = np.asarray(y, dtype=float)
@@ -353,11 +303,11 @@ def initialize_abm_history(
     n_stages: int = 3,
     tol: float = 1e-12,
 ) -> tuple[float, np.ndarray, list[list[float]]]:
-    """Bootstrap the ABM history by running ``n_stages`` RK89 steps.
+    """以 ``n_stages`` 个 RK89 步启动 ABM history。
 
-    The ABM method consumes 4 derivative samples; with the default
-    ``n_stages=3`` this returns ``(t0 + 3h, y(3h), [f_0, f_1, f_2, f_3])``.
-    The returned history is ready to feed into :func:`multistep_step`.
+    ABM 方法使用 4 个导数样本；默认 ``n_stages=3`` 时返回
+    ``(t0 + 3h, y(3h), [f_0, f_1, f_2, f_3])``，其中 history 可直接传给
+    :func:`multistep_step`。
     """
     require_rust_extension("RkMethod")
     y = np.asarray(y0, dtype=float).copy()
@@ -378,14 +328,13 @@ def cowell_step(
     accel: Callable[[float, npt.NDArray[np.floating]], npt.NDArray[np.floating]],
     history: list[npt.ArrayLike],
 ):
-    """Take a single Cowell (Störmer-Cowell) 8th-order step for ``x'' = a(t, x)``.
+    """对 ``x'' = a(t, x)`` 执行单个 Cowell（Störmer-Cowell）8 阶步。
 
-    ``history`` = ``[x_{n-1}, x_n, a_{n-7}, ..., a_n]`` (10 vectors: 2 position
-    samples + 8 acceleration samples, oldest first). ``accel(t, x)`` returns the
-    acceleration depending on position only (gravity, J2). Output is position
-    only. Fixed step.
+    ``history`` = ``[x_{n-1}, x_n, a_{n-7}, ..., a_n]``（10 个向量：2 个位置
+    样本与 8 个加速度样本，按从旧到新排列）。``accel(t, x)`` 返回只依赖位置的
+    加速度（引力、J2）。输出仅含位置，步长固定。
 
-    Returns a ``CowellResult`` with ``x_new``, ``error``, ``h_next``, ``history``.
+    返回的 ``CowellResult`` 包含 ``x_new``、``error``、``h_next``、``history``。
     """
     require_rust_extension("_cowell_step")
     hist_lists = [np.asarray(hi, dtype=float).tolist() for hi in history]
@@ -407,13 +356,12 @@ def initialize_cowell_history(
     n_startup: int = 7,
     tol: float = 1e-12,
 ) -> tuple[float, np.ndarray, np.ndarray, list[list[float]]]:
-    """Bootstrap the 8th-order Cowell history via ``n_startup`` RK89 steps.
+    """以 ``n_startup`` 个 RK89 步启动 8 阶 Cowell history。
 
-    Returns ``(t, x, v, history)`` with
-    ``history = [x_{n-1}, x_n, a_{n-7}, ..., a_n]`` (2 positions + 8
-    accelerations, ready for :func:`cowell_step`). ``n_startup`` must be ≥ 7 so
-    the 8 most recent acceleration samples are available; with the default
-    ``n_startup=7`` the state advances to ``t0 + 7h``.
+    返回 ``(t, x, v, history)``，其中
+    ``history = [x_{n-1}, x_n, a_{n-7}, ..., a_n]``（2 个位置与 8 个加速度，
+    可直接传给 :func:`cowell_step`）。``n_startup`` 须不小于 7，以获得最近的
+    8 个加速度样本；默认 ``n_startup=7`` 时状态推进至 ``t0 + 7h``。
     """
     require_rust_extension("RkMethod")
     if n_startup < 7:

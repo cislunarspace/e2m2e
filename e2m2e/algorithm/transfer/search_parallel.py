@@ -420,11 +420,6 @@ def grid_search_rust_dispatch(
             n_workers=n_workers,
             progress_callback=callback,
         )
-    except Exception:
-        if pbar is not None:
-            pbar.close()
-            pbar = None
-        raise
     finally:
         if pbar is not None:
             pbar.close()
