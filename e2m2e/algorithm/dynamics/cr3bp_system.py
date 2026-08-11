@@ -135,12 +135,12 @@ class CR3BP_System(System):
         elif self.primary_body == "Sun" and self.secondary_body == "Earth":
             self.set_characteristic_scales(
                 distance=CR3BP_System.AU,
-                period=365.25 * 86400,
+                period=365.25 * _SYSTEM_DAY,
             )
         elif self.primary_body == "Sun" and self.secondary_body == "Jupiter":
             self.set_characteristic_scales(
                 distance=5.2 * CR3BP_System.AU,
-                period=11.86 * 365.25 * 86400,
+                period=11.86 * 365.25 * _SYSTEM_DAY,
             )
         else:
             raise ValueError(

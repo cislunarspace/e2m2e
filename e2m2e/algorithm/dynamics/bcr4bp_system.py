@@ -42,7 +42,7 @@ class BCR4BPSystem(CR3BP_System):
     对应 CR3BP 的平动点，仅作参考位置使用。
     """
 
-    # 太阳参数取值来源（DE440，与 e2m2e/core/spice.py 的 _GM_VALUES 一致）
+    # 太阳参数取值来源（DE440，与 data.constants.bodies 一致）
     SUN_GM_KM3_S2 = SUN.gm_by_datum["DE440"]  # 太阳 GM (km^3/s^2), DE440
     EARTH_MOON_GM_KM3_S2 = EMB.gm_by_datum["DE440"]  # 地月质心 GM (km^3/s^2), DE440
     SUN_EARTH_DISTANCE_KM = _AU_KM  # 日地平均距离 (km), GMAT nominalSun

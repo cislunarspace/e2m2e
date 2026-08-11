@@ -6,6 +6,7 @@ from e2m2e.data.constants import (
     AU_KM,
     EARTH_MOON_DISTANCE_KM,
     KM_TO_M,
+    SUN,
     Datum,
 )
 from e2m2e.data.constants import (
@@ -48,13 +49,25 @@ class TestSystemsConstants:
         assert DAY == 86400
         assert YEAR == 365.25 * 86400
 
-    def test_single_source_with_data_constants(self):
-        """``e2m2e.data.constants`` 是物理常数单一来源，值与数据层一致。"""
-        from e2m2e.data.templates import AU as tpl_au
-        from e2m2e.data.templates import R_EARTH as tpl_rearth
+    def test_algorithm_layer_single_source(self):
+        """算法层不再硬编码物理常量：常量子来自 data.constants 单一来源。"""
+        from e2m2e.algorithm.dynamics.bcr4bp_system import BCR4BPSystem
+        from e2m2e.algorithm.dynamics.cr3bp_system import CR3BP_System
+        from e2m2e.algorithm.forces.force_mapping import perturbation_to_force_config
+        from e2m2e.algorithm.forces.gravity_file import _DEFAULT_MU
+        from e2m2e.algorithm.propagation import _DEFAULT_FORCE_CONFIG
+        from e2m2e.data.constants import SPEED_OF_LIGHT_KMS
 
-        assert tpl_au == AU_KM
-        assert tpl_rearth == R_EARTH
+        assert SUN.gm_by_datum["DE440"] == BCR4BPSystem.SUN_GM_KM3_S2
+        assert CR3BP_System.DAY == DAY
+        assert CR3BP_System.YEAR == YEAR
+        assert EARTH.gm_by_datum["DE421"] == _DEFAULT_MU
+        assert _DEFAULT_FORCE_CONFIG["forces"][0]["params"]["mu"] == Datum.DE440.earth_gm
+        relativity_cfg = perturbation_to_force_config({"relativity": 1})
+        relativity = next(
+            f for f in relativity_cfg["forces"] if f["type"] == "RelativisticCorrection"
+        )
+        assert relativity["params"]["c"] == SPEED_OF_LIGHT_KMS
 
 
 class TestSeedConstants:

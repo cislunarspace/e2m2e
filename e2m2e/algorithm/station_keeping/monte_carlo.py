@@ -774,7 +774,7 @@ def run_monte_carlo(
     feedback_arc_days: float = 28.0,
     num_controls: int = 120,
     num_monte_carlo: int = 5,
-    output_step_sec: float = 86400.0,
+    output_step_sec: float = SECONDS_PER_DAY,
     position_accuracy_m: float = 1500.0,
     velocity_accuracy_mps: float = 0.002,
     thrust_angle_err_deg: float = 0.333,

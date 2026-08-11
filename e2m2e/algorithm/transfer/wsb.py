@@ -24,6 +24,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ...data.constants import SECONDS_PER_DAY
 from ...data.constants.bodies import MOON
 from ..dynamics import BCR4BP_Dynamics, BCR4BPSystem, CR3BP_Dynamics, CR3BP_System
 from ..manifold.sections import PoincareSection, detect_crossings
@@ -202,8 +203,8 @@ def search_wsb_trajectories(
     if char_time is None:
         raise ValueError("system.characteristic_time must be set")
     tof_grid_sec = np.linspace(
-        params.tof_range[0] * 86400.0,
-        params.tof_range[1] * 86400.0,
+        params.tof_range[0] * SECONDS_PER_DAY,
+        params.tof_range[1] * SECONDS_PER_DAY,
         params.n_tof,
     )
 

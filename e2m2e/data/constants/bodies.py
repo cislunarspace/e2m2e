@@ -171,3 +171,22 @@ NEPTUNE = _build_body("NEPTUNE")
 
 #: 冥王星。
 PLUTO = _build_body("PLUTO")
+
+#: 天体名 → Body 映射（供按名称查询，如 SPICEManager.get_gm）。
+_BODIES_BY_NAME: dict[str, Body] = {
+    body.name: body
+    for body in (
+        SUN,
+        EARTH,
+        MOON,
+        EMB,
+        MERCURY,
+        VENUS,
+        MARS,
+        JUPITER,
+        SATURN,
+        URANUS,
+        NEPTUNE,
+        PLUTO,
+    )
+}
