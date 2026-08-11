@@ -22,10 +22,12 @@ pytest.importorskip("e2m2e._integrators")
 
 from e2m2e.integrators import grid_search_rust  # noqa: E402
 
+from e2m2e.data.constants import Datum
+
 pytestmark = pytest.mark.orchestration
 
 
-MU = 1.21506683e-2  # 地月质量参数
+MU = Datum.DE421.mu  # 地月质量参数
 
 
 def _circular_orbit(xc: float, r: float, n: int, t_max: float = 6.28) -> np.ndarray:

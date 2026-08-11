@@ -20,13 +20,14 @@ from e2m2e.algorithm.transfer import (
     design_low_energy_transfer,
     patch_manifolds,
 )
+from e2m2e.data.constants import Datum
 from e2m2e.data.types.orbit import Orbit
 
 # 集成/端到端层：族延拓 + 流形传播 + 转移优化共享会话级 fixture，默认全量不跑。
 # 跑本文件：uv run pytest -m l3 tests/transfer/test_low_energy.py
 pytestmark = pytest.mark.orchestration
 
-MU = 1.21506683e-2
+MU = Datum.DE421.mu
 DU = 384405.0  # km
 
 _LYAP_AX = 0.01

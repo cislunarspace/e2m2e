@@ -18,6 +18,9 @@ from ...data.constants import (
     AU_KM as _AU_KM,
 )
 from ...data.constants import (
+    Datum,
+)
+from ...data.constants import (
     EARTH_MOON_DISTANCE_KM as _SYSTEM_EM_DISTANCE,
 )
 from ...data.constants import (
@@ -120,11 +123,14 @@ class CR3BP_System(System):
         """使用默认特征尺度初始化并返回自身。
 
         典型用法：`CR3BP_System(mu=..., primary=..., secondary=...)._with_default_scales()`。
+
+        地月系统使用 DE421 基准自洽的特征长度/周期；日地、木日系统保持原
+        有近似尺度。
         """
         if self.primary_body == "Earth" and self.secondary_body == "Moon":
             self.set_characteristic_scales(
-                distance=CR3BP_System.EARTH_MOON_DISTANCE_KM,
-                period=27.32 * 86400,
+                distance=Datum.DE421.char_length_km,
+                period=2 * np.pi * Datum.DE421.char_time_s,
             )
         elif self.primary_body == "Sun" and self.secondary_body == "Earth":
             self.set_characteristic_scales(

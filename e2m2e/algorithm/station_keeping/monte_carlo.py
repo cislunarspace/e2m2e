@@ -29,7 +29,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-from ...data.constants import SECONDS_PER_DAY
+from ...data.constants import Datum, SECONDS_PER_DAY
 from ...data.types import EphemerisTable, ManeuverTable, SKStatistic
 from ..coordinate.coordinate_system import CoordinateSystem
 from ..coordinate.standard_axes import ICRSAxes
@@ -56,10 +56,11 @@ __all__ = [
 
 
 #: 地月系统质量参数与特征尺度（与 e2m2e/dfh/cr3bp_orbits.py 的
-#: earth_moon_system 一致，保证会合系转换与 design 链路同约定）
-EARTH_MOON_MU = 0.0121506683
-_CHAR_LENGTH_KM = 384400.0
-_CHAR_PERIOD_SEC = 27.32 * 86400.0
+#: earth_moon_system 一致，保证会合系转换与 design 链路同约定）。
+#: 自 ADR 0022 起统一使用 DE421 基准，废弃 1965 旧值。
+EARTH_MOON_MU = Datum.DE421.mu
+_CHAR_LENGTH_KM = Datum.DE421.char_length_km
+_CHAR_PERIOD_SEC = 2 * 3.141592653589793 * Datum.DE421.char_time_s
 
 
 def _earth_moon_system():
