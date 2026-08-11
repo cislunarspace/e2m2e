@@ -21,12 +21,15 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpy.typing as npt
 from scipy.integrate import solve_ivp
+
+from e2m2e.integrators import require_rust_extension
 
 from .cr3bp_system import CR3BP_System
 from .potential import pseudo_potential_hessian
@@ -35,15 +38,7 @@ from .system import System
 if TYPE_CHECKING:
     from ...data.types.orbit import Orbit
 
-# Rust CR3BP 快速路径探测：扩展未构建（如 doc build）时静默降级到 scipy。
-try:
-    from e2m2e.integrators import propagate_cr3bp_py, propagate_cr3bp_stm_py
-
-    if propagate_cr3bp_stm_py is None or propagate_cr3bp_py is None:
-        raise ImportError
-    _HAS_RUST_CR3BP_STM = True
-except ImportError:
-    _HAS_RUST_CR3BP_STM = False
+from e2m2e.integrators import propagate_cr3bp_py, propagate_cr3bp_stm_py
 
 # 跨语言契约（issue #317 第 3.1 项）：Rust ``propagate_cr3bp``（cr3bp.rs）步长
 # 塌缩错误形如 "step size collapsed below minimum ..."。``EphemerisDynamics
@@ -516,15 +511,22 @@ class CR3BP_Dynamics(Dynamics):
     ) -> dict[str, Any]:
         """增广状态积分（含 STM），优先走 Rust 快速路径。
 
-        Rust 路径不支持事件检测；传入 events 时回退 scipy 路径。
+        Rust 路径不支持事件检测；仅当调用者显式传入 ``events`` 时改走
+        scipy。这是 ADR 0002 规定的事件语义例外，不取决于扩展是否可用，
+        并非 Rust 缺失时的 fallback。无 events 时要求 Rust 扩展可用（issue
+        #378：缺失即抛 RustExtensionUnavailableError，不静默降级 scipy）。
         """
-        if _HAS_RUST_CR3BP_STM and events is None:
-            return self._propagate_with_stm_rust(
-                initial_state, t_span, t_eval, max_step, with_jacobi
+        if events is not None:
+            warnings.warn(
+                "CR3BP 显式传入 events 时使用 scipy 事件积分；这由 events 输入触发，"
+                "与 Rust 扩展可用性无关。",
+                stacklevel=2,
             )
-        return super()._propagate_with_stm(
-            initial_state, t_span, t_eval, max_step, with_jacobi, events
-        )
+            return super()._propagate_with_stm(
+                initial_state, t_span, t_eval, max_step, with_jacobi, events
+            )
+        require_rust_extension("propagate_cr3bp_stm_py")
+        return self._propagate_with_stm_rust(initial_state, t_span, t_eval, max_step, with_jacobi)
 
     def _propagate_with_stm_rust(
         self,
@@ -591,57 +593,65 @@ class CR3BP_Dynamics(Dynamics):
     ) -> dict[str, Any]:
         """纯状态积分（不含 STM），优先走 Rust 快速路径。
 
-        Rust 路径不支持事件检测；传入 events 时回退 scipy 路径。
+        Rust 路径不支持事件检测；仅当调用者显式传入 ``events`` 时改走
+        scipy。这是 ADR 0002 规定的事件语义例外，不取决于扩展是否可用，
+        并非 Rust 缺失时的 fallback。无 events 时要求 Rust 扩展可用（issue
+        #378：缺失即抛 RustExtensionUnavailableError，不静默降级 scipy）。
         """
-        if _HAS_RUST_CR3BP_STM and events is None:
-            mu = float(self.system.mu)
-            if t_eval is not None:
-                t_eval_list = [float(t) for t in np.asarray(t_eval, dtype=float).ravel()]
-            elif t_span[0] == t_span[1]:
-                # 零跨度：同 _propagate_with_stm_rust，退化为单点避免重复点触发长度校验。
-                t_eval_list = [float(t_span[0])]
-            else:
-                t_eval_list = [float(t_span[0]), float(t_span[1])]
+        if events is not None:
+            warnings.warn(
+                "CR3BP 显式传入 events 时使用 scipy 事件积分；这由 events 输入触发，"
+                "与 Rust 扩展可用性无关。",
+                stacklevel=2,
+            )
+            return super()._propagate_state_only(
+                initial_state, t_span, t_eval, max_step, with_jacobi, events
+            )
+        require_rust_extension("propagate_cr3bp_py")
+        mu = float(self.system.mu)
+        if t_eval is not None:
+            t_eval_list = [float(t) for t in np.asarray(t_eval, dtype=float).ravel()]
+        elif t_span[0] == t_span[1]:
+            # 零跨度：同 _propagate_with_stm_rust，退化为单点避免重复点触发长度校验。
+            t_eval_list = [float(t_span[0])]
+        else:
+            t_eval_list = [float(t_span[0]), float(t_span[1])]
 
-            # 步长塌缩时 Rust 抛 RuntimeError；这里 catch 后返回空 states，
-            # 对齐 scipy 路径失败语义（失败返回空、不 raise），让上层
-            # （TransferOptimization._evaluate_all）走 dv=1e10 惩罚，使 NLP
-            # 优化器绕开发散点。仅 catch 步长塌缩；其他 RuntimeError（如截断）
-            # 仍向上抛——那是真实 bug，该暴露。
-            try:
-                result = propagate_cr3bp_py(
-                    mu=mu,
-                    t_span=(float(t_span[0]), float(t_span[1])),
-                    t_eval=t_eval_list,
-                    initial_state=[float(x) for x in initial_state[:6]],
-                    rtol=self.rtol,
-                    atol=self.atol,
-                    max_step=float(max_step),
+        # 步长塌缩时 Rust 抛 RuntimeError；这里 catch 后返回空 states，
+        # 对齐 scipy 路径失败语义（失败返回空、不 raise），让上层
+        # （TransferOptimization._evaluate_all）走 dv=1e10 惩罚，使 NLP
+        # 优化器绕开发散点。仅 catch 步长塌缩；其他 RuntimeError（如截断）
+        # 仍向上抛——那是真实 bug，该暴露。
+        try:
+            result = propagate_cr3bp_py(
+                mu=mu,
+                t_span=(float(t_span[0]), float(t_span[1])),
+                t_eval=t_eval_list,
+                initial_state=[float(x) for x in initial_state[:6]],
+                rtol=self.rtol,
+                atol=self.atol,
+                max_step=float(max_step),
+            )
+
+            states = np.array(result["states"])
+            time = np.array(result["time"])
+
+            if len(time) != len(t_eval_list):
+                raise RuntimeError(
+                    f"Rust propagation returned {len(time)} of {len(t_eval_list)} "
+                    f"requested time points; the trajectory is truncated"
                 )
+        except RuntimeError as e:
+            if _RUST_STEP_COLLAPSED_MARKER in str(e):
+                return {"time": np.array([]), "states": np.empty((0, 6))}
+            raise
 
-                states = np.array(result["states"])
-                time = np.array(result["time"])
+        self.last_trajectory = (time, states)
 
-                if len(time) != len(t_eval_list):
-                    raise RuntimeError(
-                        f"Rust propagation returned {len(time)} of {len(t_eval_list)} "
-                        f"requested time points; the trajectory is truncated"
-                    )
-            except RuntimeError as e:
-                if _RUST_STEP_COLLAPSED_MARKER in str(e):
-                    return {"time": np.array([]), "states": np.empty((0, 6))}
-                raise
-
-            self.last_trajectory = (time, states)
-
-            out: dict[str, Any] = {"time": time, "states": states}
-            if with_jacobi:
-                out = self._handle_jacobi(states, out)
-            return out
-
-        return super()._propagate_state_only(
-            initial_state, t_span, t_eval, max_step, with_jacobi, events
-        )
+        out: dict[str, Any] = {"time": time, "states": states}
+        if with_jacobi:
+            out = self._handle_jacobi(states, out)
+        return out
 
     def propagate_orbit_state_at_time(
         self,
