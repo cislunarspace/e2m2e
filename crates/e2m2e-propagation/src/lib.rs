@@ -68,6 +68,7 @@ fn constant_value_py(key: &str) -> pyo3::PyResult<f64> {
 
         "body.SUN.mean_radius_km" => Ok(SUN_MEAN_RADIUS_KM),
         "body.SUN.naif_id" => Ok(SUN_NAIF_ID as f64),
+        "body.SUN.gm.DE440" => Ok(SUN_GM_DE440),
 
         "body.EARTH.mean_radius_km" => Ok(EARTH_MEAN_RADIUS_KM),
         "body.EARTH.gravity_ref_radius_km" => Ok(EARTH_GRAVITY_REF_RADIUS_KM),
@@ -91,20 +92,28 @@ fn constant_value_py(key: &str) -> pyo3::PyResult<f64> {
 
         "body.MERCURY.mean_radius_km" => Ok(MERCURY_MEAN_RADIUS_KM),
         "body.MERCURY.naif_id" => Ok(MERCURY_NAIF_ID as f64),
+        "body.MERCURY.gm.DE440" => Ok(MERCURY_GM_DE440),
         "body.VENUS.mean_radius_km" => Ok(VENUS_MEAN_RADIUS_KM),
         "body.VENUS.naif_id" => Ok(VENUS_NAIF_ID as f64),
+        "body.VENUS.gm.DE440" => Ok(VENUS_GM_DE440),
         "body.MARS.mean_radius_km" => Ok(MARS_MEAN_RADIUS_KM),
         "body.MARS.naif_id" => Ok(MARS_NAIF_ID as f64),
+        "body.MARS.gm.DE440" => Ok(MARS_GM_DE440),
         "body.JUPITER.mean_radius_km" => Ok(JUPITER_MEAN_RADIUS_KM),
         "body.JUPITER.naif_id" => Ok(JUPITER_NAIF_ID as f64),
+        "body.JUPITER.gm.DE440" => Ok(JUPITER_GM_DE440),
         "body.SATURN.mean_radius_km" => Ok(SATURN_MEAN_RADIUS_KM),
         "body.SATURN.naif_id" => Ok(SATURN_NAIF_ID as f64),
+        "body.SATURN.gm.DE440" => Ok(SATURN_GM_DE440),
         "body.URANUS.mean_radius_km" => Ok(URANUS_MEAN_RADIUS_KM),
         "body.URANUS.naif_id" => Ok(URANUS_NAIF_ID as f64),
+        "body.URANUS.gm.DE440" => Ok(URANUS_GM_DE440),
         "body.NEPTUNE.mean_radius_km" => Ok(NEPTUNE_MEAN_RADIUS_KM),
         "body.NEPTUNE.naif_id" => Ok(NEPTUNE_NAIF_ID as f64),
+        "body.NEPTUNE.gm.DE440" => Ok(NEPTUNE_GM_DE440),
         "body.PLUTO.mean_radius_km" => Ok(PLUTO_MEAN_RADIUS_KM),
         "body.PLUTO.naif_id" => Ok(PLUTO_NAIF_ID as f64),
+        "body.PLUTO.gm.DE440" => Ok(PLUTO_GM_DE440),
 
         _ => Err(PyKeyError::new_err(format!("unknown constant key: {key}"))),
     }

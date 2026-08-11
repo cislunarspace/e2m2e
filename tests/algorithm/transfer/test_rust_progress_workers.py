@@ -20,9 +20,8 @@ import pytest
 # 扩展未构建时（doc build / 无 spice 构建合法）整模块跳过。
 pytest.importorskip("e2m2e._integrators")
 
-from e2m2e.integrators import grid_search_rust  # noqa: E402
-
 from e2m2e.data.constants import Datum
+from e2m2e.integrators import grid_search_rust  # noqa: E402
 
 pytestmark = pytest.mark.orchestration
 

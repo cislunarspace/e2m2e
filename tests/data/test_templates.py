@@ -6,6 +6,7 @@ from e2m2e.data.constants import (
     AU_KM,
     EARTH_MOON_DISTANCE_KM,
     KM_TO_M,
+    Datum,
 )
 from e2m2e.data.constants import (
     GRAVITATIONAL_CONSTANT as G,
@@ -16,7 +17,6 @@ from e2m2e.data.constants import (
 from e2m2e.data.constants import (
     SECONDS_PER_JULIAN_YEAR as YEAR,
 )
-from e2m2e.data.constants import Datum
 from e2m2e.data.constants.bodies import EARTH
 from e2m2e.data.templates import (
     CHAR_LENGTH_KM,
@@ -59,9 +59,9 @@ class TestSystemsConstants:
 
 class TestSeedConstants:
     def test_seed_values(self):
-        assert EARTH_MOON_MU == Datum.DE421.mu
-        assert CHAR_LENGTH_KM == Datum.DE421.char_length_km
-        assert CHAR_PERIOD_SEC == 2 * 3.141592653589793 * Datum.DE421.char_time_s
+        assert Datum.DE421.mu == EARTH_MOON_MU
+        assert Datum.DE421.char_length_km == CHAR_LENGTH_KM
+        assert 2 * 3.141592653589793 * Datum.DE421.char_time_s == CHAR_PERIOD_SEC
         assert MOON_RADIUS_KM == 1737.4
         assert seed._DRO_SEED_X0 == 0.79188556619742
         assert seed._HALO_SEED_Z0 == 0.001

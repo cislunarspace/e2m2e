@@ -29,7 +29,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-from ...data.constants import Datum, SECONDS_PER_DAY
+from ...data.constants import SECONDS_PER_DAY, Datum
 from ...data.types import EphemerisTable, ManeuverTable, SKStatistic
 from ..coordinate.coordinate_system import CoordinateSystem
 from ..coordinate.standard_axes import ICRSAxes

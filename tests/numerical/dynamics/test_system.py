@@ -114,9 +114,7 @@ class TestCR3BPSystemKnownSystems:
         system = CR3BP_System(
             mu=Datum.DE421.mu, primary="Earth", secondary="Moon"
         )._with_default_scales()
-        assert system.characteristic_length == pytest.approx(
-            Datum.DE421.char_length_km, abs=1e-6
-        )
+        assert system.characteristic_length == pytest.approx(Datum.DE421.char_length_km, abs=1e-6)
 
     def test_earth_moon_TU_days(self):
         """Earth-Moon characteristic time must match DE421 datum."""
@@ -346,9 +344,7 @@ class TestCR3BPSystemDUTUVUProperties:
 
     def test_VU_returns_meters_per_second(self, earth_moon_system):
         """VU returns characteristic velocity in m/s (TOD convention)."""
-        expected_vu = (
-            Datum.DE421.char_length_km / Datum.DE421.char_time_s * 1000.0
-        )
+        expected_vu = Datum.DE421.char_length_km / Datum.DE421.char_time_s * 1000.0
         assert pytest.approx(expected_vu, abs=0.01) == earth_moon_system.VU
 
 

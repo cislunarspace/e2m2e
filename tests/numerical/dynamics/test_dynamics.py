@@ -20,9 +20,7 @@ pytestmark = pytest.mark.theory
 @pytest.fixture
 def earth_moon_system():
     """Create Earth-Moon CR3BP system using DE421 datum."""
-    return CR3BP_System(
-        mu=Datum.DE421.mu, primary="Earth", secondary="Moon"
-    )._with_default_scales()
+    return CR3BP_System(mu=Datum.DE421.mu, primary="Earth", secondary="Moon")._with_default_scales()
 
 
 @pytest.fixture

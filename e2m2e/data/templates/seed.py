@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from e2m2e.data.constants import Datum, SECONDS_PER_DAY
+from e2m2e.data.constants import Datum
 from e2m2e.data.constants.bodies import MOON
 
 #: 地月 CR3BP 参数（与 examples/、tests/conftest.py 的标准系统一致）。

@@ -2,11 +2,20 @@
 
 以"基准（datum）"为一等概念，每套基准内部 GM、μ、特征长度、特征时间
 来自同一来源，保持自洽。数值由仓库根 ``constants.toml`` 加载。
+
+基准按字段形状分成三类，类型上精确区分"必有值"与"可选值"：
+- ``_FullEarthMoonDatumSpec``：DE421，μ、GM 表、特征长度/时间齐备；
+- ``_EarthMoonDatumSpec``：DE440/DE430，μ 与 GM 表必有值，特征尺度未提供
+  （避免编造），为合法 ``None``；
+- ``_ShapeDatumSpec``：WGS-84，只定义地球形状/地球 GM。
+
+调用方取"必有值"字段时得到 ``float``；取可选字段时类型为 ``float | None``，
+需自行确认该基准确实提供该值。
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import tomllib
@@ -43,6 +52,14 @@ def _datum_value(datum: str, key: str) -> float | None:
     return float(entry)  # type: ignore[arg-type]
 
 
+def _datum_require(datum: str, key: str) -> float:
+    """取必有值的基准字段；缺失即抛错（与 universal._value 同范式）。"""
+    value = _datum_value(datum, key)
+    if value is None:
+        raise KeyError(f"constants.toml 中 [datum.{datum}] 缺少 {key!r}")
+    return value
+
+
 def _datum_source(datum: str, key: str) -> ConstantSource | None:
     section = _DATUMS.get(datum)
     if section is None:
@@ -57,35 +74,72 @@ def _datum_source(datum: str, key: str) -> ConstantSource | None:
 
 @dataclass(frozen=True)
 class _DatumSpec:
-    """单个基准集的内部字段。
+    """基准集公共字段：来源标识与逐字段出处元数据。
 
     所有 GM 量单位均为 km³/s²；特征长度单位为 km；特征时间单位为 s。
-    字段标注 ``source`` 给出每个值的原始出处（可能与基准本身不同，如
-    WGS-84 基准中的地球半径来自 WGS-84，但基准标签仍是 WGS-84）。
     """
 
     source: ConstantSource
+    field_sources: dict[str, ConstantSource]
+
+
+@dataclass(frozen=True)
+class _EarthMoonDatumSpec(_DatumSpec):
+    """地月 CR3BP 基准（DE440/DE430）：μ 与 GM 表必有值，特征尺度未提供。
+
+    特征长度/特征时间由 GM 与星历历元推导，当前阶段未提供，为合法 None。
+    """
+
+    # 地月系统质量比（无量纲）。
+    mu: float
+    # 地球引力参数（km³/s²）。
+    earth_gm: float
+    # 月球引力参数（km³/s²）。
+    moon_gm: float
+    # 太阳引力参数（km³/s²）。
+    sun_gm: float
+    # 地月系质心（EMB）引力参数（km³/s²）。
+    emb_gm: float
+    # 地月特征长度 l*（km）。
+    char_length_km: float | None = None
+    # 地月特征时间 t*（s）。
+    char_time_s: float | None = None
+    # 地球赤道半径（km）。
+    earth_radius_km: float | None = None
+    # 地球扁率（无量纲）。
+    earth_flattening: float | None = None
+
+
+@dataclass(frozen=True)
+class _FullEarthMoonDatumSpec(_EarthMoonDatumSpec):
+    """DE421：在 CR3BP 基准基础上，特征长度/时间也必有值。"""
+
+    char_length_km: float
+    char_time_s: float
+
+
+@dataclass(frozen=True)
+class _ShapeDatumSpec(_DatumSpec):
+    """地球形状基准（WGS-84）：地球 GM、赤道半径、扁率必有值。"""
+
+    # 地球引力参数（km³/s²）。
+    earth_gm: float
+    # 地球赤道半径（km）。
+    earth_radius_km: float
+    # 地球扁率（无量纲）。
+    earth_flattening: float
     # 地月系统质量比（无量纲）。
     mu: float | None = None
     # 地月特征长度 l*（km）。
     char_length_km: float | None = None
     # 地月特征时间 t*（s）。
     char_time_s: float | None = None
-    # 地球引力参数（km³/s²）。
-    earth_gm: float | None = None
     # 月球引力参数（km³/s²）。
     moon_gm: float | None = None
     # 太阳引力参数（km³/s²）。
     sun_gm: float | None = None
     # 地月系质心（EMB）引力参数（km³/s²）。
     emb_gm: float | None = None
-    # 地球赤道半径（km）。
-    earth_radius_km: float | None = None
-    # 地球扁率（无量纲）。
-    earth_flattening: float | None = None
-
-    # 每个字段的出处元数据（字段名 → ConstantSource）。
-    field_sources: dict[str, ConstantSource] = field(default_factory=dict)
 
 
 class _DatumEnumMeta(type):
@@ -118,15 +172,15 @@ class Datum(metaclass=_DatumEnumMeta):
     """
 
     # 来源：Folta 2022 Table 2；NASA JPL DE421。
-    DE421 = _DatumSpec(
+    DE421 = _FullEarthMoonDatumSpec(
         source=ConstantSource.DE421,
-        mu=_datum_value("DE421", "mu"),
-        char_length_km=_datum_value("DE421", "char_length_km"),
-        char_time_s=_datum_value("DE421", "char_time_s"),
-        earth_gm=_datum_value("DE421", "earth_gm"),
-        moon_gm=_datum_value("DE421", "moon_gm"),
-        sun_gm=_datum_value("DE421", "sun_gm"),
-        emb_gm=_datum_value("DE421", "emb_gm"),
+        mu=_datum_require("DE421", "mu"),
+        char_length_km=_datum_require("DE421", "char_length_km"),
+        char_time_s=_datum_require("DE421", "char_time_s"),
+        earth_gm=_datum_require("DE421", "earth_gm"),
+        moon_gm=_datum_require("DE421", "moon_gm"),
+        sun_gm=_datum_require("DE421", "sun_gm"),
+        emb_gm=_datum_require("DE421", "emb_gm"),
         field_sources={
             "mu": _datum_source("DE421", "mu") or ConstantSource.DE421,
             "char_length_km": _datum_source("DE421", "char_length_km") or ConstantSource.LITERATURE,
@@ -140,13 +194,13 @@ class Datum(metaclass=_DatumEnumMeta):
 
     # 来源：JPL DE440 星历。
     # 特征长度/特征时间由 GM 与星历历元推导，当前阶段未提供，避免编造。
-    DE440 = _DatumSpec(
+    DE440 = _EarthMoonDatumSpec(
         source=ConstantSource.DE440,
-        mu=_datum_value("DE440", "mu"),
-        earth_gm=_datum_value("DE440", "earth_gm"),
-        moon_gm=_datum_value("DE440", "moon_gm"),
-        sun_gm=_datum_value("DE440", "sun_gm"),
-        emb_gm=_datum_value("DE440", "emb_gm"),
+        mu=_datum_require("DE440", "mu"),
+        earth_gm=_datum_require("DE440", "earth_gm"),
+        moon_gm=_datum_require("DE440", "moon_gm"),
+        sun_gm=_datum_require("DE440", "sun_gm"),
+        emb_gm=_datum_require("DE440", "emb_gm"),
         field_sources={
             "mu": _datum_source("DE440", "mu") or ConstantSource.DE440,
             "earth_gm": _datum_source("DE440", "earth_gm") or ConstantSource.DE440,
@@ -157,11 +211,11 @@ class Datum(metaclass=_DatumEnumMeta):
     )
 
     # 来源：WGS-84 / GMAT R2026a 默认地球形状模型。
-    WGS84 = _DatumSpec(
+    WGS84 = _ShapeDatumSpec(
         source=ConstantSource.WGS84,
-        earth_gm=_datum_value("WGS84", "earth_gm"),
-        earth_radius_km=_datum_value("WGS84", "earth_radius_km"),
-        earth_flattening=_datum_value("WGS84", "earth_flattening"),
+        earth_gm=_datum_require("WGS84", "earth_gm"),
+        earth_radius_km=_datum_require("WGS84", "earth_radius_km"),
+        earth_flattening=_datum_require("WGS84", "earth_flattening"),
         field_sources={
             "earth_gm": _datum_source("WGS84", "earth_gm") or ConstantSource.WGS84,
             "earth_radius_km": _datum_source("WGS84", "earth_radius_km") or ConstantSource.WGS84,

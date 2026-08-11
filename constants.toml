@@ -54,6 +54,9 @@ earth_flattening = { value = 0.0033528106647474805, source = "WGS84" }
 mean_radius_km = { value = 696000.0, source = "Vallado" }
 naif_id = { value = 10, source = "NAIF" }
 
+[body.SUN.gm]
+DE440 = { value = 1.32712440018e11, source = "DE440" }
+
 [body.EARTH]
 mean_radius_km = { value = 6378.137, source = "WGS84" }
 gravity_ref_radius_km = { value = 6378.1363, source = "GMAT" }
@@ -87,30 +90,54 @@ DE440 = { value = 403503.235502, source = "DE440" }
 mean_radius_km = { value = 2440.53, source = "IAU2015" }
 naif_id = { value = 199, source = "NAIF" }
 
+[body.MERCURY.gm]
+DE440 = { value = 22031.868551, source = "DE440" }
+
 [body.VENUS]
 mean_radius_km = { value = 6051.8, source = "IAU2015" }
 naif_id = { value = 299, source = "NAIF" }
+
+[body.VENUS.gm]
+DE440 = { value = 324858.592000, source = "DE440" }
 
 [body.MARS]
 mean_radius_km = { value = 3396.19, source = "IAU2015" }
 naif_id = { value = 499, source = "NAIF" }
 
+[body.MARS.gm]
+DE440 = { value = 42828.375816, source = "DE440" }
+
 [body.JUPITER]
 mean_radius_km = { value = 71492.0, source = "IAU2015" }
 naif_id = { value = 599, source = "NAIF" }
+
+[body.JUPITER.gm]
+DE440 = { value = 126712764.100000, source = "DE440" }
 
 [body.SATURN]
 mean_radius_km = { value = 60268.0, source = "IAU2015" }
 naif_id = { value = 699, source = "NAIF" }
 
+[body.SATURN.gm]
+DE440 = { value = 37940584.841800, source = "DE440" }
+
 [body.URANUS]
 mean_radius_km = { value = 25559.0, source = "IAU2015" }
 naif_id = { value = 799, source = "NAIF" }
+
+[body.URANUS.gm]
+DE440 = { value = 5794556.400000, source = "DE440" }
 
 [body.NEPTUNE]
 mean_radius_km = { value = 24764.0, source = "IAU2015" }
 naif_id = { value = 899, source = "NAIF" }
 
+[body.NEPTUNE.gm]
+DE440 = { value = 6836527.100580, source = "DE440" }
+
 [body.PLUTO]
 mean_radius_km = { value = 1188.3, source = "IAU2015" }
 naif_id = { value = 999, source = "NAIF" }
+
+[body.PLUTO.gm]
+DE440 = { value = 975.500000, source = "DE440" }

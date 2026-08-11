@@ -16,6 +16,7 @@ import numpy.typing as npt
 
 from ...data.constants import AU_KM as _AU_KM
 from ...data.constants import Datum
+from ...data.constants.bodies import EMB, SUN
 from .cr3bp_system import CR3BP_System
 
 
@@ -42,8 +43,8 @@ class BCR4BPSystem(CR3BP_System):
     """
 
     # 太阳参数取值来源（DE440，与 e2m2e/core/spice.py 的 _GM_VALUES 一致）
-    SUN_GM_KM3_S2 = 1.32712440018e11  # 太阳 GM (km^3/s^2), DE440
-    EARTH_MOON_GM_KM3_S2 = 403503.235502  # 地月质心 GM (km^3/s^2), DE440
+    SUN_GM_KM3_S2 = SUN.gm_by_datum["DE440"]  # 太阳 GM (km^3/s^2), DE440
+    EARTH_MOON_GM_KM3_S2 = EMB.gm_by_datum["DE440"]  # 地月质心 GM (km^3/s^2), DE440
     SUN_EARTH_DISTANCE_KM = _AU_KM  # 日地平均距离 (km), GMAT nominalSun
 
     def __init__(

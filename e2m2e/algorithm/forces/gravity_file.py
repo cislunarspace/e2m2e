@@ -20,7 +20,7 @@ import numpy.typing as npt
 from ...data.constants import SECONDS_PER_JULIAN_YEAR
 from ...data.constants.bodies import EARTH
 
-_DEFAULT_MU = 398600.4415  # km^3/s^2
+_DEFAULT_MU = EARTH.gm_by_datum["DE421"]  # km^3/s^2
 _DEFAULT_RADIUS: float = cast(float, EARTH.gravity_ref_radius_km)  # km
 
 

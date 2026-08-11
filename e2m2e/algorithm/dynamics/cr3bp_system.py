@@ -18,9 +18,6 @@ from ...data.constants import (
     AU_KM as _AU_KM,
 )
 from ...data.constants import (
-    Datum,
-)
-from ...data.constants import (
     EARTH_MOON_DISTANCE_KM as _SYSTEM_EM_DISTANCE,
 )
 from ...data.constants import (
@@ -31,6 +28,9 @@ from ...data.constants import (
 )
 from ...data.constants import (
     SECONDS_PER_JULIAN_YEAR as _SYSTEM_YEAR,
+)
+from ...data.constants import (
+    Datum,
 )
 from ...data.templates.enums import ReferenceFrame, UnitSystem
 from .potential import pseudo_potential_hessian

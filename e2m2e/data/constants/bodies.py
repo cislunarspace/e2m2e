@@ -109,6 +109,12 @@ class Body:
     rotation_rate_gmat_rad_s: float | None = None
     rotation_rate_gmat_source: ConstantSource | None = None
 
+    def require_mean_radius_km(self) -> float:
+        """平均半径（km）；该天体未定义半径时抛错（如 EMB 无半径概念）。"""
+        if self.mean_radius_km is None:
+            raise KeyError(f"constants.toml 中 [body.{self.name}] 缺少 'mean_radius_km'")
+        return self.mean_radius_km
+
 
 def _build_body(name: str) -> Body:
     section = _BODIES.get(name, {})

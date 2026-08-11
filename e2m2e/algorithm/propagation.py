@@ -10,7 +10,7 @@ from typing import Any
 
 import numpy as np
 
-from ..data.constants import SECONDS_PER_DAY
+from ..data.constants import SECONDS_PER_DAY, Datum
 from ..data.types import EphemerisTable
 
 __all__ = ["propagate_orbit"]
@@ -30,7 +30,7 @@ _DEFAULT_FORCE_CONFIG: dict[str, Any] = {
             "name": "gravity_earth",
             "type": "PointMassGravity",
             "enabled": True,
-            "params": {"body": "EARTH", "mu": 398600.435507},
+            "params": {"body": "EARTH", "mu": Datum.DE440.earth_gm},
         },
         {
             "name": "gravity_moon",
