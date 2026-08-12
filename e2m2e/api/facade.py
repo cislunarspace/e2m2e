@@ -18,7 +18,6 @@ import numpy as np
 
 from e2m2e.data.constants import SECONDS_PER_DAY
 from e2m2e.data.templates import ConvergenceState, FailureCause
-from e2m2e.tools.logging import configure_logging
 
 from .config import Config
 from .models import (
@@ -205,14 +204,10 @@ class Facade:
     def __init__(self, config: Config | None = None) -> None:
         """构造 Facade。
 
-        按 ``config.log_level`` 配置根 logger（应用边界接管日志配置，
-        ADR 0011：Formatter 把 extra 键值对转 ``key=val``）。
-
         Args:
             config: 运行配置（api/config.py Config），缺省从环境变量读。
         """
         self._config = config or Config()
-        configure_logging(level=self._config.log_level)
 
     # ---- 一档任务（mcp_exposed=True）----
 
