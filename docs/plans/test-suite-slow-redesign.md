@@ -129,9 +129,9 @@ pytest.skip(
 
 **保留**。验证中心流形约化的核心正确性（双曲耦合消除 + 6 周期有界），目标本身重，fixture 已缓存复用。order 5 不降（降阶影响约化质量，验证失意义）。
 
-#### `design/scenarios/test_frozen_orbit_e2e.py`（4 个 slow）
+#### `design/scenarios/test_frozen_orbit_e2e.py`
 
-**保留**，审弧长。fixture 已共享（module scope）。断言物理结论（i=75° 无严格冻结、Δe≈−0.019、Δrp≈+61 km、漂移方向、|Δrp| 随 a 增大）。60 天 → 审 30 天是否够体现结论方向（Δrp 减半但正负、单调性不变）；`test_drift_rp_increases_with_a` 的 a8000 第二次传播可同步缩短。
+**删除**。该文件的绝对漂移值来自外部 GMAT 原型和报告，既不是 e2m2e 的物理定义，也不是本库锁定的力模型配置；按照 ADR 0013，不将外部软件输出作为测试 oracle。ELFO 公共入口的结果结构与短弧传播链路由现有集成测试覆盖，根数转换与漂移统计由纯函数单元测试覆盖。
 
 #### `numerical/forces/test_low_thrust_propagation.py::test_low_thrust_spiral_orbit_evolution`（1 个 slow）
 
@@ -144,7 +144,6 @@ pytest.skip(
 - `tests/algorithm/design/scenarios/test_lissajous.py:10-11`（「属 tests/orbit_design 三层分层中的 L3（scenarios，端到端）」）
 - `tests/algorithm/design/scenarios/test_triangular.py:10-11`（同上）
 - `tests/algorithm/design/scenarios/test_segmented.py:10`（同上）
-- `tests/algorithm/design/scenarios/test_frozen_orbit_e2e.py:1`（「（L3）」）
 
 替换为 ADR 0021 的功能类描述（`orchestration`：design_orbit 全链路集成），不引用已废分层。
 
