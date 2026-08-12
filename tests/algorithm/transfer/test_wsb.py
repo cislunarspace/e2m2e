@@ -272,6 +272,7 @@ class TestWsbPhysics:
 
 class TestWsbTransferOrbit:
     """transfer_orbit("WSB") 编排器输入校验。"""
+
     def test_wsb_missing_params_raises(self):
         """transfer_orbit("WSB") 缺少必要参数时报错。"""
         with pytest.raises(ValueError, match="tli_params"):

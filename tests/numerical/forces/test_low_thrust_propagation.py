@@ -72,7 +72,6 @@ def _semi_major_axis(state, mu):
     return -mu / (2.0 * energy)
 
 
-
 @pytest.fixture
 def earth_ephemeris_system(spice_kernel_path):
     """Earth-centered J2000 ephemeris system for low-thrust tests."""
