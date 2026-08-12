@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
+from e2m2e.api.config import Config
 from e2m2e.api.facade import Facade, mcp_tools
 from e2m2e.api.models import (
     ControlOrbitRequest,
@@ -22,6 +23,30 @@ from e2m2e.data.templates import ConvergenceState, FailureCause
 from e2m2e.data.types.trajectory import EphemerisTable
 
 pytestmark = pytest.mark.interface
+
+
+class TestFacadeLogging:
+    """Facade 构造即按 Config 配置根 logger。"""
+
+    def test_log_level_from_config(self):
+        import logging
+
+        Facade(config=Config(log_level="DEBUG"))
+        assert logging.getLogger().level == logging.DEBUG
+
+    def test_default_log_level_warning(self):
+        import logging
+
+        Facade()
+        assert logging.getLogger().level == logging.WARNING
+
+    def test_configure_logging_idempotent(self):
+        import logging
+
+        Facade(config=Config(log_level="INFO"))
+        n_handlers = len(logging.getLogger().handlers)
+        Facade(config=Config(log_level="INFO"))
+        assert len(logging.getLogger().handlers) == n_handlers
 
 
 class TestDesignOrbitRequest:
