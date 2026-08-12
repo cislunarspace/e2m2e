@@ -117,6 +117,10 @@ dev = [
     "ruff>=0.1",
     "mypy",
     "maturin>=1.0",
+    # matplotlib 默认装入开发环境：tests/tools/viz/ 是测试套件的一部分，缺
+    # 它会让套件收集直接 ImportError。库本身仍保持 viz extra 可选（ADR 0011
+    # 核心库不依赖 matplotlib）。
+    "matplotlib>=3.7",
 ]
 docs = [
     "sphinx>=7",
