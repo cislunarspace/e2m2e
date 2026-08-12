@@ -11,8 +11,9 @@ e2m2e 的 GitHub Release 下载预编译的 MICE 工具包（``cspice-windows-v1
     python scripts/download_cspice.py [--cache-dir DIR]
     python scripts/download_cspice.py --print-cspice-dir
 
-不传参数：下载（若未缓存）+ 解压到缓存，在 stdout 打印 ``CSPICE_DIR=<dir>``。
-``--print-cspice-dir``：仅打印已解压的 ``CSPICE_DIR``（供 shell ``$(...)`` 捕获）。
+不传参数：下载（若未缓存）+ 解压到缓存，在 stdout 打印 ``export CSPICE_DIR=<dir>``，
+可直接 ``eval "$(python3 scripts/download_cspice.py)"`` 在当前 shell 设置环境变量。
+``--print-cspice-dir``：仅打印已解压的 ``CSPICE_DIR`` 纯路径（供 shell ``$(...)`` 捕获）。
 
 默认缓存目录：仓库根 ``.cspice/``（gitignore 已忽略）。
 """
@@ -100,7 +101,9 @@ def main() -> None:
     if args.print_cspice_dir:
         print(cspice_dir)
         return
-    print(f"CSPICE_DIR={cspice_dir}")
+    # 输出可 eval 的 export 语句：``eval "$(python3 scripts/download_cspice.py)"``
+    # 即在当前 shell 设好 CSPICE_DIR，之后的裸 cargo/maturin/uv 构建均可见。
+    print(f"export CSPICE_DIR={cspice_dir}")
 
 
 if __name__ == "__main__":
