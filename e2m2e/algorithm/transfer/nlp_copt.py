@@ -4,8 +4,9 @@
 供 :class:`~e2m2e.transfer.transfer_optimization.DROTRONLPOptimizer` 选用。
 
 未安装 ``coptpy`` 时：本模块仍可被导入（``coptpy`` 退化为 ``None``），
-但 :class:`COPTNLPSolver` 退化为占位实现，:func:`optimize_with_copt`
-应通过 ``fallback_to_scipy`` 回退 SciPy 求解。
+:class:`COPTNLPSolver` 类不定义；:func:`optimize_with_copt` 默认直接报错
+（``fallback_to_scipy=False``，ADR 0020 决策 4：不隐式换后端），显式传
+``fallback_to_scipy=True`` 才回退 SciPy 求解。
 """
 
 from __future__ import annotations
