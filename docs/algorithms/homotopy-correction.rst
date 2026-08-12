@@ -161,6 +161,7 @@ API
    from e2m2e.algorithm.dynamics.ephemeris_dynamics import EphemerisDynamics
    from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
    from e2m2e.data.kernels.manager import SPICEManager
+   from e2m2e.data.templates import ConvergenceState
    from e2m2e.data.templates.enums import ReferenceFrame
 
    KERNEL_DIR = "/path/to/kernels"
@@ -191,7 +192,11 @@ API
        kernel_dir=KERNEL_DIR,
        base_bodies=["EARTH", "MOON"],   # Earth+Moon → Earth+Moon+Sun
    )
-   print(result.converged, result.iterations, result.max_residual)
+   print(
+       result.status == ConvergenceState.CONVERGED,
+       result.iterations,
+       result.max_residual,
+   )
 
 **二层多重打靶同伦过渡** ：
 
@@ -210,7 +215,7 @@ API
        # velocity_tolerance=1e-6,         # 可选，默认 1e-6
    )
    print(
-       result_two_level.converged,
+       result_two_level.status == ConvergenceState.CONVERGED,
        result_two_level.velocity_residual,
        result_two_level.velocity_residual_history,
    )
