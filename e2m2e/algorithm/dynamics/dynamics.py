@@ -31,6 +31,7 @@ from scipy.integrate import solve_ivp
 from e2m2e.exceptions import PropagationFailure
 from e2m2e.integrators import require_rust_extension
 
+from ...data.templates import ConvergenceState, FailureCause
 from .cr3bp_system import CR3BP_System
 from .potential import pseudo_potential_hessian
 from .system import System
@@ -318,11 +319,24 @@ class Dynamics:
         # result.y 形状为 (6, n_points)，转置为 (n_points, 6) — REQ-002
         states = result.y.T
 
+        # 显式 failure 标记（ADR 0020 决策 2）：步长塌缩/积分器未成功时返回
+        # DIVERGED 标记而非仅靠空 states 表达失败，下游不再用 len==0 嗅探。
+        if not result.success or states.shape[0] == 0:
+            return {
+                "time": np.array([]),
+                "states": np.empty((0, self.STATE_DIM)),
+                "status": ConvergenceState.DIVERGED,
+                "cause": FailureCause.DIVERGENCE_DETECTED,
+                "message": str(getattr(result, "message", "propagation failed")),
+            }
+
         self.last_trajectory = (result.t, states)
 
         out: dict[str, Any] = {
             "time": result.t,
             "states": states,
+            "status": ConvergenceState.CONVERGED,
+            "cause": FailureCause.NONE,
         }
 
         if events is not None:
@@ -837,11 +851,10 @@ class CR3BP_Dynamics(Dynamics):
         else:
             t_eval_list = [float(t_span[0]), float(t_span[1])]
 
-        # 步长塌缩时 Rust 经 FFI 抛 PropagationFailure；这里 catch 后返回空 states，
-        # 对齐 scipy 路径失败语义（失败返回空、不 raise），让上层
-        # （TransferOptimization._evaluate_all）走 dv=1e10 惩罚，使 NLP
-        # 优化器绕开发散点。仅 catch 步长塌缩；其他 RuntimeError（如截断）
-        # 仍向上抛——那是真实 bug，该暴露。
+        # 步长塌缩时 Rust 经 FFI 抛 PropagationFailure；这里 catch 后返回带
+        # failure 标记的空 states（ADR 0020 决策 2），下游读 status/cause 而非
+        # 嗅探空 states。仅 catch 步长塌缩；其他 RuntimeError（如截断）仍向上
+        # 抛——那是真实 bug，该暴露。
         try:
             result = propagate_cr3bp_py(
                 mu=mu,
@@ -861,12 +874,23 @@ class CR3BP_Dynamics(Dynamics):
                     f"Rust propagation returned {len(time)} of {len(t_eval_list)} "
                     f"requested time points; the trajectory is truncated"
                 )
-        except PropagationFailure:
-            return {"time": np.array([]), "states": np.empty((0, 6))}
+        except PropagationFailure as exc:
+            return {
+                "time": np.array([]),
+                "states": np.empty((0, 6)),
+                "status": ConvergenceState.DIVERGED,
+                "cause": FailureCause.DIVERGENCE_DETECTED,
+                "message": str(exc),
+            }
 
         self.last_trajectory = (time, states)
 
-        out: dict[str, Any] = {"time": time, "states": states}
+        out: dict[str, Any] = {
+            "time": time,
+            "states": states,
+            "status": ConvergenceState.CONVERGED,
+            "cause": FailureCause.NONE,
+        }
         if with_jacobi:
             out = self._handle_jacobi(states, out)
         return out
@@ -910,9 +934,26 @@ class CR3BP_Dynamics(Dynamics):
         time = np.asarray(result["time"])
         states = np.asarray(result["states"])
 
+        # 事件积分失败（空输出）同样带显式 failure 标记（ADR 0020 决策 2）。
+        if states.shape[0] == 0:
+            return {
+                "time": np.array([]),
+                "states": np.empty((0, self.STATE_DIM)),
+                "status": ConvergenceState.DIVERGED,
+                "cause": FailureCause.DIVERGENCE_DETECTED,
+                "message": "event propagation produced no output",
+                "t_events": [np.asarray([]) for _ in events],
+                "y_events": [np.asarray([]) for _ in events],
+            }
+
         self.last_trajectory = (time, states)
 
-        out: dict[str, Any] = {"time": time, "states": states}
+        out: dict[str, Any] = {
+            "time": time,
+            "states": states,
+            "status": ConvergenceState.CONVERGED,
+            "cause": FailureCause.NONE,
+        }
         out["t_events"] = [np.asarray(te) for te in result["t_events"]]
         out["y_events"] = [np.asarray(ye) for ye in result["y_events"]]
         if with_jacobi:
