@@ -115,7 +115,8 @@ jobs:
       # cargo 编译缓存：wheel release 全量编译（linux 容器内 6min / windows 2min）
       # → 增量。linux 经 maturin-action 容器构建，workspace（含 target/）同路径
       # 挂载进容器，host 侧的缓存恢复/保存对容器内构建生效；key 默认含 OS/arch，
-      # x86_64、aarch64、windows 三平台天然隔离。
+      # x86_64、aarch64、windows 三平台天然隔离。容器内 $CARGO_HOME（registry）
+      # 与 host 不共享，依赖源码仍每次下载（约 20s，不重编）。
       - uses: Swatinem/rust-cache@v2
         with:
           env-vars: CSPICE_DIR
