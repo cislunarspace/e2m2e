@@ -14,10 +14,9 @@ import pytest
 from e2m2e.algorithm.dynamics import BCR4BP_Dynamics, BCR4BPSystem, CR3BP_Dynamics, CR3BP_System
 from e2m2e.algorithm.transfer import WsbSearchParams, transfer_orbit
 from e2m2e.algorithm.transfer.hohmann import TliParams
-from e2m2e.algorithm.transfer.wsb import (
-    compute_kepler_energy_moon,
-)
+from e2m2e.algorithm.transfer.wsb import _wsb_worker, compute_kepler_energy_moon
 from e2m2e.data.constants import Datum
+from e2m2e.exceptions import PropagationFailure
 
 pytestmark = pytest.mark.orchestration
 
@@ -62,9 +61,40 @@ def _make_target_state(system):
     return np.array([x_target, 0.0, 0.0, 0.0, v_circ_dim, 0.0])
 
 
-# ---------------------------------------------------------------------------
-# TestWsbSearchParams：搜索参数验证
-# ---------------------------------------------------------------------------
+def test_wsb_worker_skips_a_grid_point_when_propagation_fails(monkeypatch):
+    system = _make_bcr4bp_system()
+    departure = _make_departure_state(system)
+    target = _make_target_state(system)
+    params = WsbSearchParams(n_departure_phase=1, n_propagation_samples=2)
+
+    def fail_propagate(self, *args, **kwargs):  # noqa: ARG001
+        raise PropagationFailure("step size collapsed")
+
+    monkeypatch.setattr(BCR4BP_Dynamics, "propagate", fail_propagate)
+    r0 = departure[:3]
+    v_park = departure[3:]
+    r0_norm = np.linalg.norm(r0)
+    v_hat = v_park / np.linalg.norm(v_park)
+    r_hat = r0 / r0_norm
+
+    candidates = _wsb_worker(
+        params,
+        departure,
+        r0,
+        v_hat,
+        r_hat,
+        math.sqrt(2.0 * (1.0 - system.mu) / r0_norm) * 1.01,
+        v_park,
+        target,
+        float(np.linalg.norm(target[:3])),
+        system.mu,
+        system.characteristic_length,
+        system.characteristic_time,
+        0.0,
+        params.tof_range[0] * 86400.0,
+    )
+
+    assert candidates == []
 
 
 class TestWsbSearchParams:

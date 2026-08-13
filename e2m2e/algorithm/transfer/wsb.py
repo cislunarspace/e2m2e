@@ -30,6 +30,7 @@ import numpy as np
 from ...data.constants import SECONDS_PER_DAY
 from ...data.constants.bodies import MOON
 from ...data.templates import ConvergenceState, FailureCause
+from ...exceptions import PropagationFailure
 from ..dynamics import BCR4BP_Dynamics, BCR4BPSystem, CR3BP_Dynamics, CR3BP_System
 from ..manifold.sections import PoincareSection, detect_crossings
 from ..results import ResultStatus
@@ -303,7 +304,7 @@ def _wsb_worker(
         try:
             t_eval = np.linspace(0.0, tof_dim, n_samples)
             result = dynamics.propagate(x0, (0.0, tof_dim), t_eval=t_eval)
-        except (RuntimeError, ValueError, np.linalg.LinAlgError):
+        except (RuntimeError, ValueError, np.linalg.LinAlgError, PropagationFailure):
             logger.debug(
                 "传播失败：sun_phase=%.3f, angle=%.3f, tof=%.2f",
                 sun_phase0,

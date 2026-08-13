@@ -27,6 +27,7 @@ from e2m2e.algorithm.transfer.lga import (
 )
 from e2m2e.data.constants import Datum
 from e2m2e.data.templates import ConvergenceState
+from e2m2e.exceptions import PropagationFailure
 
 pytestmark = pytest.mark.orchestration
 
@@ -137,6 +138,18 @@ class TestLgaSearch:
         system, dynamics, dep_state, tgt_state = cr3bp_setup
         candidates = search_lga_trajectories(dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS)
         assert len(candidates) > 0, "LGA 搜索应返回至少一个候选"
+
+    def test_propagation_failure_skips_the_infeasible_grid_point(self, cr3bp_setup):
+        system, _, dep_state, tgt_state = cr3bp_setup
+
+        class FailingDynamics:
+            def propagate(self, *args, **kwargs):  # noqa: ARG002
+                raise PropagationFailure("step size collapsed")
+
+        params = LgaSearchParams(n_departure_phase=1, n_tof=1, n_propagation_samples=2)
+        assert (
+            search_lga_trajectories(dep_state, tgt_state, system, FailingDynamics(), params) == []
+        )
 
     def test_candidates_sorted_by_dv(self, cr3bp_setup):
         """候选按 total_dv 升序排列。"""

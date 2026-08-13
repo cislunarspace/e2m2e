@@ -50,7 +50,7 @@ def test_equations_remain_finite_at_machine_scale_singularity(dynamics):
 
 def test_jacobi_constant_is_conserved_during_propagation(dynamics, sample_state):
     result = dynamics.propagate(sample_state, (0.0, 2.0), with_jacobi=True)
-    assert result["jacobi_error"] < 1e-4
+    assert result["jacobi_error"] < 1e-10
     assert len(result["jacobi"]) == len(result["states"])
 
 
