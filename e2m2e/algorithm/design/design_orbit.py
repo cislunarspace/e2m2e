@@ -591,6 +591,14 @@ def _build_ephemeris_table(
     """
     t_c = syn_j2000.cr3bp_system.characteristic_time
     assert t_c is not None
+    # 位置/速度与时间网格必须逐点对齐：segmented 逐段积分曾把 propagate
+    # 自动追加的段终点 tf 拼进 states（位置数组比时间网格多出段数个点），
+    # batch_j2000_to_synodic 按索引配对位置与旋转时刻，错位逐段累积导致
+    # 会合系曲线一圈一圈偏离周期轨道。此断言防未来回归。
+    if len(states) != len(et_grid):
+        raise ValueError(
+            f"星历状态点数 {len(states)} 与时间网格点数 {len(et_grid)} 不一致，位置与时间将错位"
+        )
     t_syn = (et_grid - et0) / t_c
     synodic = syn_j2000.batch_j2000_to_synodic(states, t_syn, et0)[:, :3]
     synodic[:, 0] += syn_j2000.cr3bp_system.mu
@@ -874,7 +882,12 @@ def _design_elfo(
     et_grid = et0 + np.arange(0.0, duration_sec + 0.5 * output_step, output_step)
     out = fm.propagate(state0, (et0, et_end), t_eval=et_grid, max_steps=5_000_000)
     states = np.asarray(out["states"], dtype=float)
-    n_pts = len(states)
+    # ForceModel._prepare_t_eval 会在 t_eval 末尾自动追加 t_span 终点
+    # （duration 非整小时时 et_end 不在 et_grid 上，输出多 1 点）；截断到
+    # et_grid 长度，保证状态与时间网格逐点对齐（否则位置数组比时间字段
+    # 多 1 点，_build_ephemeris_table 的长度一致性断言会拒绝）。
+    n_pts = min(len(states), len(et_grid))
+    states = states[:n_pts]
     times = et_grid[:n_pts]
 
     # 月心根数提取与漂移统计
@@ -1172,11 +1185,12 @@ def design_orbit(
                 verbose=verbose,
             )
 
-            # 逐段积分填满 et_grid：每段从修正后节点初值积分到下一节点
+            # 逐段积分填满 et_grid：每段从修正后节点初值积分到下一节点。
+            # mask 用右开区间（seam 整点只归后段），相邻段 t_eval 无重叠。
             states_list: list[np.ndarray] = []
             for i in range(len(t_patch_long) - 1):
                 seg_t0, seg_t1 = t_patch_long[i], t_patch_long[i + 1]
-                mask = (et_grid >= seg_t0 - 1e-6) & (et_grid <= seg_t1 + 1e-6)
+                mask = (et_grid >= seg_t0 - 1e-6) & (et_grid < seg_t1 - 1e-6)
                 t_eval_seg = et_grid[mask]
                 if len(t_eval_seg) == 0:
                     continue
@@ -1186,7 +1200,12 @@ def design_orbit(
                     t_eval=t_eval_seg,
                     max_steps=500_000,
                 )
-                states_list.append(np.asarray(out_seg["states"], dtype=float))
+                # ForceModel._prepare_t_eval 会在 t_eval 末尾自动追加段终点 tf，
+                # 输出比 t_eval 多 1 点（段终点状态，不在 et_grid 上）。截断丢掉，
+                # 保证 states_dense 与 et_grid 严格对齐——否则星历位置数组比时间
+                # 网格多出段数个点，batch_j2000_to_synodic 按索引配对位置与旋转
+                # 时刻，错位逐段累积，会合系曲线一圈一圈偏离 Halo 轨道。
+                states_list.append(np.asarray(out_seg["states"], dtype=float)[: len(t_eval_seg)])
             if not states_list:
                 raise DesignNotConvergedError(
                     "segmented 拼接未生成任何星历点",
