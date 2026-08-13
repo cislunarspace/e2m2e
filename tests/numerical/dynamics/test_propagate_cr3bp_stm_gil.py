@@ -6,7 +6,7 @@ GIL，下游 worker 线程跑 ``design_orbit`` 时主线程（GUI / QTimer tick�
 66s+。本测试守住"积分循环包进 ``py.allow_threads``"：主线程积分期间，另一个
 Python 线程应能持续推进（心跳打点）。
 
-判别原理同 ``test_propagate_compiled_gil.py``（#318）：心跳线程循环
+判别原理同 ``integrators/bindings/test_propagate_compiled.py`` 中的 GIL 测试（#318）：心跳线程循环
 ``ticks += 1; time.sleep(0.005)``。``time.sleep`` 释 GIL，醒来执行 ``ticks += 1``
 必须重新获取 GIL——
 
