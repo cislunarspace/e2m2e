@@ -33,7 +33,6 @@ import math
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -599,18 +598,19 @@ def _build_ephemeris_table(
     synodic = syn_j2000.batch_j2000_to_synodic(states, t_syn, et0)[:, :3]
     synodic[:, 0] += syn_j2000.cr3bp_system.mu
 
-    n = len(et_grid)
-    year = np.empty(n, dtype=int)
-    month = np.empty(n, dtype=int)
-    day = np.empty(n, dtype=int)
-    hour = np.empty(n, dtype=int)
-    minute = np.empty(n, dtype=int)
-    second = np.empty(n, dtype=float)
-    for k in range(n):
-        dt = datetime.fromisoformat(spice.et_to_utc(float(et_grid[k])))
-        year[k], month[k], day[k] = dt.year, dt.month, dt.day
-        hour[k], minute[k] = dt.hour, dt.minute
-        second[k] = dt.second + dt.microsecond / 1e6
+    # ET→UTC 日历分量批量下沉 Rust（frame_convert.batch_et_to_utc_py）：
+    # 免去逐点 spiceypy.et2utc FFI + datetime.fromisoformat 字符串解析
+    # （一年 8766 点的逐点 Python 循环）。
+    from e2m2e.integrators import batch_et_to_utc_py, require_rust_extension
+
+    require_rust_extension("batch_et_to_utc_py")
+    y, mo, d, h, mi, s = batch_et_to_utc_py([float(x) for x in et_grid])
+    year = np.asarray(y, dtype=int)
+    month = np.asarray(mo, dtype=int)
+    day = np.asarray(d, dtype=int)
+    hour = np.asarray(h, dtype=int)
+    minute = np.asarray(mi, dtype=int)
+    second = np.asarray(s, dtype=float)
 
     return EphemerisTable(
         year=year,

@@ -17,6 +17,7 @@ from e2m2e.exceptions import RustExtensionUnavailableError
 # 扩展符号在运行时逐个装载；静态类型检查将其视为动态对象。
 if TYPE_CHECKING:
     augmented_eom_7d_py: Any
+    batch_body_states_py: Any
     batch_et_to_utc_py: Any
     batch_j2000_to_synodic_py: Any
     batch_synodic_to_j2000_py: Any
@@ -75,6 +76,7 @@ _RUST_SYMBOLS = (
     "_multistep_step",
     "_rk_step",
     "augmented_eom_7d_py",
+    "batch_body_states_py",
     "batch_et_to_utc_py",
     "batch_j2000_to_synodic_py",
     "batch_synodic_to_j2000_py",
@@ -234,6 +236,7 @@ def require_rust_extension(*required_symbols: str) -> None:
 
 __all__ = [
     "augmented_eom_7d_py",
+    "batch_body_states_py",
     "batch_et_to_utc_py",
     "batch_j2000_to_synodic_py",
     "batch_synodic_to_j2000_py",

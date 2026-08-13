@@ -3185,6 +3185,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
         m
     )?)?;
     #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(frame_convert::batch_body_states_py, m)?)?;
+    #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(frame_convert::batch_et_to_utc_py, m)?)?;
     m.add_class::<RkMethod>()?;
     m.add_class::<MultistepMethod>()?;
