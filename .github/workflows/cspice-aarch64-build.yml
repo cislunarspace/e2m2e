@@ -45,9 +45,16 @@ jobs:
           ls cspice/
       - name: 编译（aarch64 native）
         run: |
-          cd cspice
-          make 2>&1 | tail -30
-          ls -la lib/
+          set -euxo pipefail
+          # NAIF 包无顶层 makefile，编译入口是 src/cspice/mkprodct.csh（同本地
+          # 交叉编译验证过的路径）；默认 TKCOMPILEOPTIONS 含 -m64，aarch64 gcc
+          # 不接受，须显式覆盖；TKCOMPILER 默认 gcc 即可，但仍显式声明。
+          export TKCOMPILER=gcc
+          export TKCOMPILEOPTIONS="-c -ansi -O2 -fPIC -DNON_UNIX_STDIO"
+          cd cspice/src/cspice
+          chmod u+x mkprodct.csh
+          ./mkprodct.csh 2>&1 | tail -30
+          ls -la ../../lib/
       - name: 校验产物并整理目录结构
         run: |
           set -eux
