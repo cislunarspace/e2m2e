@@ -221,9 +221,7 @@ def _extract_moon_centric_elements(
     moon = np.asarray(
         batch_body_states_py("MOON", "EARTH", [float(t) for t in times]), dtype=float
     ).reshape(-1, 6)
-    rel = np.concatenate(
-        [states[:, :3] - moon[:, :3], states[:, 3:] - moon[:, 3:]], axis=1
-    )
+    rel = np.concatenate([states[:, :3] - moon[:, :3], states[:, 3:] - moon[:, 3:]], axis=1)
     return _cart2oe_batch(rel, mu)
 
 

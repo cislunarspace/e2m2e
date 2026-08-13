@@ -22,6 +22,12 @@ use e2m2e_spice::spice_ffi::{et2utc, mat3_mul_vec, mat3_t_mul_vec, spkezr, Spice
 /// 轴速率差分步长（秒），对齐 Python ``SynodicAxes._DEFAULT_RATE_STEP``。
 const RATE_STEP: f64 = 1.0;
 
+/// 3×3 行优先矩阵（旋转矩阵/轴速率）。
+type Mat3 = [[f64; 3]; 3];
+
+/// 批量 ET→UTC 的输出：年/月/日/时/分/秒六分量数组。
+type UtcFields = (Vec<i32>, Vec<i32>, Vec<i32>, Vec<i32>, Vec<i32>, Vec<f64>);
+
 /// Rust cspice 实例的行星名注册（Once 保护，见 lib.rs::ensure_bodies_registered）。
 fn spkezr_or_err(target: &str, et: f64, observer: &str) -> PyResult<[f64; 6]> {
     crate::ensure_bodies_registered();
@@ -35,7 +41,7 @@ fn spice_err(e: SpiceFfiError) -> PyErr {
 }
 
 /// 由月球相对地球位置/速度构造会合轴旋转矩阵（列 = e1, e2, e3）。
-fn synodic_rotation(r: [f64; 3], v: [f64; 3]) -> [[f64; 3]; 3] {
+fn synodic_rotation(r: [f64; 3], v: [f64; 3]) -> Mat3 {
     let rn = (r[0] * r[0] + r[1] * r[1] + r[2] * r[2]).sqrt();
     let e1 = [r[0] / rn, r[1] / rn, r[2] / rn];
     let h = [
@@ -59,7 +65,7 @@ fn synodic_rotation(r: [f64; 3], v: [f64; 3]) -> [[f64; 3]; 3] {
 }
 
 /// 查询时刻 ``et`` 的会合轴旋转矩阵、轴速率与地月距离。
-fn rotation_and_rate(et: f64) -> PyResult<([[f64; 3]; 3], [[f64; 3]; 3], f64)> {
+fn rotation_and_rate(et: f64) -> PyResult<(Mat3, Mat3, f64)> {
     let s = spkezr_or_err("MOON", et, "EARTH")?;
     let lc = (s[0] * s[0] + s[1] * s[1] + s[2] * s[2]).sqrt();
     let r_now = synodic_rotation([s[0], s[1], s[2]], [s[3], s[4], s[5]]);
@@ -135,11 +141,7 @@ fn j2000_to_syn(
     let rdot_p = mat3_mul_vec(rate, &p_out);
     let v_out = mat3_t_mul_vec(
         rot,
-        &[
-            v_j[0] - rdot_p[0],
-            v_j[1] - rdot_p[1],
-            v_j[2] - rdot_p[2],
-        ],
+        &[v_j[0] - rdot_p[0], v_j[1] - rdot_p[1], v_j[2] - rdot_p[2]],
     );
     // 无量纲化：r_syn = p_out / lc - offset；v_syn = v_out·t_c / l_c
     [
@@ -227,9 +229,7 @@ pub fn batch_body_states_py(target: &str, observer: &str, ets: Vec<f64>) -> PyRe
 /// 直接返回六分量数组，免去 Python 侧 ``datetime.fromisoformat`` 字符串解析。
 /// 秒为浮点（ISOC prec=0 下为整数秒）。
 #[pyfunction]
-pub fn batch_et_to_utc_py(
-    et: Vec<f64>,
-) -> PyResult<(Vec<i32>, Vec<i32>, Vec<i32>, Vec<i32>, Vec<i32>, Vec<f64>)> {
+pub fn batch_et_to_utc_py(et: Vec<f64>) -> PyResult<UtcFields> {
     crate::ensure_bodies_registered();
     let n = et.len();
     let mut year = Vec::with_capacity(n);
@@ -317,7 +317,8 @@ mod tests {
             assert!(
                 (back[k] - s[k]).abs() < 1e-9,
                 "分量 {k}: 往返 {} vs 原值 {}",
-                back[k], s[k]
+                back[k],
+                s[k]
             );
         }
     }

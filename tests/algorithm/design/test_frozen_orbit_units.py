@@ -37,9 +37,11 @@ def test_cart2oe_batch_roundtrip():
         (5000, 0.612, 75.0, 30.0, 270.0, 45.0),
         (15000, 0.871, 75.0, 90.0, 90.0, 180.0),
     ]
-    states = np.vstack([_oe2cart(a, e, i, raan, aop, nu, MU_MOON) for a, e, i, raan, aop, nu in cases])
+    states = np.vstack(
+        [_oe2cart(a, e, i, raan, aop, nu, MU_MOON) for a, e, i, raan, aop, nu in cases]
+    )
     oe = _cart2oe_batch(states, MU_MOON)
-    for k, (a, e, i, raan, aop, nu) in enumerate(cases):
+    for k, (a, e, i, _raan, _aop, _nu) in enumerate(cases):
         assert abs(oe["a"][k] - a) < 1e-6, f"case {k} a={a}: got {oe['a'][k]}"
         assert abs(oe["e"][k] - e) < 1e-10, f"case {k} e={e}: got {oe['e'][k]}"
         assert abs(oe["i"][k] - i) < 1e-8, f"case {k} i={i}: got {oe['i'][k]}"
