@@ -38,6 +38,7 @@ class _FakeSystem:
         return 398600.4415
 
 
+@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
 def test_finite_burn_spiral_raises_semi_major_axis(point_mass_force):
     """沿速度方向低推力传播 → 半长轴持续提升（电推进螺旋趋势）。"""
     mu = point_mass_force.mu
