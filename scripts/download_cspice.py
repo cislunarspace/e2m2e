@@ -2,10 +2,10 @@
 
 背景：仓库不启用 ``cspice-sys`` 的 ``downloadcspice`` feature（其从 naif.jpl.nasa.gov 下载
 CSPICE 源码就地编译，国内网络常不可达，构建时 TCP 超时），CSPICE 一律经本脚本从
-e2m2e 的 GitHub Release 下载预编译的 MICE 工具包（``cspice-windows-v1`` /
-``cspice-linux-v1`` / ``cspice-linux-aarch64-v1``），解压后把 ``mice_{platform}`` 目录作为
-``CSPICE_DIR`` 输出。``cspice-sys`` 的 build.rs 检测到 ``CSPICE_DIR`` 即使用之；缺
-``CSPICE_DIR`` 时构建直接报错（见 cspice-sys build.rs 第 21-33 行）。
+e2m2e 的 GitHub Release 下载预编译的 MICE 工具包（release ``cspice-v1`` 的资产
+``cspice-windows.zip`` / ``cspice-linux.zip`` / ``cspice-linux-aarch64.zip``），解压后把
+``mice_{platform}`` 目录作为 ``CSPICE_DIR`` 输出。``cspice-sys`` 的 build.rs 检测到
+``CSPICE_DIR`` 即使用之；缺 ``CSPICE_DIR`` 时构建直接报错（见 cspice-sys build.rs 第 21-33 行）。
 
 资产按「操作系统 × 架构」选择：x86_64 Linux 与 aarch64 Linux 各自独立的 zip
 （``cspice-linux.zip`` / ``cspice-linux-aarch64.zip``），aarch64 库由
@@ -68,14 +68,8 @@ def _asset(platform_key: tuple[str, str]) -> tuple[str, str]:
         return ASSET_BY_PLATFORM[platform_key]
     except KeyError:
         os_name, machine = platform_key
-        hint = ""
-        if (os_name, machine) == ("linux", "aarch64"):
-            hint = (
-                "（aarch64 库需先运行 .github/workflows/cspice-aarch64-build.yml"
-                " 编译并上传 cspice-v1 release）"
-            )
         raise SystemExit(
-            f"暂无 {os_name}/{machine} 的 CSPICE 编译包{hint}：资产表 {sorted(ASSET_BY_PLATFORM)}"
+            f"暂无 {os_name}/{machine} 的 CSPICE 编译包：资产表 {sorted(ASSET_BY_PLATFORM)}"
         ) from None
 
 
