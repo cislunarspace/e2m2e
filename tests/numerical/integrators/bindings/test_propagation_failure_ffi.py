@@ -3,10 +3,10 @@
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.dynamics import CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.dynamics import BCR4BPSystem, CR3BP_Dynamics, CR3BP_System
 from e2m2e.data.constants import Datum
 from e2m2e.exceptions import E2M2EError, PropagationFailure
-from e2m2e.integrators import propagate_cr3bp_py, propagate_with_stm_py
+from e2m2e.integrators import propagate_bcr4bp_py, propagate_cr3bp_py, propagate_with_stm_py
 
 pytestmark = pytest.mark.integrator
 
@@ -29,6 +29,24 @@ def test_rust_ffi_translates_step_collapse_to_propagation_failure():
             initial_state=_collapsing_state(),
             rtol=1e-12,
             atol=1e-12,
+        )
+
+
+def test_bcr4bp_rust_ffi_translates_step_collapse_to_propagation_failure():
+    system = BCR4BPSystem.earth_moon()
+    with pytest.raises(PropagationFailure):
+        propagate_bcr4bp_py(
+            mu=system.mu,
+            mu_sun=system.sun_mass,
+            sun_distance=system.sun_distance,
+            sun_angular_rate=system.sun_angular_rate,
+            sun_phase0=system.sun_phase0,
+            t_span=(0.0, 2.0),
+            t_eval=np.linspace(0.0, 2.0, 21).tolist(),
+            initial_state=_collapsing_state(),
+            rtol=1e-12,
+            atol=1e-12,
+            max_step=0.01,
         )
 
 

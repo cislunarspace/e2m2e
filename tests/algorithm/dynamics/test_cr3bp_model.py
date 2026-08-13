@@ -4,6 +4,8 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
+from e2m2e.algorithm.family.cr3bp_orbits import design_dpo
+
 pytestmark = pytest.mark.theory
 
 
@@ -48,10 +50,17 @@ def test_equations_remain_finite_at_machine_scale_singularity(dynamics):
         assert np.all(np.isfinite(derivative))
 
 
-def test_jacobi_constant_is_conserved_during_propagation(dynamics, sample_state):
-    result = dynamics.propagate(sample_state, (0.0, 2.0), with_jacobi=True)
-    assert result["jacobi_error"] < 1e-10
-    assert len(result["jacobi"]) == len(result["states"])
+def test_jacobi_constant_is_conserved_over_a_periodic_orbit_period(dynamics):
+    """REQ-003：周期 DPO 在完整周期内的 Jacobi 最大漂移不超过 1e-10。"""
+    orbit = design_dpo(20_000.0)
+    result = dynamics.propagate(
+        orbit.states[0],
+        (0.0, orbit.period),
+        t_eval=np.linspace(0.0, orbit.period, 1000),
+        with_jacobi=True,
+    )
+    jacobi = np.asarray(result["jacobi"])
+    assert np.max(np.abs(jacobi - jacobi[0])) < 1e-10
 
 
 def test_jacobi_constant_implementation_agrees_with_system(dynamics, sample_state):
