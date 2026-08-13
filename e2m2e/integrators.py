@@ -17,6 +17,9 @@ from e2m2e.exceptions import RustExtensionUnavailableError
 # 扩展符号在运行时逐个装载；静态类型检查将其视为动态对象。
 if TYPE_CHECKING:
     augmented_eom_7d_py: Any
+    batch_et_to_utc_py: Any
+    batch_j2000_to_synodic_py: Any
+    batch_synodic_to_j2000_py: Any
     build_cr3bp_hamiltonian_py: Any
     check_collision_py: Any
     compute_distance_series_py: Any
@@ -38,6 +41,7 @@ if TYPE_CHECKING:
     propagate_compiled_lowthrust_sensitivity: Any
     propagate_compiled_stm_py: Any
     propagate_cr3bp_py: Any
+    propagate_segments_py: Any
     propagate_cr3bp_stm_py: Any
     propagate_with_state_py: Any
     propagate_with_stm_py: Any
@@ -71,6 +75,9 @@ _RUST_SYMBOLS = (
     "_multistep_step",
     "_rk_step",
     "augmented_eom_7d_py",
+    "batch_et_to_utc_py",
+    "batch_j2000_to_synodic_py",
+    "batch_synodic_to_j2000_py",
     "build_cr3bp_hamiltonian_py",
     "check_collision_py",
     "compute_distance_series_py",
@@ -95,6 +102,7 @@ _RUST_SYMBOLS = (
     "propagate_compiled_stm_py",
     "propagate_cr3bp_py",
     "propagate_cr3bp_stm_py",
+    "propagate_segments_py",
     "propagate_with_state_py",
     "propagate_with_stm_py",
     "reset_ephem_ffi_call_count",
@@ -226,6 +234,9 @@ def require_rust_extension(*required_symbols: str) -> None:
 
 __all__ = [
     "augmented_eom_7d_py",
+    "batch_et_to_utc_py",
+    "batch_j2000_to_synodic_py",
+    "batch_synodic_to_j2000_py",
     "build_cr3bp_hamiltonian_py",
     "check_collision_py",
     "CowellResult",
@@ -259,6 +270,7 @@ __all__ = [
     "propagate_bcr4bp_stm_py",
     "propagate_cr3bp_py",
     "propagate_cr3bp_stm_py",
+    "propagate_segments_py",
     "propagate_with_state_py",
     "propagate_with_stm_py",
     "reset_ephem_ffi_call_count",

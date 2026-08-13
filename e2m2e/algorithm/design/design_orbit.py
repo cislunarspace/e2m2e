@@ -643,11 +643,16 @@ def _design_apolune_segmented(
     var_time: bool = True,
     verbose: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, float]:
-    """分段打靶星历转换（朱彦伟 2026 多重打靶拼接）。
+    """分段打靶星历转换（朱彦伟 2026 多重打靶拼接，Rust 实现）。
 
     将 CR3BP 周期解转换到星历模型：整条 CR3BP tile 按 ``revs_per_group``
-    圈切段，每段独立多重打靶转星历；段数 >1 时分层两两合并（固定首末远月点、
-    内部 seam 自由连续化）直至整条连续。
+    圈切段，每段独立多重打靶转星历；段数 >1 时分层两两合并（合并段全节点
+    自由、最小范数更新，对齐文献）直至整条连续。
+
+    计算全部下沉 Rust ``segmented_shooting_correct``：切段、第 1 步各段
+    打靶（段间独立 rayon 并行）、分层合并（同层配对合并段 rayon 并行）。
+    本函数仅做参数装配与结果归一（此前分段/合并循环在 Python，逐段串行调
+    打靶——#400 性能修复下沉）。
 
     关键配置（实测 Halo/NRHO，对齐文献）：
 
@@ -655,6 +660,11 @@ def _design_apolune_segmented(
       长段节点密、段内约束强，单弧打靶即可收敛且各段不漂离真实动力学；
       1 圈短段各段独立修正后会漂走（seam 跳 ~1e5 km，合并层无法消除——
       STM 条件数分析见 Liu & Liu 2025 §3）。
+    - **合并层**：合并段全节点自由（``fixed_node_mask=None``），LM 最小范数
+      更新对齐文献。固定首末锚定曾致合并层不收敛（#400）：各段独立打靶后
+      seam 不连续，锚定把修正全压给内部节点，60 天合并层停在 7.5e-01 km；
+      去锚定后 60 天合并层收敛到 1.4e-03 km，180 天三层合并全程收敛
+      （5.8e-03 / 5.7e-04 / 1.4e-02 km）。
     - **var_time**：Halo/NRHO 固定节点时刻（False，对齐杨洪伟 2015、
       刘刚 2017）；稳定轨道（DRO 等）保留自由时刻（True）吸收 CR3BP→星历
       的时间偏差。
@@ -675,134 +685,39 @@ def _design_apolune_segmented(
         ``(t_patch, state_patch, max_residual)`` （J2000），整条连续星历轨迹与
         全程各段/合并段的最大打靶残差（km）。
     """
-    from e2m2e.integrators import multiple_shooting_correct_py
+    from e2m2e.integrators import segmented_shooting_correct_py
 
-    n_total = len(t_patch_j2000)
-    n_rev = n_total // points_per_rev
-    # 全程最大残差（各段 + 各合并段打靶的最大值）
-    max_residual = 0.0
-
-    # --- 第 1 步：切段，每段独立打靶转星历 ---
-    seg_t: list[np.ndarray] = []
-    seg_s: list[np.ndarray] = []
-    k = 0
-    while k < n_rev:
-        end = min(k + revs_per_group, n_rev)
-        # 段节点区间 [k*P, end*P]（含末尾，供拼接；首段起于 0）
-        lo = k * points_per_rev
-        hi = end * points_per_rev
-        if hi >= n_total:
-            hi = n_total - 1
-        # 首段含第 0 节点；后续段跳过前一共享节点（段间 seam）
-        if seg_t:
-            lo += 1
-        t_seg = np.asarray(t_patch_j2000[lo : hi + 1], dtype=float)
-        s_seg = np.asarray(state_patch_j2000[lo : hi + 1], dtype=float)
-        if verbose:
-            print(f"  段 {len(seg_t) + 1}: {len(t_seg)} 节点 ({k}-{end} 圈)")
-        try:
-            result = multiple_shooting_correct_py(
-                forces_py,
-                observer,
-                list(t_seg),
-                [list(map(float, x)) for x in s_seg],
-                var_time=var_time,
-                fix_first_node=False,
-                fixed_node_mask=None,
-                max_iter=max_iter,
-                tolerance=tolerance,
-                rtol=1e-10,
-                vel_weight=vel_weight,
-            )
-        except RuntimeError as e:
-            raise DesignNotConvergedError(
-                f"分段打靶段 {len(seg_t) + 1} 积分失败: {e}",
-                cause=FailureCause.INTEGRATION_FAILED,
-            ) from e
-        if result.status is not ConvergenceState.CONVERGED:
-            raise DesignNotConvergedError(
-                f"分段打靶段 {len(seg_t) + 1} 未收敛"
-                f"（残差 {result.max_residual:.3e} km > 容差 {tolerance:.3e} km）",
-                status=result.status,
-                cause=result.cause,
-            )
-        sp = np.asarray(result.state_patch)
-        seg_t.append(np.asarray(result.t_patch, dtype=float))
-        seg_s.append(sp)
-        max_residual = max(max_residual, float(result.max_residual))
-        if verbose:
-            print(f"    残差 {result.max_residual:.2e} km, {result.iterations} 次迭代")
-        k = end
-
-    # --- 第 2 步：远月点分层两两合并 ---
-    # 合并段固定首末两端（远月点锚点），内部 seam 自由连续化。
-    layer = 1
-    while len(seg_t) > 1:
-        merged_t: list[np.ndarray] = []
-        merged_s: list[np.ndarray] = []
-        n_pairs = len(seg_t) // 2
-        if verbose:
-            print(f"  合并第 {layer} 层: {len(seg_t)} 段 -> {n_pairs + len(seg_t) % 2} 段")
-        i = 0
-        while i < len(seg_t):
-            if i + 1 >= len(seg_t):
-                # 奇数段：直接进位（不合并）
-                merged_t.append(seg_t[i])
-                merged_s.append(seg_s[i])
-                i += 1
-                continue
-            # 相邻两段拼接：段 i 全部 + 段 i+1 去首（共享 seam 远月点）
-            t_comb = np.concatenate([seg_t[i], seg_t[i + 1][1:]])
-            s_comb = np.concatenate([seg_s[i], seg_s[i + 1][1:]])
-            n = len(t_comb)
-            # 固定首末两端（远月点锚点）；中间节点自由
-            mask = [False] * n
-            mask[0] = True
-            mask[-1] = True
-            try:
-                result = multiple_shooting_correct_py(
-                    forces_py,
-                    observer,
-                    list(t_comb),
-                    [list(map(float, x)) for x in s_comb],
-                    var_time=var_time,
-                    fix_first_node=False,
-                    fixed_node_mask=mask,
-                    max_iter=max_iter,
-                    tolerance=tolerance,
-                    rtol=1e-10,
-                    vel_weight=vel_weight,
-                )
-            except RuntimeError as e:
-                # 合并段打靶失败：整条轨道在此无法拼接连续，明确报错而非
-                # 静默回退（回退保留两段会让 seam 处轨道不连续，产出错误结果）
-                raise DesignNotConvergedError(
-                    f"分层合并第 {layer} 层段打靶积分失败: {e}",
-                    cause=FailureCause.INTEGRATION_FAILED,
-                ) from e
-            if result.status is not ConvergenceState.CONVERGED:
-                raise DesignNotConvergedError(
-                    f"分层合并第 {layer} 层段未收敛"
-                    f"（残差 {result.max_residual:.3e} km > 容差 {tolerance:.3e} km）",
-                    status=result.status,
-                    cause=result.cause,
-                )
-            spm = np.asarray(result.state_patch)
-            merged_t.append(np.asarray(result.t_patch, dtype=float))
-            merged_s.append(spm)
-            max_residual = max(max_residual, float(result.max_residual))
-            if verbose:
-                print(
-                    f"    合并段 {n} 节点: 残差 {result.max_residual:.2e} km, "
-                    f"{result.iterations} 次迭代"
-                )
-            i += 2
-        seg_t, seg_s = merged_t, merged_s
-        layer += 1
-
-    all_t = seg_t[0]
-    all_s = seg_s[0]
-    return np.asarray(all_t, dtype=float), np.asarray(all_s, dtype=float), max_residual
+    try:
+        result = segmented_shooting_correct_py(
+            forces_py,
+            observer,
+            list(t_patch_j2000),
+            [list(map(float, x)) for x in state_patch_j2000],
+            revs_per_group=revs_per_group,
+            per_rev=points_per_rev,
+            var_time=var_time,
+            max_iter_per_segment=max_iter,
+            tolerance=tolerance,
+            rtol=1e-10,
+            vel_weight=vel_weight,
+            verbose=verbose,
+        )
+    except RuntimeError as e:
+        raise DesignNotConvergedError(
+            f"分段打靶拼接积分失败: {e}",
+            cause=FailureCause.INTEGRATION_FAILED,
+        ) from e
+    if result.status is not ConvergenceState.CONVERGED:
+        raise DesignNotConvergedError(
+            f"{result.message}（容差 {tolerance:.3e} km）",
+            status=result.status,
+            cause=result.cause,
+        )
+    return (
+        np.asarray(result.t_patch, dtype=float),
+        np.asarray(result.state_patch, dtype=float),
+        float(result.max_residual),
+    )
 
 
 def _design_elfo(
@@ -1190,12 +1105,20 @@ def design_orbit(
                 verbose=verbose,
             )
 
-            # 逐段积分填满 et_grid：每段从修正后节点初值积分到下一节点。
-            # 中间段 mask 用右开区间（seam 整点只归后段），相邻段 t_eval 无
-            # 重叠；最后一段闭区间、t_span 终点延伸到 et_grid 尾部——打靶节点
-            # 采样不含圈终点（endpoint=False），et_grid 尾部可能超出最后节点，
+            # 逐段积分填满 et_grid（下沉 Rust propagate_segments_py 并发积分，
+            # #400 性能修复）：每段从修正后节点初值积分到下一节点。中间段
+            # mask 用右开区间（seam 整点只归后段），相邻段 t_eval 无重叠；
+            # 最后一段闭区间、t_span 终点延伸到 et_grid 尾部——打靶节点采样
+            # 不含圈终点（endpoint=False），et_grid 尾部可能超出最后节点，
             # 右开会把尾部点排除在段外，星历缺尾段数据（长度断言报错）。
-            states_list: list[np.ndarray] = []
+            # Rust 侧输出逐点对应 t_eval（不追加段终点），无需截断——此前
+            # ForceModel._prepare_t_eval 追加 tf 使输出多 1 点（段终点状态，
+            # 不在 et_grid 上），截断丢掉才能保证 states_dense 与 et_grid
+            # 严格对齐（位置-时间错位回归 #398）。
+            seg_t0_list: list[float] = []
+            seg_t1_list: list[float] = []
+            seg_states_list: list[np.ndarray] = []
+            t_eval_list: list[np.ndarray] = []
             for i in range(len(t_patch_long) - 1):
                 seg_t0, seg_t1 = t_patch_long[i], t_patch_long[i + 1]
                 is_last = i == len(t_patch_long) - 2
@@ -1208,24 +1131,32 @@ def design_orbit(
                 t_eval_seg = et_grid[mask]
                 if len(t_eval_seg) == 0:
                     continue
-                out_seg = fm.propagate(
-                    s_patch_long[i],
-                    (float(seg_t0), float(seg_end)),
-                    t_eval=t_eval_seg,
-                    max_steps=500_000,
-                )
-                # ForceModel._prepare_t_eval 会在 t_eval 末尾自动追加段终点 tf，
-                # 输出比 t_eval 多 1 点（段终点状态，不在 et_grid 上）。截断丢掉，
-                # 保证 states_dense 与 et_grid 严格对齐——否则星历位置数组比时间
-                # 网格多出段数个点，batch_j2000_to_synodic 按索引配对位置与旋转
-                # 时刻，错位逐段累积，会合系曲线一圈一圈偏离 Halo 轨道。
-                states_list.append(np.asarray(out_seg["states"], dtype=float)[: len(t_eval_seg)])
-            if not states_list:
+                seg_t0_list.append(float(seg_t0))
+                seg_t1_list.append(float(seg_end))
+                seg_states_list.append(s_patch_long[i])
+                t_eval_list.append(t_eval_seg)
+            if not seg_t0_list:
                 raise DesignNotConvergedError(
                     "segmented 拼接未生成任何星历点",
                     cause=FailureCause.INTEGRATION_FAILED,
                 )
-            states_dense = np.concatenate(states_list, axis=0)
+            from e2m2e.integrators import propagate_segments_py
+
+            states_dense = np.concatenate(
+                [
+                    np.asarray(seg_states, dtype=float)
+                    for seg_states in propagate_segments_py(
+                        "EARTH",
+                        forces_py,
+                        seg_t0_list,
+                        seg_t1_list,
+                        [list(map(float, s)) for s in seg_states_list],
+                        [list(map(float, t)) for t in t_eval_list],
+                        rtol=fm.rtol,
+                    )
+                ],
+                axis=0,
+            )
             # 右开区间下段间无重叠，无需去重；去重反而会掩蔽 mask 回归（若改回
             # 闭区间，seam 重复点被删、长度恢复一致，长度断言失效）。
         finally:
