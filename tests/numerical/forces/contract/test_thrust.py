@@ -1,6 +1,7 @@
-"""ImpulsiveBurn / FiniteBurn 单元测试。
+"""ImpulsiveBurn / FiniteBurn 定义与 API 契约。
 
-覆盖冻结拷贝、零推力、常值推力、固定/可调用方向与归一化。
+覆盖冻结拷贝、零推力、常值推力、固定/可调用方向与归一化、构造校验。低推力
+传播物理见 ``physics/test_thrust.py``。
 
 低推力功能尚未开发完成（Facade 任务入口占位，Rust 传播路径已接入）；本文件标记
 ``low_thrust``，本轮检查排除在绿门外。
@@ -11,32 +12,9 @@ import dataclasses
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.forces import ForceModel
 from e2m2e.algorithm.forces.thrust import FiniteBurn, ImpulsiveBurn
 
 pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
-
-
-class _FakeSystem:
-    """仅用于传播测试的最小 System 桩。"""
-
-    def __init__(self):
-        self.coordinate_system = object()
-
-    @property
-    def frame(self):
-        from e2m2e.mbse.data.enums import ReferenceFrame
-
-        return ReferenceFrame.J2000
-
-    @property
-    def unit_system(self):
-        from e2m2e.mbse.data.enums import UnitSystem
-
-        return UnitSystem.SI
-
-    def gravitational_parameter(self, body):
-        return 398600.4415
 
 
 def test_impulsive_burn_stores_copied_delta_v_and_is_frozen():
@@ -123,36 +101,3 @@ def test_finite_burn_validation():
     burn = FiniteBurn(lambda t: -5.0, np.array([1.0, 0.0, 0.0]), 1000.0)
     with pytest.raises(ValueError, match="thrust"):
         burn.compute_acceleration(0.0, np.zeros(6), system=None)
-
-
-def test_finite_burn_spiral_raises_semi_major_axis(point_mass_force):
-    """沿速度方向低推力传播 → 半长轴持续提升（电推进螺旋趋势）。"""
-    mu = point_mass_force.mu
-    r0 = 6678.0  # LEO 300km
-    v_circ = np.sqrt(mu / r0)
-    y0 = np.array([r0, 0.0, 0.0, 0.0, v_circ, 0.0])
-
-    burn = FiniteBurn(
-        thrust_profile=lambda t: 2.0,  # N
-        direction=lambda t, s: s[3:6],  # 沿速度方向（可调用）
-        mass=1000.0,  # kg
-    )
-    fm = ForceModel(_FakeSystem(), forces=[point_mass_force, burn])
-
-    period = 2.0 * np.pi * np.sqrt(r0**3 / mu)
-    n_orbits = 3
-    result = fm.propagate(
-        y0, (0.0, n_orbits * period), t_eval=np.linspace(0.0, n_orbits * period, 60)
-    )
-
-    states = result["states"]
-    r = np.linalg.norm(states[:, :3], axis=1)
-    v = np.linalg.norm(states[:, 3:], axis=1)
-    energy = 0.5 * v**2 - mu / r
-    semi_major = -mu / (2.0 * energy)
-
-    # 半长轴末端 > 起点
-    assert semi_major[-1] > semi_major[0]
-    # 整体趋势向上（线性拟合斜率 > 0）
-    slope = np.polyfit(np.arange(semi_major.size), semi_major, 1)[0]
-    assert slope > 0.0

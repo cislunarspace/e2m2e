@@ -49,3 +49,12 @@ def test_srp_to_rust_spec_with_shadow() -> None:
     srp = SolarRadiationPressure(area=5.0, mass=500.0, cr=1.2, shadow=shadow)
     spec = srp.to_rust_spec(None)
     assert spec == ("srp", 5.0, 500.0, 1.2, ["EARTH", "MOON"])
+
+
+def test_srp_stores_injected_shadow() -> None:
+    """SRP 持有注入的阴影模型实例。"""
+    from e2m2e.algorithm.forces.shadow import ConicalShadowModel
+
+    shadow = ConicalShadowModel(bodies=["EARTH", "MOON"])
+    srp = SolarRadiationPressure(area=10.0, mass=1000.0, shadow=shadow)
+    assert srp.shadow is shadow

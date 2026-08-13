@@ -1,8 +1,8 @@
-"""ECOM 光压模型的 Rust 编译传播验证。
+"""ECOM 光压模型的 Rust 编译传播物理验证。
 
 ECOM 的 D-Y-B 几何、阴影和加速度计算均在 Rust 内执行，Python 侧只保存
-配置并序列化为力元组。因此本模块以同一 SPICE 场景下的短弧传播结果验证
-Rust 端到端契约；不再保留不能覆盖运行路径的 Python 参考公式。
+配置并序列化为力元组。本文件以同一 SPICE 场景下的短弧传播结果验证
+Rust 端到端物理：零 DYB 退化点质量、DYB[0] 退化 cannonball、周期项改变轨迹。
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ from numpy.testing import assert_allclose
 from e2m2e.algorithm.forces import ForceModel
 from e2m2e.algorithm.forces.ecom_srp import EcomSolarRadiationPressure
 from e2m2e.algorithm.forces.point_mass_gravity import PointMassGravity
-from e2m2e.algorithm.forces.shadow import ConicalShadowModel
 from e2m2e.algorithm.forces.srp import SolarRadiationPressure
 from tests.numerical.forces.conftest import EARTH_MU
 
@@ -32,32 +31,6 @@ def _propagate(system, force, t_eval):
     model = ForceModel(system, [PointMassGravity("EARTH", mu=EARTH_MU), force])
     state = np.array([42164.0, 0.0, 0.0, 0.0, 3.074666284127684, 0.0])
     return model.propagate(state, (float(t_eval[0]), float(t_eval[-1])), t_eval=t_eval)
-
-
-class TestEcomConstruction:
-    """构造与配置序列化。"""
-
-    def test_dyb_length_must_be_9(self):
-        with pytest.raises(ValueError, match="9 elements"):
-            EcomSolarRadiationPressure(dyb=[0.01] * 8)
-
-    def test_dyb_returns_copy(self):
-        ecom = EcomSolarRadiationPressure(dyb=[0.01] * 9)
-        returned = ecom.dyb
-        returned[0] = 999.0
-        assert ecom.dyb[0] == 0.01
-
-    def test_to_rust_spec_preserves_dyb_and_shadow_bodies(self):
-        dyb = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
-        ecom = EcomSolarRadiationPressure(
-            dyb=dyb,
-            shadow=ConicalShadowModel(bodies=["EARTH", "MOON"]),
-        )
-
-        assert ecom.to_rust_spec() == ("ecom_srp", dyb, ["EARTH", "MOON"])
-        assert (
-            EcomSolarRadiationPressure.from_config(ecom.to_config()).to_config() == ecom.to_config()
-        )
 
 
 class TestEcomCompiledPropagation:

@@ -1,9 +1,11 @@
-"""ThirdBodyGravity 测试（issue #182）。
+"""ThirdBodyGravity 物理规律验证（issue #182）。
 
 验证第三体引力摄动模型：
   A. Rust 单点 ``third_body_acceleration`` 与 EphemerisDynamics 第三体分支一致；
   B. 力分解路径 (ForceModel) 与 EphemerisDynamics 传播同一条 cislunar
      轨道，末状态位置差自洽。
+
+定义与序列化契约见 ``contract/test_third_body_gravity.py``。
 """
 
 from __future__ import annotations
@@ -16,7 +18,6 @@ from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
 from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
 from e2m2e.algorithm.forces import (
     ForceModel,
-    PhysicalModel,
     PointMassGravity,
     ThirdBodyGravity,
 )
@@ -68,42 +69,6 @@ def _third_body_contribution(dynamics, t, r_sc, body):
     r_bsc_norm = max(float(np.linalg.norm(r_bsc)), dynamics.MIN_DISTANCE)
     r_ob_norm = max(float(np.linalg.norm(r_ob)), dynamics.MIN_DISTANCE)
     return -gm * (r_bsc / r_bsc_norm**3 + r_ob / r_ob_norm**3)
-
-
-# =============================================================================
-# 基本接口
-# =============================================================================
-class TestThirdBodyGravityInterface:
-    """测试类的基本构造与接口。"""
-
-    def test_is_physical_model(self):
-        """ThirdBodyGravity 应是 PhysicalModel 子类。"""
-        assert issubclass(ThirdBodyGravity, PhysicalModel)
-
-    def test_body_uppercased(self):
-        """body 应被存为大写。"""
-        force = ThirdBodyGravity(body="moon")
-        assert force.body == "MOON"
-
-    def test_to_rust_spec_serializes_body_and_mu(self, spice_eph_system):
-        """to_rust_spec 返回 ("third_body", body, mu)。
-
-        body 字段是 NAIF ID 字符串：spiceypy 可用且天体在 boddef 注册时
-        （MOON→"301"），否则原样名字。环境固定 spiceypy>=8.1.0，故 MOON
-        解析为 "301"。
-        """
-        force = ThirdBodyGravity("MOON")
-        spec = force.to_rust_spec(spice_eph_system)
-        assert spec[0] == "third_body"
-        assert spec[1] == "301"
-        assert spec[2] == pytest.approx(spice_eph_system.get_gm("MOON"))
-
-    def test_no_origin_parameter_exposed(self):
-        """构造函数不应暴露 origin 参数（接口约定）。"""
-        import inspect
-
-        sig = inspect.signature(ThirdBodyGravity.__init__)
-        assert "origin" not in sig.parameters
 
 
 # =============================================================================

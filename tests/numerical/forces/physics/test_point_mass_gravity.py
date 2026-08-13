@@ -1,6 +1,7 @@
-"""ForceModel 二体传播测试。
+"""PointMassGravity 物理规律验证。
 
-验证点质量圆轨道一个周期闭合与能量守恒。
+点质量圆轨道一个周期闭合（二体闭式解对照）与比机械能守恒。契约测试见
+``contract/test_point_mass_gravity.py``。
 """
 
 import numpy as np
@@ -34,8 +35,8 @@ class _FakeSystem:
         return 398600.4415
 
 
-def test_propagate_circular_orbit_one_period(point_mass_force):
-    """点质量圆轨道传播一个周期应回到近似初始状态。"""
+def test_point_mass_gravity_rust_propagation_matches_two_body_solution(point_mass_force):
+    """Rust compiled 传播点质量圆轨道，一个周期后回到初值（二体闭式解）。"""
     system = _FakeSystem()
     fm = ForceModel(system, forces=[point_mass_force])
 
@@ -43,13 +44,13 @@ def test_propagate_circular_orbit_one_period(point_mass_force):
     r = 6778.0  # km
     v = np.sqrt(mu / r)
     period = 2.0 * np.pi * np.sqrt(r**3 / mu)
-
     y0 = np.array([r, 0.0, 0.0, 0.0, v, 0.0])
-    result = fm.propagate(y0, (0.0, period), t_eval=np.linspace(0.0, period, 5))
+
+    result = fm.propagate(y0, (0.0, period), t_eval=np.array([0.0, period]))
 
     final = result["states"][-1]
-    np.testing.assert_allclose(final[:3], y0[:3], rtol=1e-4, atol=1e-8)
-    np.testing.assert_allclose(final[3:], y0[3:], rtol=1e-4, atol=1e-8)
+    np.testing.assert_allclose(final[:3], y0[:3], rtol=1e-6, atol=1e-8)
+    np.testing.assert_allclose(final[3:], y0[3:], rtol=1e-6, atol=1e-8)
 
 
 def test_propagate_energy_conservation(point_mass_force):

@@ -42,23 +42,7 @@ def _build_lowthrust_problem(system, thrust, isp, mass, direction_kind="velocity
 
 
 @pytest.mark.spice
-def test_variable_mass_events_are_rejected_before_rust_propagation(earth_icrf_system):
-    """可变质量低推力带 events 时必须在进入 Rust 路径前显式报错。"""
-    fm, y0 = _build_lowthrust_problem(
-        earth_icrf_system, thrust=0.1, isp=3000.0, mass=1000.0, direction_kind="fixed"
-    )
-    et0 = earth_icrf_system.spice.utc_to_et("2025-06-21T11:00:06")
-
-    with pytest.raises(NotImplementedError, match="事件传播"):
-        fm.propagate(
-            y0,
-            (et0, et0 + 60.0),
-            events=[lambda _t, state: float(state[0])],
-        )
-
-
-@pytest.mark.spice
-def test_variable_mass_thrustsemi_major_axis_rate(earth_icrf_system):
+def test_variable_mass_thrust_semi_major_axis_rate(earth_icrf_system):
     """可变质量低推力圆轨道提升：半长轴变化率与解析公式误差 < 5%。"""
     system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")

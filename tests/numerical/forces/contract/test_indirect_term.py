@@ -1,14 +1,12 @@
-"""IndirectTerm 测试。
+"""IndirectTerm 定义与序列化契约。
 
-Python 单点 ``compute_acceleration`` 已按 issue #378 删除；本文件验证
-``to_rust_spec`` 序列化与 Rust 单点 ``indirect_term_acceleration`` 绑定。
+验证构造校验、body 归一化、``to_rust_spec`` 序列化与 mu fallback；Rust 单点
+``indirect_term_acceleration`` 的物理对照在 ``physics/test_indirect_term.py``。
 """
 
-import numpy as np
 import pytest
 
 from e2m2e.algorithm.forces import IndirectTerm
-from e2m2e.integrators import indirect_term_acceleration
 
 pytestmark = pytest.mark.force
 
@@ -76,15 +74,3 @@ def test_indirect_term_is_physical_model():
     from e2m2e.algorithm.forces import PhysicalModel
 
     assert issubclass(IndirectTerm, PhysicalModel)
-
-
-@pytest.mark.spice
-def test_indirect_term_rust_binding_matches_point_mass_formula(spice_manager, reference_epoch):
-    """Rust ``indirect_term_acceleration`` 与 -mu·r/|r|³ 公式一致（SPICE 取位）。"""
-    et = spice_manager.utc_to_et(reference_epoch)
-    mu = 4902.800122
-    acc = indirect_term_acceleration(et, "MOON", "EARTH", mu)
-
-    r_moon = np.asarray(spice_manager.get_body_position("MOON", et, "J2000", "EARTH"), dtype=float)
-    expected = -mu / np.linalg.norm(r_moon) ** 3 * r_moon
-    np.testing.assert_allclose(acc, expected, rtol=1e-10)

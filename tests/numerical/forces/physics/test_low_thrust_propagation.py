@@ -1,7 +1,7 @@
 """低推力传播端到端验证。
 
-验证半长轴变化率与解析公式误差 < 5%、7 天螺旋轨道演化、
-以及 FiniteBurn 配置 round-trip。
+验证半长轴变化率与解析公式误差 < 5%、7 天螺旋轨道演化。
+FiniteBurn 配置 round-trip 见 ``config/test_low_thrust_config_propagation.py``。
 """
 
 import numpy as np
@@ -18,7 +18,7 @@ pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
 
 
 @pytest.mark.spice
-def test_low_thrust_circular_orbitsemi_major_axis_rate(earth_icrf_system):
+def test_low_thrust_circular_orbit_semi_major_axis_rate(earth_icrf_system):
     """低推力圆轨道提升：半长轴变化率与解析公式误差 < 5%。"""
     system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")
@@ -58,55 +58,4 @@ def test_low_thrust_circular_orbitsemi_major_axis_rate(earth_icrf_system):
     assert relative_error < 0.05, (
         f"半长轴变化率偏差过大: measured={a_final:.3f} km, "
         f"theory={a_theory:.3f} km, error={relative_error:.1%}"
-    )
-
-
-@pytest.mark.spice
-def test_low_thrust_config_round_trip(earth_icrf_system):
-    """FiniteBurn 配置往返后，低推力传播结果一致。"""
-    system = earth_icrf_system
-    mu = system.gravitational_parameter("EARTH")
-
-    r_earth = EARTH_RE
-    a0 = r_earth + 300.0
-    y0 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
-
-    thrust = 0.1
-    mass = 1000.0
-    duration_s = 1.0 * 86400.0
-
-    from e2m2e.algorithm.forces.force_config import build_force
-
-    burn_original = FiniteBurn(
-        thrust_profile=build_force(
-            "FiniteBurn",
-            {
-                "thrust_profile": {"kind": "constant", "thrust": thrust},
-                "direction": {"kind": "fixed", "vector": [0.0, 1.0, 0.0]},
-                "mass": mass,
-            },
-        ).thrust_profile,
-        direction=[0.0, 1.0, 0.0],
-        mass=mass,
-    )
-    fm_original = ForceModel(
-        system,
-        forces=[GravityField(body="EARTH", degree=0, order=0), burn_original],
-    )
-
-    config = fm_original.to_config()
-    fm_restored = ForceModel.from_config(config, system)
-
-    et0 = system.spice.utc_to_et("2025-06-21T11:00:06")
-    t_span = (et0, et0 + duration_s)
-    t_eval = np.array([et0, et0 + duration_s])
-
-    result_original = fm_original.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
-    result_restored = fm_restored.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
-
-    np.testing.assert_allclose(
-        result_original["states"][-1],
-        result_restored["states"][-1],
-        rtol=1e-12,
-        atol=1e-12,
     )

@@ -1,6 +1,7 @@
-"""ConicalShadowModel 圆锥阴影模型测试。
+"""ConicalShadowModel 圆锥阴影模型的几何物理验证。
 
-覆盖纯几何路径：全光照、深本影与半影中间值。
+覆盖纯几何路径：全光照、深本影、半影（透镜公式对照）、环食、守卫分支，
+以及多遮挡体合成（GMT-6543）。构造与半径表契约见 ``contract/test_shadow.py``。
 """
 
 from __future__ import annotations
@@ -190,37 +191,3 @@ def test_combine_one_full_one_partial_takes_min() -> None:
     model = ConicalShadowModel()
     flux = _combine(model, [1.0, 0.6], [0.01, 0.01], [0.0, 0.05])
     assert flux == pytest.approx(0.6)
-
-
-# --------------------------- 构造与半径表 ---------------------------
-
-
-def test_default_bodies_is_earth_only() -> None:
-    """默认遮挡体仅地球。"""
-    model = ConicalShadowModel()
-    assert model.bodies == ("EARTH",)
-
-
-def test_bodies_normalized_uppercase() -> None:
-    """遮挡体名大写规范化。"""
-    model = ConicalShadowModel(bodies=["earth", "Moon"])
-    assert model.bodies == ("EARTH", "MOON")
-
-
-def test_radii_table_has_earth_and_moon() -> None:
-    """半径表含地球与月球（验收：支持地球和月球两个遮挡天体）。"""
-    model = ConicalShadowModel(bodies=["EARTH", "MOON"])
-    assert model.body_radius("EARTH") == pytest.approx(6378.1363)
-    assert model.body_radius("MOON") == pytest.approx(1737.4)
-
-
-def test_unknown_body_without_override_raises() -> None:
-    """未知遮挡体未提供 radii 覆盖 → ValueError。"""
-    with pytest.raises(ValueError, match="MARS"):
-        ConicalShadowModel(bodies=["MARS"])
-
-
-def test_unknown_body_with_radii_override_ok() -> None:
-    """未知遮挡体通过 radii 覆盖可构造。"""
-    model = ConicalShadowModel(bodies=["MARS"], radii={"MARS": 3389.5})
-    assert model.body_radius("MARS") == pytest.approx(3389.5)

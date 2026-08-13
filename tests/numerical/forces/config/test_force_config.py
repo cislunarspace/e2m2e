@@ -12,13 +12,16 @@ from e2m2e.algorithm.forces import (
     FiniteBurn,
     ForceModel,
     GravityField,
+    RelativisticCorrection,
     SolarRadiationPressure,
 )
 from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
 from e2m2e.algorithm.forces.force_config import (
     NotSerializableError,
+    build_force,
     dump_force_config,
     load_force_config,
+    serialize_force,
 )
 
 pytestmark = pytest.mark.force
@@ -359,3 +362,32 @@ def test_finite_burn_invalid_direction_frame_from_config_raises():
 
     with pytest.raises(ValueError, match="direction_frame"):
         ForceModel.from_config(config_dict, system)
+
+
+def test_relativistic_correction_round_trip():
+    """RelativisticCorrection 支持 serialize_force / build_force 配置往返。"""
+    original = RelativisticCorrection(
+        central_body="Earth",
+        primary_body="Sun",
+        enable_schwarzschild=True,
+        enable_lense_thirring=False,
+        enable_de_sitter=True,
+        angular_momentum_vector=[0.0, 0.0, 7.5e33],
+        body_radius=6378.137,
+        c=299792.458,
+        gamma=1.0,
+    )
+
+    config = serialize_force(original)
+    restored = build_force(config["type"], config["params"])
+
+    assert isinstance(restored, RelativisticCorrection)
+    assert restored.central_body == "EARTH"
+    assert restored.primary_body == "SUN"
+    assert restored.enable_schwarzschild is True
+    assert restored.enable_lense_thirring is False
+    assert restored.enable_de_sitter is True
+    np.testing.assert_array_equal(restored.angular_momentum_vector, np.array([0.0, 0.0, 7.5e33]))
+    assert restored.body_radius == pytest.approx(6378.137)
+    assert restored.c == pytest.approx(299792.458)
+    assert restored.gamma == pytest.approx(1.0)
