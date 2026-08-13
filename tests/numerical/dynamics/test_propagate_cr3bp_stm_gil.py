@@ -30,6 +30,7 @@ import pytest
 
 pytest.importorskip("e2m2e._integrators")
 
+from e2m2e.data.constants import Datum
 from e2m2e.integrators import propagate_cr3bp_stm_py
 
 pytestmark = pytest.mark.integrator
@@ -38,8 +39,8 @@ pytestmark = pytest.mark.integrator
 if propagate_cr3bp_stm_py is None:
     pytest.skip("propagate_cr3bp_stm_py 需要 Rust 扩展构建", allow_module_level=True)
 
-# 地月质量参数（无量纲）
-MU_EARTH_MOON = 0.0121505856
+# 地月质量参数（无量纲）：DE421 基准（Datum.DE421）。
+MU_EARTH_MOON = Datum.DE421.mu
 
 
 def _l4_state() -> list[float]:
