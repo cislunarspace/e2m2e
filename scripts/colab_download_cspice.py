@@ -18,13 +18,13 @@ import requests
 from google.colab import drive
 
 # 1. 挂载 Google Drive
-drive.mount('/content/drive')
+drive.mount("/content/drive")
 
 
 def download_file(url, filename, save_dir):
     """下载到临时文件再改名落盘：中断的下载不残留半截文件。"""
     save_path = os.path.join(save_dir, filename)
-    tmp_path = save_path + '.part'
+    tmp_path = save_path + ".part"
     if os.path.exists(save_path):
         size_mb = os.path.getsize(save_path) / 1024 / 1024
         print(f"文件已存在，跳过下载: {filename} ({size_mb:.1f} MB)")
@@ -33,7 +33,7 @@ def download_file(url, filename, save_dir):
     try:
         response = requests.get(url, stream=True, timeout=60)
         response.raise_for_status()
-        with open(tmp_path, 'wb') as f:
+        with open(tmp_path, "wb") as f:
             for chunk in response.iter_content(chunk_size=1024 * 1024):
                 f.write(chunk)
         os.replace(tmp_path, save_path)
