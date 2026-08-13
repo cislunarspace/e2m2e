@@ -50,11 +50,7 @@ from ..coordinate.coordinate_system import CoordinateSystem
 from ..coordinate.standard_axes import ICRSAxes
 from ..coordinate.standard_origins import CelestialBodyOrigin
 from ..coordinate.synodic_j2000 import SynodicJ2000System
-from ..dynamics import CR3BP_Dynamics, EphemerisDynamics, EphemerisSystem
-from ..ephemeris_correction import (
-    EphemerisCorrectionResult,
-    correct_ephemeris_patch_points,
-)
+from ..dynamics import CR3BP_Dynamics, EphemerisSystem
 from ..family.cr3bp_orbits import (
     design_axial,
     design_dpo,
@@ -68,7 +64,7 @@ from ..family.cr3bp_orbits import (
     design_triangular,
     earth_moon_system,
 )
-from ..results import ResultStatus, StageRecord
+from ..results import EphemerisCorrectionResult, ResultStatus, StageRecord
 from ..solver.multiple_shooting import sample_patch_points_perilune_clustered
 
 if TYPE_CHECKING:
@@ -916,8 +912,8 @@ def design_orbit(
     dyb = request.dyb
     correction_method = request.correction_method
     correction_revolutions = request.correction_revolutions
-    # Halo/NRHO 不稳定：two_level/standard 的"修正 1 圈 + 自由外推"必发散，
-    # homotopy 不支持 ForceModel。统一走 segmented（全程分段打靶），产出
+    # Halo/NRHO 不稳定：two_level/standard 的"修正 1 圈 + 自由外推"必发散。
+    # 统一走 segmented（全程分段打靶），产出
     # 不发散的标称参考轨道。圈间漂移是固有准周期特征，由 station_keeping
     # 处理（架构分工见 docs/architecture/architecture.md §总体定位）。
     if sel in ("HALO", "NRHO") and correction_method != "segmented":
@@ -1012,7 +1008,7 @@ def design_orbit(
         # --- segmented：论文式分段打靶拼接（默认方法）---
         # 整条 CR3BP 多圈 tile → 逐段独立转星历 → 远月点分层合并 → 逐段
         # 积分填满 et_grid。不再单点自由外推整个 duration（旧方法发散根因）。
-        from ..ephemeris_correction.types import EphemerisCorrectionResult
+        from ..results import EphemerisCorrectionResult
 
         # 收集 Rust force 序列。跳过 RelativisticCorrection（与
         # ForceModel._STM_UNSUPPORTED_TYPES 对齐）：相对论修正的 STM
@@ -1196,65 +1192,15 @@ def design_orbit(
     # 改走 Rust 打靶 + vel_weight（=pos_tol/vel_tol）：速度项加权后在容差尺度
     # 与位置可比，LM 真正压速度连续到 ≤0.01 m/s，修正解落在准周期轨道上，
     # 稳定轨道自由外推有界。同时全程预制星历表（cspice 缓存），不再逐步 FFI。
-    if correction_method == "homotopy":
-        # homotopy 同伦插值建立在质点 N 体语义上，不支持 ForceModel——保留旧 Python 路径
-        eph_system = EphemerisSystem(bodies=bodies, spice=spice, origin="EARTH")
-        eph_dynamics = EphemerisDynamics(system=eph_system)
-        eph_dynamics.rtol = 1e-12
-        eph_dynamics.atol = 1e-12
-        eph_dynamics.max_step = 600.0
-        correction = correct_ephemeris_patch_points(
-            method="homotopy",
-            dynamics=eph_dynamics,
-            t_patch=t_patch_j2000,
-            state_patch=state_patch_j2000,
-            tolerance=CORRECTION_TOL_KM,
-            max_iter=50,
-            verbose=verbose,
-            n_workers=1,
-            kernel_dir=kernel_dir,
-            base_bodies=["EARTH", "MOON"],
-        )
-        if correction.status is not ConvergenceState.CONVERGED:
-            raise DesignNotConvergedError(
-                f"{sel} 星历修正（homotopy）未收敛：迭代 {correction.iterations} 次，"
-                f"最大残差 {correction.max_residual:.3e} km",
-                status=correction.status,
-                cause=correction.cause,
-            )
-        t0_corr = float(correction.t_patch[0])
-        out = fm.propagate(
-            correction.state_patch[0],
-            (min(t0_corr, et0), float(et_grid[-1])),
-            t_eval=et_grid,
-            max_steps=2_000_000,
-        )
-        ephemeris = _build_ephemeris_table(
-            spice, syn_j2000, et0, et_grid, np.asarray(out["states"], dtype=float)
-        )
-        return OrbitDesignResult(
-            orbit_type=sel,
-            epoch_utc=epoch_iso,
-            duration_day=duration_day,
-            output_step_sec=float(output_step),
-            initial_state=np.asarray(correction.state_patch[0], dtype=float),
-            ephemeris=ephemeris,
-            cr3bp_orbit=cr3bp_orbit,
-            cr3bp_jacobi=jacobi,
-            correction=correction,
-            force_config=force_config,
-            stages=_design_stages(),
-        )
-
-    # 默认路径（稳定轨道）：Rust 多重打靶 + vel_weight
+    # --- 稳定轨道路径（DRO 等）：Rust 多重打靶（速度加权）+ 长期预报 ---
     if correction_method not in ("two_level", "standard", "rust"):
         raise ValueError(
-            "correction_method 需为 segmented / homotopy / two_level / standard / rust，"
+            "correction_method 需为 segmented / two_level / standard / rust，"
             f"当前 {correction_method!r}"
         )
     from e2m2e.integrators import multiple_shooting_correct_py as _msc
 
-    from ..ephemeris_correction.types import EphemerisCorrectionResult
+    from ..results import EphemerisCorrectionResult
 
     forces_py = []
     for entry in fm.list_forces():
