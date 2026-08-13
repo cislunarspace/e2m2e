@@ -10,22 +10,23 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.forces.shadow import ConicalShadowModel
+from e2m2e.data.constants import AU_KM
+from e2m2e.data.constants.bodies import EARTH, SUN
 
 pytestmark = pytest.mark.force
 
-
-_AU_KM = 149597870.691
-_R_EARTH = 6378.1363
-_R_SUN = 695700.0
+# 遮挡体半径与阴影模型内部表同源（shadow._BODY_RADII_KM 亦取这些常量）。
+_R_EARTH = EARTH.gravity_ref_radius_km
+_R_SUN = SUN.mean_radius_km
 
 
 def test_body_flux_factor_full_sun_returns_one() -> None:
     """SC 远离遮挡体、日体角距远大于视角径之和 → 全光照 1.0。"""
     model = ConicalShadowModel()
     sun_pos = np.array([0.0, 0.0, 0.0])
-    body_pos = np.array([_AU_KM, 0.0, 0.0])
+    body_pos = np.array([AU_KM, 0.0, 0.0])
     # 体正上方 10000 km，明显在阴影锥外
-    sc_pos = np.array([_AU_KM, 1.0e7, 0.0])
+    sc_pos = np.array([AU_KM, 1.0e7, 0.0])
 
     flux = model._body_flux_factor(sc_pos, body_pos, sun_pos, _R_EARTH, _R_SUN)
     assert flux == pytest.approx(1.0)
@@ -35,9 +36,9 @@ def test_body_flux_factor_deep_umbra_returns_zero() -> None:
     """SC 在遮挡体背日轴上、深本影锥内 → 0.0。"""
     model = ConicalShadowModel()
     sun_pos = np.array([0.0, 0.0, 0.0])
-    body_pos = np.array([_AU_KM, 0.0, 0.0])
+    body_pos = np.array([AU_KM, 0.0, 0.0])
     # 地球背日侧 ~地月距离处，c=0 < b-a → 本影
-    sc_pos = np.array([_AU_KM + 384000.0, 0.0, 0.0])
+    sc_pos = np.array([AU_KM + 384000.0, 0.0, 0.0])
 
     flux = model._body_flux_factor(sc_pos, body_pos, sun_pos, _R_EARTH, _R_SUN)
     assert flux == pytest.approx(0.0, abs=1e-15)
@@ -60,9 +61,9 @@ def test_body_flux_factor_penumbra_matches_lens_formula() -> None:
     """半影区内点 → 0 < flux < 1，与独立透镜面积公式一致（驱动 M&G 面积分支）。"""
     model = ConicalShadowModel()
     sun_pos = np.array([0.0, 0.0, 0.0])
-    body_pos = np.array([_AU_KM, 0.0, 0.0])
+    body_pos = np.array([AU_KM, 0.0, 0.0])
     # 背日侧 1e6 km、偏轴 5000 km → 半影
-    sc_pos = np.array([_AU_KM + 1.0e6, 5000.0, 0.0])
+    sc_pos = np.array([AU_KM + 1.0e6, 5000.0, 0.0])
 
     flux = model._body_flux_factor(sc_pos, body_pos, sun_pos, _R_EARTH, _R_SUN)
     assert 0.0 < flux < 1.0
@@ -83,10 +84,10 @@ def test_body_flux_factor_umbra_boundary_cone_tip_is_zero() -> None:
     """本影锥尖（遮挡体与太阳表现等大、c=0）→ 0.0（验收：本影边界光压=0）。"""
     model = ConicalShadowModel()
     sun_pos = np.array([0.0, 0.0, 0.0])
-    body_pos = np.array([_AU_KM, 0.0, 0.0])
+    body_pos = np.array([AU_KM, 0.0, 0.0])
     # 本影锥尖距离 d = Rb·AU/(Rs-Rb)，此处 b=a、c=0
-    d_tip = _R_EARTH * _AU_KM / (_R_SUN - _R_EARTH)
-    sc_pos = np.array([_AU_KM + d_tip, 0.0, 0.0])
+    d_tip = _R_EARTH * AU_KM / (_R_SUN - _R_EARTH)
+    sc_pos = np.array([AU_KM + d_tip, 0.0, 0.0])
 
     flux = model._body_flux_factor(sc_pos, body_pos, sun_pos, _R_EARTH, _R_SUN)
     assert flux == pytest.approx(0.0, abs=1e-6)
@@ -115,9 +116,9 @@ def test_body_flux_factor_sunny_side_is_full_sun() -> None:
     """SC 在遮挡体向日侧（体在 SC 背后）→ 全光照 1.0（c=π ≫ a+b）。"""
     model = ConicalShadowModel()
     sun_pos = np.array([0.0, 0.0, 0.0])
-    body_pos = np.array([_AU_KM, 0.0, 0.0])
+    body_pos = np.array([AU_KM, 0.0, 0.0])
     # SC 在体与太阳之间（向日侧 1e5 km）
-    sc_pos = np.array([_AU_KM - 1.0e5, 0.0, 0.0])
+    sc_pos = np.array([AU_KM - 1.0e5, 0.0, 0.0])
 
     flux = model._body_flux_factor(sc_pos, body_pos, sun_pos, _R_EARTH, _R_SUN)
     assert flux == pytest.approx(1.0)
@@ -127,7 +128,7 @@ def test_body_flux_factor_guard_sun_radius_ge_dsun() -> None:
     """守卫：sun_radius ≥ satToSunDist（SC 在日冕内）→ 1.0，避免 arcsin 定义域错。"""
     model = ConicalShadowModel()
     sun_pos = np.array([0.0, 0.0, 0.0])
-    body_pos = np.array([_AU_KM, 0.0, 0.0])
+    body_pos = np.array([AU_KM, 0.0, 0.0])
     # SC 距太阳 1e5 km ≪ sun_radius(695700) → 触发守卫
     sc_pos = np.array([1.0e5, 0.0, 0.0])
 
@@ -139,9 +140,9 @@ def test_body_flux_factor_guard_body_radius_ge_dbody() -> None:
     """守卫：body_radius ≥ satToBodyDist（SC 在遮挡体内）→ 0.0。"""
     model = ConicalShadowModel()
     sun_pos = np.array([0.0, 0.0, 0.0])
-    body_pos = np.array([_AU_KM, 0.0, 0.0])
+    body_pos = np.array([AU_KM, 0.0, 0.0])
     # SC 距地心 1000 km ≪ R_EARTH → 触发守卫
-    sc_pos = np.array([_AU_KM + 1000.0, 0.0, 0.0])
+    sc_pos = np.array([AU_KM + 1000.0, 0.0, 0.0])
 
     flux = model._body_flux_factor(sc_pos, body_pos, sun_pos, _R_EARTH, _R_SUN)
     assert flux == pytest.approx(0.0)

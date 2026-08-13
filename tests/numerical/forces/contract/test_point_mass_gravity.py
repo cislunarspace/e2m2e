@@ -7,43 +7,30 @@
 import pytest
 
 from e2m2e.algorithm.forces import PointMassGravity
+from tests.numerical.forces.conftest import EARTH_MU, MOON_MU, FakeSystem
 
 pytestmark = pytest.mark.force
 
 
-class _FakeSystem:
-    """最小 System 桩，提供 gravitational_parameter 与 coordinate_system。"""
-
-    coordinate_system = object()
-    origin = "EARTH"
-
-    def gravitational_parameter(self, body):
-        if body.upper() == "EARTH":
-            return 398600.4415
-        if body.upper() == "MOON":
-            return 4902.800122
-        raise ValueError(f"unknown body {body}")
-
-
 def test_point_mass_gravity_with_explicit_mu_serializes_to_rust_spec():
     """显式传入 mu 时，to_rust_spec 携带该 mu。"""
-    force = PointMassGravity(body="EARTH", mu=398600.4415)
-    spec = force.to_rust_spec(_FakeSystem())
-    assert spec == ("point_mass", 398600.4415)
+    force = PointMassGravity(body="EARTH", mu=EARTH_MU)
+    spec = force.to_rust_spec(FakeSystem())
+    assert spec == ("point_mass", EARTH_MU)
 
 
 def test_point_mass_gravity_falls_back_to_system_mu():
     """mu=None 时从 system.gravitational_parameter(body) 获取并写入 spec。"""
     force = PointMassGravity(body="EARTH")
-    spec = force.to_rust_spec(_FakeSystem())
-    assert spec == ("point_mass", 398600.4415)
+    spec = force.to_rust_spec(FakeSystem())
+    assert spec == ("point_mass", EARTH_MU)
 
 
 def test_point_mass_gravity_moon_body():
     """换用 MOON 体，spec 使用月球 mu。"""
     force = PointMassGravity(body="MOON")
-    spec = force.to_rust_spec(_FakeSystem())
-    assert spec == ("point_mass", 4902.800122)
+    spec = force.to_rust_spec(FakeSystem())
+    assert spec == ("point_mass", MOON_MU)
 
 
 def test_point_mass_gravity_no_system_no_mu_raises():

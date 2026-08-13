@@ -21,15 +21,9 @@ from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces import ForceModel, GravityField, ThirdBodyGravity
 from e2m2e.data.kernels.manager import SPICEManager
 from e2m2e.integrators import disable_ephem_cache, enable_ephem_cache
+from tests.numerical.forces.conftest import semi_major_axis
 
 pytestmark = pytest.mark.integrator
-
-
-def _semi_major_axis(state, mu):
-    r = np.linalg.norm(state[:3])
-    v = np.linalg.norm(state[3:6])
-    energy = v**2 / 2.0 - mu / r
-    return -mu / (2.0 * energy)
 
 
 @pytest.fixture
@@ -76,7 +70,7 @@ def test_ephem_cache_disabled_is_baseline(earth_system):
     state_no_cache, _ = _propagate_leo(system, [gravity], 3 * 3600.0)
     # 末态应为有限值，半长轴接近初始圆轨道
     mu = system.gravitational_parameter("EARTH")
-    a = _semi_major_axis(state_no_cache, mu)
+    a = semi_major_axis(state_no_cache, mu)
     assert abs(a - (6378.137 + 300.0)) / (6378.137 + 300.0) < 1e-3
 
 

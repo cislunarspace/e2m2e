@@ -7,43 +7,30 @@
 import pytest
 
 from e2m2e.algorithm.forces import IndirectTerm
+from tests.numerical.forces.conftest import EARTH_MU, MOON_MU, FakeSystem
 
 pytestmark = pytest.mark.force
 
 
-class _FakeSystem:
-    """最小 System 桩，提供 gravitational_parameter。"""
-
-    coordinate_system = object()
-    origin = "EARTH"
-
-    def gravitational_parameter(self, body):
-        if body.upper() == "EARTH":
-            return 398600.4415
-        if body.upper() == "MOON":
-            return 4902.800122
-        raise ValueError(f"unknown body {body}")
-
-
 def test_indirect_term_with_explicit_mu_serializes_to_rust_spec():
     """显式传入 mu 时，to_rust_spec 携带该 mu。"""
-    force = IndirectTerm(body="MOON", mu=4902.800122)
-    spec = force.to_rust_spec(_FakeSystem())
-    assert spec == ("indirect", "301", 4902.800122)
+    force = IndirectTerm(body="MOON", mu=MOON_MU)
+    spec = force.to_rust_spec(FakeSystem())
+    assert spec == ("indirect", "301", MOON_MU)
 
 
 def test_indirect_term_falls_back_to_system_mu():
     """mu=None 时从 system.gravitational_parameter(body) 获取并写入 spec。"""
     force = IndirectTerm(body="MOON")
-    spec = force.to_rust_spec(_FakeSystem())
-    assert spec == ("indirect", "301", 4902.800122)
+    spec = force.to_rust_spec(FakeSystem())
+    assert spec == ("indirect", "301", MOON_MU)
 
 
 def test_indirect_term_earth_body_spec():
     """EARTH 体的 spec 与 MOON 体仅 body/mu 不同。"""
-    force = IndirectTerm(body="EARTH", mu=398600.4415)
-    spec = force.to_rust_spec(_FakeSystem())
-    assert spec == ("indirect", "399", 398600.4415)
+    force = IndirectTerm(body="EARTH", mu=EARTH_MU)
+    spec = force.to_rust_spec(FakeSystem())
+    assert spec == ("indirect", "399", EARTH_MU)
 
 
 def test_indirect_term_no_system_no_mu_raises():
@@ -61,9 +48,9 @@ def test_indirect_term_body_normalized():
 
 def test_indirect_term_properties():
     """property body/mu 正确暴露。"""
-    force = IndirectTerm(body="MOON", mu=4902.800122)
+    force = IndirectTerm(body="MOON", mu=MOON_MU)
     assert force.body == "MOON"
-    assert force.mu == 4902.800122
+    assert force.mu == MOON_MU
 
     force_default = IndirectTerm(body="MOON")
     assert force_default.mu is None

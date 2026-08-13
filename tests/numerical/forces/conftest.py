@@ -23,6 +23,51 @@ from e2m2e.data.kernels.manager import SPICEManager
 # 地球引力参数与赤道半径：WGS-84 基准（近地场景默认基准）。
 EARTH_MU = Datum.WGS84.earth_gm  # km³/s²
 EARTH_RE = Datum.WGS84.earth_radius_km  # km
+# 月球引力参数：DE421 基准（地月系统默认基准）。
+MOON_MU = Datum.DE421.moon_gm  # km³/s²
+
+# 哨兵：区分"未传 spice"（默认有 SPICE）与"显式传 None"（模拟资源缺失）。
+_SPICE_UNSET = object()
+
+
+class FakeSystem:
+    """最小 System 桩，供不需要 SPICE 的契约/传播测试使用。
+
+    - ``coordinate_system``：默认占位对象，可用 ``has_coordinate_system=False`` 关闭；
+    - ``spice``：默认占位对象（模拟有 SPICE：力无 Rust spec 属能力缺失）；
+      传 ``spice=None`` 模拟资源缺失（ADR 0020 分流）；
+    - ``gravitational_parameter``：EARTH 用 ``Datum.WGS84.earth_gm``（近地场景
+      默认基准）、MOON 用 ``Datum.DE421.moon_gm``（地月系统默认基准，ADR 0022）。
+    """
+
+    def __init__(
+        self,
+        has_coordinate_system: bool = True,
+        spice: object | None = _SPICE_UNSET,
+    ):
+        self.coordinate_system = object() if has_coordinate_system else None
+        self.origin = "EARTH"
+        self.spice = object() if spice is _SPICE_UNSET else spice
+
+    @property
+    def frame(self):
+        from e2m2e.mbse.data.enums import ReferenceFrame
+
+        return ReferenceFrame.J2000
+
+    @property
+    def unit_system(self):
+        from e2m2e.mbse.data.enums import UnitSystem
+
+        return UnitSystem.SI
+
+    def gravitational_parameter(self, body: str) -> float:
+        b = body.upper()
+        if b == "EARTH":
+            return EARTH_MU
+        if b == "MOON":
+            return MOON_MU
+        raise ValueError(f"unknown body {body}")
 
 
 def keplerian_to_cartesian(a, e, i, raan, argp, nu, mu):

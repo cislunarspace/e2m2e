@@ -23,19 +23,14 @@ from e2m2e.algorithm.forces.force_config import (
     load_force_config,
     serialize_force,
 )
+from tests.numerical.forces.conftest import FakeSystem
 
 pytestmark = pytest.mark.force
 
 
-class _FakeSystem:
-    """仅用于配置测试的最小 System 桩（力构造不需 system，仅 ForceModel 需要）。"""
-
-    coordinate_system = object()
-
-
 def test_gravity_field_round_trip():
     """单个 GravityField 的 to_config → from_config → to_config 字典相等。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     fm.add_force(GravityField("EARTH", degree=2, order=0), name="j2")
 
@@ -55,7 +50,7 @@ def test_gravity_field_round_trip():
 
 def test_srp_with_shadow_round_trip():
     """SolarRadiationPressure 含嵌套 ConicalShadowModel 的 round-trip。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     shadow = ConicalShadowModel(bodies=["EARTH", "MOON"])
     fm.add_force(
@@ -77,7 +72,7 @@ def test_srp_with_shadow_round_trip():
 
 def test_srp_without_shadow_round_trip():
     """SRP 无阴影模型时 shadow 序列化为 null，round-trip 一致。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     fm.add_force(
         SolarRadiationPressure(area=5.0, mass=1000.0, cr=1.5, shadow=None),
@@ -93,7 +88,7 @@ def test_srp_without_shadow_round_trip():
 
 def test_finite_burn_constant_fixed_round_trip():
     """FiniteBurn 恒推力 + 固定方向的 from_config → to_config round-trip。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     config_dict = {
         "version": 1,
         "forces": [
@@ -117,7 +112,7 @@ def test_finite_burn_constant_fixed_round_trip():
 
 def test_finite_burn_pulse_round_trip():
     """FiniteBurn 脉冲推力（on/off 区间）的 round-trip。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     config_dict = {
         "version": 1,
         "forces": [
@@ -144,9 +139,9 @@ def test_finite_burn_pulse_round_trip():
     assert ForceModel.to_config(fm) == config_dict
 
 
-def test_finite_burn_built_force_computes_correct_acceleration():
+def test_finite_burn_built_force_propagation_rejected():
     """DSL 构造的 FiniteBurn 在传播入口明确拒绝未实现的 Rust 能力。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     config_dict = {
         "version": 1,
         "forces": [
@@ -171,7 +166,7 @@ def test_finite_burn_built_force_computes_correct_acceleration():
 
 def test_finite_burn_unknown_callable_not_serializable():
     """用户手写 lambda 构造的 FiniteBurn 无法 to_config，抛 NotSerializableError。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     fm.add_force(
         FiniteBurn(
@@ -188,7 +183,7 @@ def test_finite_burn_unknown_callable_not_serializable():
 
 def test_unknown_force_type_raises():
     """from_config 遇未知 type 抛 ValueError，列出已知类型。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     config = {
         "version": 1,
         "forces": [{"name": "x", "type": "BogusForce", "enabled": True, "params": {}}],
@@ -199,7 +194,7 @@ def test_unknown_force_type_raises():
 
 def test_unsupported_version_raises():
     """from_config 遇不支持 version 抛 ValueError。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     config = {"version": 99, "forces": []}
     with pytest.raises(ValueError, match="version"):
         ForceModel.from_config(config, system)
@@ -207,7 +202,7 @@ def test_unsupported_version_raises():
 
 def test_disabled_force_persisted_in_config():
     """disable 后 to_config 输出 enabled:false，from_config 重建仍为 disabled。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     fm.add_force(GravityField("EARTH", degree=2, order=0), name="j2")
     fm.disable("j2")
@@ -221,7 +216,7 @@ def test_disabled_force_persisted_in_config():
 
 def test_full_leo_config_round_trip():
     """完整 LEO 配置（J2 + 阻力 + 光压）round-trip。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     fm.add_force(GravityField("EARTH", degree=2, order=0), name="j2")
     fm.add_force(
@@ -240,7 +235,7 @@ def test_full_leo_config_round_trip():
 
 def test_json_io_round_trip(tmp_path):
     """dump_force_config 写 JSON，load_force_config 读回，配置一致。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     fm.add_force(GravityField("EARTH", degree=2, order=0), name="j2")
     fm.add_force(
@@ -257,7 +252,7 @@ def test_json_io_round_trip(tmp_path):
 
 def test_drag_model_round_trip():
     """DragModel 含嵌套 atmosphere 的 round-trip。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     atm = ExponentialAtmosphere(f107=120.0, ap=10.0)
     fm.add_force(
@@ -280,7 +275,7 @@ def test_drag_model_round_trip():
 
 def test_finite_burn_vnb_direction_frame_round_trip():
     """FiniteBurn 带 VNB direction_frame 的 from_config → to_config round-trip。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     config_dict = {
         "version": 1,
         "forces": [
@@ -311,7 +306,7 @@ def test_finite_burn_vnb_direction_frame_round_trip():
 
 def test_finite_burn_lvlh_direction_frame_round_trip():
     """FiniteBurn 带 LVLH direction_frame 的 from_config → to_config round-trip。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     config_dict = {
         "version": 1,
         "forces": [
@@ -342,7 +337,7 @@ def test_finite_burn_lvlh_direction_frame_round_trip():
 
 def test_finite_burn_invalid_direction_frame_from_config_raises():
     """from_config 遇非法 direction_frame 抛 ValueError。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     config_dict = {
         "version": 1,
         "forces": [

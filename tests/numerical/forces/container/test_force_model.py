@@ -9,32 +9,9 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.forces import ForceModel, PhysicalModel, PointMassGravity
+from tests.numerical.forces.conftest import FakeSystem
 
 pytestmark = pytest.mark.force
-
-
-class _FakeSystem:
-    """仅用于聚合测试的最小 System 桩。"""
-
-    def __init__(self, has_coordinate_system=True):
-        self.coordinate_system = object() if has_coordinate_system else None
-        self.origin = "EARTH"
-        self.spice = object()  # 模拟有 SPICE：力无 Rust spec 属能力缺失
-
-    @property
-    def frame(self):
-        from e2m2e.mbse.data.enums import ReferenceFrame
-
-        return ReferenceFrame.J2000
-
-    @property
-    def unit_system(self):
-        from e2m2e.mbse.data.enums import UnitSystem
-
-        return UnitSystem.SI
-
-    def gravitational_parameter(self, body):
-        return 398600.4415
 
 
 class ConstantForce(PhysicalModel):
@@ -46,14 +23,14 @@ class ConstantForce(PhysicalModel):
 
 def test_force_model_requires_coordinate_system():
     """ForceModel 构造需要 system.coordinate_system 非 None。"""
-    system = _FakeSystem(has_coordinate_system=False)
+    system = FakeSystem(has_coordinate_system=False)
     with pytest.raises(ValueError, match="coordinate_system"):
         ForceModel(system)
 
 
 def test_force_model_adds_forces():
     """ForceModel 可以聚合多个力模型。"""
-    system = _FakeSystem()
+    system = FakeSystem()
 
     fm = ForceModel(system)
     fm.add_force(ConstantForce([1.0, 0.0, 0.0]))
@@ -64,7 +41,7 @@ def test_force_model_adds_forces():
 
 def test_force_model_remove_force_by_index():
     """可以通过索引移除力模型。"""
-    system = _FakeSystem()
+    system = FakeSystem()
 
     f1 = ConstantForce([1.0, 0.0, 0.0])
     f2 = ConstantForce([0.0, 2.0, 0.0])
@@ -78,7 +55,7 @@ def test_force_model_remove_force_by_index():
 
 def test_add_force_with_name_and_get_by_name():
     """add_force 带 name 后可用 get_force 按名取回同一实例。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     force = ConstantForce([1.0, 0.0, 0.0])
 
@@ -89,7 +66,7 @@ def test_add_force_with_name_and_get_by_name():
 
 def test_list_forces_exposes_name_and_enabled():
     """list_forces 返回 entry，暴露 name / force / enabled 三个维度。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     f1 = ConstantForce([1.0, 0.0, 0.0])
     fm.add_force(f1, name="primary")
@@ -104,7 +81,7 @@ def test_list_forces_exposes_name_and_enabled():
 
 def test_enable_disable_toggles_entry():
     """disable(name) 关闭力，enable(name) 重新打开。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     fm.add_force(ConstantForce([1.0, 0.0, 0.0]), name="primary")
 
@@ -117,7 +94,7 @@ def test_enable_disable_toggles_entry():
 
 def test_disabled_force_skipped_but_kept_in_forces():
     """disable 后 forces/list_forces 仍含它，传播时该力被跳过。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     fm.add_force(ConstantForce([1.0, 0.0, 0.0]), name="a")
     fm.add_force(ConstantForce([0.0, 2.0, 0.0]), name="b")
@@ -134,7 +111,7 @@ def test_disabled_force_skipped_but_kept_in_forces():
 
 def test_disabled_force_with_rust_spec_is_skipped_in_propagation():
     """禁用有 Rust spec 的力后，传播结果与空力模型一致。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system, forces=[PointMassGravity("EARTH", mu=398600.4415)])
     fm.disable("PointMassGravity")
 
@@ -149,7 +126,7 @@ def test_disabled_force_with_rust_spec_is_skipped_in_propagation():
 
 def test_auto_name_disambiguates_same_type():
     """不传 name 时，同类力自动消歧（Foo、Foo_2）。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     fm.add_force(ConstantForce([1.0, 0.0, 0.0]))
     fm.add_force(ConstantForce([0.0, 2.0, 0.0]))
@@ -160,7 +137,7 @@ def test_auto_name_disambiguates_same_type():
 
 def test_auto_name_skips_occupied_suffix():
     """显式占用 Foo_2 后，自动命名不再回退到 Foo，而是取 Foo_3。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     fm.add_force(ConstantForce([1.0, 0.0, 0.0]), name="ConstantForce_2")
     fm.add_force(ConstantForce([0.0, 2.0, 0.0]))
@@ -171,7 +148,7 @@ def test_auto_name_skips_occupied_suffix():
 
 def test_explicit_duplicate_name_raises():
     """显式给出重名时抛 ValueError。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     fm.add_force(ConstantForce([1.0, 0.0, 0.0]), name="primary")
     with pytest.raises(ValueError, match="already exists"):
@@ -180,7 +157,7 @@ def test_explicit_duplicate_name_raises():
 
 def test_remove_force_by_name():
     """可按名字移除力模型。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     f1 = ConstantForce([1.0, 0.0, 0.0])
     fm = ForceModel(system)
     fm.add_force(f1, name="primary")
@@ -194,7 +171,7 @@ def test_remove_force_by_name():
 
 def test_remove_force_by_index():
     """可按索引移除力模型。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     fm.add_force(ConstantForce([1.0, 0.0, 0.0]), name="primary")
     fm.add_force(ConstantForce([0.0, 2.0, 0.0]), name="secondary")
@@ -207,7 +184,7 @@ def test_remove_force_by_index():
 
 def test_get_force_missing_raises_keyerror():
     """get_force 不存在的名字抛 KeyError。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     with pytest.raises(KeyError):
         fm.get_force("nope")
@@ -215,7 +192,7 @@ def test_get_force_missing_raises_keyerror():
 
 def test_disable_missing_name_raises_keyerror():
     """disable/enable 不存在的名字抛 KeyError。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     with pytest.raises(KeyError):
         fm.disable("nope")
@@ -225,7 +202,7 @@ def test_disable_missing_name_raises_keyerror():
 
 def test_multi_force_rust_propagation_superposes():
     """多力组合的 Rust 传播与单力传播差等价于各力贡献叠加（定性验证）。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm_single = ForceModel(system, forces=[PointMassGravity("EARTH", mu=398600.4415)])
     fm_double = ForceModel(
         system,

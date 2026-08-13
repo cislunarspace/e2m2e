@@ -10,6 +10,7 @@ import pytest
 from e2m2e.algorithm.forces import ForceModel, PhysicalModel
 from e2m2e.algorithm.forces.point_mass_gravity import PointMassGravity
 from e2m2e.algorithm.forces.thrust import FiniteBurn, VariableMassFiniteBurn
+from tests.numerical.forces.conftest import FakeSystem
 
 pytestmark = pytest.mark.force
 
@@ -21,25 +22,9 @@ class ConstantForce(PhysicalModel):
         self._acceleration = np.asarray(acceleration, dtype=float)
 
 
-class _FakeSystem:
-    """仅用于能力检查的最小 System 桩（模拟有 SPICE 的环境）。"""
-
-    coordinate_system = object()
-    spice = object()
-
-    def gravitational_parameter(self, _body):
-        return 398600.4418
-
-
-class _NoSpiceSystem(_FakeSystem):
-    """无 ``spice`` 属性的 System 桩（模拟 SPICE 资源缺失的环境）。"""
-
-    spice = None
-
-
 def test_propagate_rejects_force_without_rust_spec():
     """有 SPICE 但力无 Rust spec（能力缺失）→ NotImplementedError。"""
-    force_model = ForceModel(_FakeSystem(), forces=[ConstantForce([0.0, 0.0, 1.0])])
+    force_model = ForceModel(FakeSystem(), forces=[ConstantForce([0.0, 0.0, 1.0])])
 
     with pytest.raises(NotImplementedError, match="无 Rust 实现"):
         force_model.propagate(np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0]), (0.0, 1.0))
@@ -49,7 +34,7 @@ def test_propagate_reports_spice_missing_as_resource_error():
     """system 无 spice（资源缺失）→ RustExtensionUnavailableError（ADR 0020 决策 4 分流）。"""
     from e2m2e.exceptions import RustExtensionUnavailableError
 
-    force_model = ForceModel(_NoSpiceSystem(), forces=[ConstantForce([0.0, 0.0, 1.0])])
+    force_model = ForceModel(FakeSystem(spice=None), forces=[ConstantForce([0.0, 0.0, 1.0])])
 
     with pytest.raises(RustExtensionUnavailableError, match="需要 SPICE"):
         force_model.propagate(np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0]), (0.0, 1.0))
@@ -57,7 +42,7 @@ def test_propagate_reports_spice_missing_as_resource_error():
 
 def test_propagate_point_mass_uses_rust_and_honors_t_eval():
     """PointMass 的 compiled propagation 返回真实轨迹与规范化输出时间。"""
-    force_model = ForceModel(_FakeSystem(), forces=[PointMassGravity("EARTH", mu=398600.4418)])
+    force_model = ForceModel(FakeSystem(), forces=[PointMassGravity("EARTH", mu=398600.4418)])
     y0 = np.array([7000.0, 0.0, 0.0, 0.0, 7.546049108166282, 0.0])
     t_eval = np.array([0.0, 10.0, 30.0])
 
@@ -77,7 +62,7 @@ def test_finite_burn_propagation_reports_unsupported_rust_capability():
         direction=[1.0, 0.0, 0.0],
         mass=1000.0,
     )
-    force_model = ForceModel(_FakeSystem(), forces=[burn])
+    force_model = ForceModel(FakeSystem(), forces=[burn])
 
     with pytest.raises(NotImplementedError, match="FiniteBurn.*Rust"):
         force_model.propagate(
@@ -94,7 +79,7 @@ def test_variable_mass_propagate_rejects_events_before_rust_path():
         initial_mass=1000.0,
         direction=np.array([1.0, 0.0, 0.0]),
     )
-    force_model = ForceModel(_FakeSystem(), forces=[burn])
+    force_model = ForceModel(FakeSystem(), forces=[burn])
 
     with pytest.raises(NotImplementedError, match="事件传播"):
         force_model.propagate(
@@ -106,7 +91,7 @@ def test_variable_mass_propagate_rejects_events_before_rust_path():
 
 def test_propagate_rejects_events_without_compiled_forces_api():
     """事件传播不进入 Python 力循环。"""
-    force_model = ForceModel(_FakeSystem())
+    force_model = ForceModel(FakeSystem())
 
     with pytest.raises(NotImplementedError, match="事件传播"):
         force_model.propagate(

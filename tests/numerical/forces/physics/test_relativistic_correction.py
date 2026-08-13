@@ -14,7 +14,9 @@ from tests.numerical.forces.conftest import EARTH_RE, keplerian_to_cartesian
 pytestmark = [pytest.mark.force, pytest.mark.spice]
 
 
-# 地球角动量矢量近似值 (km²/s)，与 GMAT 自动计算结果同量级。
+# 地球角动量矢量近似值（km²/s），用于 Lense-Thirring 量级参考：
+# 地球自转角动量 = I·ω ≈ 8.0e37 kg·m²/s 换算到 km²/s 量级（约 1e3），
+# 仅要求量级正确（测试断言的是修正量级上下界，不是精确值）。
 _EARTH_ANGULAR_MOMENTUM = np.array([0.0, 0.0, 1.18e3])
 
 

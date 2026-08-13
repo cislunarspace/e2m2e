@@ -10,36 +10,14 @@ import pytest
 from e2m2e.algorithm.forces import ForceModel, PointMassGravity
 from e2m2e.algorithm.forces.thrust import ImpulsiveBurn
 from e2m2e.integrators import RkMethod
+from tests.numerical.forces.conftest import FakeSystem
 
 pytestmark = pytest.mark.force
 
 
-class _FakeSystem:
-    """仅用于传播测试的最小 System 桩。"""
-
-    def __init__(self):
-        self.coordinate_system = object()
-        self.origin = "EARTH"
-
-    @property
-    def frame(self):
-        from e2m2e.mbse.data.enums import ReferenceFrame
-
-        return ReferenceFrame.J2000
-
-    @property
-    def unit_system(self):
-        from e2m2e.mbse.data.enums import UnitSystem
-
-        return UnitSystem.SI
-
-    def gravitational_parameter(self, body):
-        return 398600.4415
-
-
 def test_propagate_pd78_works():
     """PD78 积分器可正常传播。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     mu = 398600.4415
     fm = ForceModel(system, forces=[PointMassGravity("EARTH", mu=mu)])
 
@@ -58,7 +36,7 @@ def test_propagate_pd78_works():
 
 def test_propagate_pd45_and_pd78_similar_results():
     """同一初值分别用 PD45 和 PD78 传播，末状态应相近。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     mu = 398600.4415
     fm = ForceModel(system, forces=[PointMassGravity("EARTH", mu=mu)])
 
@@ -79,7 +57,7 @@ def test_propagate_pd45_and_pd78_similar_results():
 
 def test_propagate_default_method_is_pd45():
     """默认参数不指定 method 时，行为与显式传 PD45 一致。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     mu = 398600.4415
     fm = ForceModel(system, forces=[PointMassGravity("EARTH", mu=mu)])
 
@@ -96,7 +74,7 @@ def test_propagate_default_method_is_pd45():
 
 def test_propagate_maneuvers_method_param():
     """propagate_maneuvers 支持 method 参数并透传。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)  # 零外力
 
     v0 = np.array([1.0, 0.0, 0.0])

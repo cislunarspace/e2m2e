@@ -5,6 +5,7 @@ import pytest
 from e2m2e.algorithm.forces import ForceModel
 from e2m2e.algorithm.forces.force_config import dump_force_config, load_force_config
 from e2m2e.algorithm.forces.force_mapping import PLANET_BODIES, perturbation_to_force_config
+from tests.numerical.forces.conftest import FakeSystem
 
 pytestmark = pytest.mark.force
 
@@ -32,12 +33,6 @@ def _types(config):
 
 def _entries_by_type(config, type_name):
     return [f for f in config["forces"] if f["type"] == type_name]
-
-
-class _FakeSystem:
-    """最小 System 桩（力构造不需 system，仅 ForceModel 需要）。"""
-
-    coordinate_system = object()
 
 
 class TestBaseModel:
@@ -225,7 +220,7 @@ class TestBuildAndRoundTrip:
 
     def test_build_force_model_from_config(self):
         cfg = perturbation_to_force_config(self.FULL, earth_degree=4, moon_degree=4)
-        fm = ForceModel.from_config(cfg, _FakeSystem())
+        fm = ForceModel.from_config(cfg, FakeSystem())
         types = [type(f).__name__ for f in fm.forces]
         assert types == _types(cfg)
         # 阶次截断生效
@@ -239,12 +234,12 @@ class TestBuildAndRoundTrip:
 
     def test_config_round_trip_dict_equal(self):
         cfg = perturbation_to_force_config(self.FULL)
-        fm = ForceModel.from_config(cfg, _FakeSystem())
+        fm = ForceModel.from_config(cfg, FakeSystem())
         assert fm.to_config() == cfg
 
     def test_json_dump_load_round_trip(self, tmp_path):
         cfg = perturbation_to_force_config(self.FULL)
-        system = _FakeSystem()
+        system = FakeSystem()
         fm = ForceModel.from_config(cfg, system)
         path = tmp_path / "force_config.json"
         dump_force_config(fm, path)

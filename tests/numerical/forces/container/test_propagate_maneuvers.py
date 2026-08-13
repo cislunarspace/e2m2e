@@ -8,35 +8,14 @@ import pytest
 
 from e2m2e.algorithm.forces import ForceModel
 from e2m2e.algorithm.forces.thrust import BurnApplication, ImpulsiveBurn
+from tests.numerical.forces.conftest import FakeSystem
 
 pytestmark = pytest.mark.force
 
 
-class _FakeSystem:
-    """仅用于传播测试的最小 System 桩。"""
-
-    def __init__(self):
-        self.coordinate_system = object()
-
-    @property
-    def frame(self):
-        from e2m2e.mbse.data.enums import ReferenceFrame
-
-        return ReferenceFrame.J2000
-
-    @property
-    def unit_system(self):
-        from e2m2e.mbse.data.enums import UnitSystem
-
-        return UnitSystem.SI
-
-    def gravitational_parameter(self, body):
-        return 398600.4415
-
-
 def test_single_impulsive_burn_changes_velocity_and_energy():
     """单脉冲 @ t0、零外力：末速度 = 初速度 + Δv；比动能变化 = v·Δv + 0.5|Δv|²。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)  # 无力模型 → 零加速度
 
     v0 = np.array([1.0, 0.5, -0.2])
@@ -59,7 +38,7 @@ def test_single_impulsive_burn_changes_velocity_and_energy():
 
 def test_propagate_maneuvers_records_burn_application():
     """BurnApplication 记录 index/epoch/delta_v/velocity_before/after，index 指向 post-burn 行。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)  # 零外力
 
     v0 = np.array([1.0, 0.0, 0.0])
@@ -85,7 +64,7 @@ def test_propagate_maneuvers_records_burn_application():
 
 def test_propagate_maneuvers_no_duplicate_epoch_at_burn():
     """burn epoch 处输出单行（post-burn）：time 严格单调、burn epoch 恰好一次。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)  # 零外力
 
     y0 = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0])
@@ -101,7 +80,7 @@ def test_propagate_maneuvers_no_duplicate_epoch_at_burn():
 
 def test_propagate_maneuvers_rejects_burn_epoch_outside_span():
     """burn epoch 落在 t_span 之外 → ValueError（不静默丢弃）。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system)
     y0 = np.zeros(6)
 

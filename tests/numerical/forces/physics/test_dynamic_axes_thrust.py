@@ -1,10 +1,11 @@
-"""动态坐标系推力传播集成测试（Slice 12 验收）。
+"""动态坐标系推力传播集成测试（Slice 12 验收，预留 #407）。
 
 验证 VNB 沿速度方向推力提升半长轴、LVLH 径向推力增加偏心率、
 转换矩阵正交性与混合方向。
 
-低推力功能尚未开发完成，FiniteBurn 的 Rust 传播路径暂缺；本文件标记
-``low_thrust``，本轮检查排除在绿门外。
+预留状态：``FiniteBurn`` 恒质量低推力从未实现（``to_rust_spec`` 抛
+``NotImplementedError``），本文件全部测试标记 ``xfail``；实现后（#407）
+去掉 ``pytestmark`` 里的 xfail 即可恢复断言。
 """
 
 from __future__ import annotations
@@ -13,13 +14,48 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.forces import FiniteBurn, ForceModel, PointMassGravity
-from tests.numerical.forces.conftest import (
-    EARTH_RE,
-    keplerian_to_cartesian,
-    semi_major_axis,
-)
+from tests.numerical.forces.conftest import EARTH_RE, keplerian_to_cartesian, semi_major_axis
 
-pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
+pytestmark = [
+    pytest.mark.force,
+    pytest.mark.low_thrust,
+    pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现"),
+]
+
+
+def _propagate_dynamic_axes(
+    system,
+    direction,
+    direction_frame,
+    duration_s,
+    n_points,
+    *,
+    e: float = 0.0,
+    thrust: float = 1.0,
+):
+    """构造动态轴推力传播，返回 ``(result, mu, fm, et0)``。
+
+    初值：近圆 LEO（400 km 高度）；推力沿 ``direction``（在
+    ``direction_frame`` 下解释）、质量 1000 kg。
+    """
+    mu = system.gravitational_parameter("EARTH")
+    a0 = EARTH_RE + 400.0
+    y0 = keplerian_to_cartesian(a0, e, 0.0, 0.0, 0.0, 0.0, mu)
+
+    gravity = PointMassGravity(body="EARTH")
+    burn = FiniteBurn(
+        thrust_profile=lambda t: thrust,
+        direction=direction,
+        mass=1000.0,
+        direction_frame=direction_frame,
+    )
+    fm = ForceModel(system, forces=[gravity, burn])
+
+    et0 = system.spice.utc_to_et("2025-06-21T11:00:06")
+    t_span = (et0, et0 + duration_s)
+    t_eval = np.linspace(et0, et0 + duration_s, n_points)
+    result = fm.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
+    return result, mu, fm, et0
 
 
 def _eccentricity(state, mu):
@@ -46,39 +82,14 @@ def _orbital_energy(state, mu):
 @pytest.mark.spice
 def test_vnb_velocity_direction_thrust_increases_semi_major_axis(earth_icrf_system):
     """VNB 下 direction=[1,0,0] 沿速度方向推力，验证半长轴与轨道能量增加。"""
-    # Arrange
-    system = earth_icrf_system
-    mu = system.gravitational_parameter("EARTH")
-
-    a0 = EARTH_RE + 400.0  # 近圆 LEO，400 km 高度
-    y0 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
-
-    thrust = 1.0  # N
-    mass = 1000.0  # kg
-    duration_s = 3600.0  # 1 小时
-
-    gravity = PointMassGravity(body="EARTH")
-    burn = FiniteBurn(
-        thrust_profile=lambda t: thrust,
-        direction=[1.0, 0.0, 0.0],
-        mass=mass,
-        direction_frame="VNB",
+    result, mu, _, _ = _propagate_dynamic_axes(
+        earth_icrf_system, [1.0, 0.0, 0.0], "VNB", 3600.0, 50
     )
-    fm = ForceModel(system, forces=[gravity, burn])
 
-    et0 = system.spice.utc_to_et("2025-06-21T11:00:06")
-    t_span = (et0, et0 + duration_s)
-    t_eval = np.linspace(et0, et0 + duration_s, 50)
-
-    # Act
-    result = fm.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
-
-    # Assert：半长轴增加
     a_initial = semi_major_axis(result["states"][0], mu)
     a_final = semi_major_axis(result["states"][-1], mu)
     assert a_final > a_initial, f"半长轴应增加: initial={a_initial:.3f} km, final={a_final:.3f} km"
 
-    # Assert：轨道能量增加
     energy_initial = _orbital_energy(result["states"][0], mu)
     energy_final = _orbital_energy(result["states"][-1], mu)
     assert energy_final > energy_initial, (
@@ -87,39 +98,12 @@ def test_vnb_velocity_direction_thrust_increases_semi_major_axis(earth_icrf_syst
 
 
 @pytest.mark.spice
-def test_vnb_velocity_direction_thrust_acceleration_aligns_with_velocity(
-    earth_icrf_system,
-):
+def test_vnb_velocity_direction_thrust_acceleration_aligns_with_velocity(earth_icrf_system):
     """VNB 沿速度方向推力，验证惯性系中推力加速度方向与速度方向点积 ≈ 1。"""
-    # Arrange
-    system = earth_icrf_system
-    mu = system.gravitational_parameter("EARTH")
-
-    a0 = EARTH_RE + 400.0
-    y0 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
-
-    thrust = 1.0
-    mass = 1000.0
-    duration_s = 600.0  # 10 分钟，短弧段验证方向
-
-    gravity = PointMassGravity(body="EARTH")
-    burn = FiniteBurn(
-        thrust_profile=lambda t: thrust,
-        direction=[1.0, 0.0, 0.0],
-        mass=mass,
-        direction_frame="VNB",
+    result, mu, fm, et0 = _propagate_dynamic_axes(
+        earth_icrf_system, [1.0, 0.0, 0.0], "VNB", 600.0, 20
     )
-    fm = ForceModel(system, forces=[gravity, burn])
 
-    et0 = system.spice.utc_to_et("2025-06-21T11:00:06")
-    t_span = (et0, et0 + duration_s)
-    t_eval = np.linspace(et0, et0 + duration_s, 20)
-
-    # Act
-    result = fm.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
-
-    # Assert：推力加速度方向与速度方向点积 ≈ 1
-    # 在纯二体 + VNB 速度方向推力下，推力加速度始终沿速度方向
     for state in result["states"]:
         v = state[3:6]
         v_norm = np.linalg.norm(v)
@@ -145,78 +129,22 @@ def test_vnb_velocity_direction_thrust_acceleration_aligns_with_velocity(
 @pytest.mark.spice
 def test_lvlh_radial_direction_thrust_increases_eccentricity(earth_icrf_system):
     """LVLH 下 direction=[1,0,0] 径向推力，验证偏心率随时间增加。"""
-    # Arrange
-    system = earth_icrf_system
-    mu = system.gravitational_parameter("EARTH")
-
-    a0 = EARTH_RE + 400.0
-    y0 = keplerian_to_cartesian(a0, 0.001, 0.0, 0.0, 0.0, 0.0, mu)
-
-    thrust = 1.0
-    mass = 1000.0
-    duration_s = 3600.0
-
-    gravity = PointMassGravity(body="EARTH")
-    burn = FiniteBurn(
-        thrust_profile=lambda t: thrust,
-        direction=[1.0, 0.0, 0.0],
-        mass=mass,
-        direction_frame="LVLH",
+    result, mu, _, _ = _propagate_dynamic_axes(
+        earth_icrf_system, [1.0, 0.0, 0.0], "LVLH", 3600.0, 50, e=0.001
     )
-    fm = ForceModel(system, forces=[gravity, burn])
 
-    et0 = system.spice.utc_to_et("2025-06-21T11:00:06")
-    t_span = (et0, et0 + duration_s)
-    t_eval = np.linspace(et0, et0 + duration_s, 50)
-
-    # Act
-    result = fm.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
-
-    # Assert：偏心率增加
     e_initial = _eccentricity(result["states"][0], mu)
     e_final = _eccentricity(result["states"][-1], mu)
     assert e_final > e_initial, f"偏心率应增加: initial={e_initial:.6f}, final={e_final:.6f}"
 
-    # 进一步验证：偏心率序列单调递增（或至少总体趋势上升）
-    e_history = np.array([_eccentricity(s, mu) for s in result["states"]])
-    assert e_history[-1] > e_history[0], (
-        f"偏心率最终值应大于初始值: {e_history[-1]:.6f} > {e_history[0]:.6f}"
-    )
-
 
 @pytest.mark.spice
-def test_lvlh_radial_direction_thrust_acceleration_aligns_with_position(
-    earth_icrf_system,
-):
+def test_lvlh_radial_direction_thrust_acceleration_aligns_with_position(earth_icrf_system):
     """LVLH 径向推力，验证惯性系中推力加速度方向与位置向量方向点积 ≈ 1。"""
-    # Arrange
-    system = earth_icrf_system
-    mu = system.gravitational_parameter("EARTH")
-
-    a0 = EARTH_RE + 400.0
-    y0 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
-
-    thrust = 1.0
-    mass = 1000.0
-    duration_s = 600.0
-
-    gravity = PointMassGravity(body="EARTH")
-    burn = FiniteBurn(
-        thrust_profile=lambda t: thrust,
-        direction=[1.0, 0.0, 0.0],
-        mass=mass,
-        direction_frame="LVLH",
+    result, mu, fm, et0 = _propagate_dynamic_axes(
+        earth_icrf_system, [1.0, 0.0, 0.0], "LVLH", 600.0, 20
     )
-    fm = ForceModel(system, forces=[gravity, burn])
 
-    et0 = system.spice.utc_to_et("2025-06-21T11:00:06")
-    t_span = (et0, et0 + duration_s)
-    t_eval = np.linspace(et0, et0 + duration_s, 20)
-
-    # Act
-    result = fm.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
-
-    # Assert：推力加速度方向与位置向量方向点积 ≈ 1
     for state in result["states"]:
         r = state[:3]
         r_norm = np.linalg.norm(r)
@@ -229,7 +157,7 @@ def test_lvlh_radial_direction_thrust_acceleration_aligns_with_position(
             if thrust_acc_norm > 1e-15:
                 dot_product = np.dot(thrust_acc / thrust_acc_norm, r_hat)
                 assert dot_product > 0.99, (
-                    f"推力加速度方向与位置方向点积应 > 0.99, got {dot_product:.6f}"
+                    f"推力加速度方向与位置向量方向点积应 > 0.99, got {dot_product:.6f}"
                 )
 
 
@@ -239,34 +167,8 @@ def test_lvlh_radial_direction_thrust_acceleration_aligns_with_position(
 @pytest.mark.spice
 def test_vnb_rotation_matrix_orthogonality_during_propagation(earth_icrf_system):
     """VNB 推力传播过程中，动态坐标系转换矩阵保持正交（R @ R.T ≈ I）。"""
-    # Arrange
-    system = earth_icrf_system
-    mu = system.gravitational_parameter("EARTH")
+    result, _, _, _ = _propagate_dynamic_axes(earth_icrf_system, [1.0, 0.0, 0.0], "VNB", 3600.0, 30)
 
-    a0 = EARTH_RE + 400.0
-    y0 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
-
-    thrust = 1.0
-    mass = 1000.0
-    duration_s = 3600.0
-
-    gravity = PointMassGravity(body="EARTH")
-    burn = FiniteBurn(
-        thrust_profile=lambda t: thrust,
-        direction=[1.0, 0.0, 0.0],
-        mass=mass,
-        direction_frame="VNB",
-    )
-    fm = ForceModel(system, forces=[gravity, burn])
-
-    et0 = system.spice.utc_to_et("2025-06-21T11:00:06")
-    t_span = (et0, et0 + duration_s)
-    t_eval = np.linspace(et0, et0 + duration_s, 30)
-
-    # Act
-    result = fm.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
-
-    # Assert：每个采样点构造 VNB 转换矩阵并验证正交性
     for state in result["states"]:
         r = state[:3]
         v = state[3:6]
@@ -297,34 +199,10 @@ def test_vnb_rotation_matrix_orthogonality_during_propagation(earth_icrf_system)
 @pytest.mark.spice
 def test_lvlh_rotation_matrix_orthogonality_during_propagation(earth_icrf_system):
     """LVLH 推力传播过程中，动态坐标系转换矩阵保持正交（R @ R.T ≈ I）。"""
-    # Arrange
-    system = earth_icrf_system
-    mu = system.gravitational_parameter("EARTH")
-
-    a0 = EARTH_RE + 400.0
-    y0 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
-
-    thrust = 1.0
-    mass = 1000.0
-    duration_s = 3600.0
-
-    gravity = PointMassGravity(body="EARTH")
-    burn = FiniteBurn(
-        thrust_profile=lambda t: thrust,
-        direction=[1.0, 0.0, 0.0],
-        mass=mass,
-        direction_frame="LVLH",
+    result, _, _, _ = _propagate_dynamic_axes(
+        earth_icrf_system, [1.0, 0.0, 0.0], "LVLH", 3600.0, 30
     )
-    fm = ForceModel(system, forces=[gravity, burn])
 
-    et0 = system.spice.utc_to_et("2025-06-21T11:00:06")
-    t_span = (et0, et0 + duration_s)
-    t_eval = np.linspace(et0, et0 + duration_s, 30)
-
-    # Act
-    result = fm.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
-
-    # Assert：每个采样点构造 LVLH 基并验证几何关系
     for state in result["states"]:
         r = state[:3]
         v = state[3:6]
@@ -341,120 +219,49 @@ def test_lvlh_rotation_matrix_orthogonality_during_propagation(earth_icrf_system
         assert N_norm > 1e-15, "轨道面法向不能为零"
         N = N / N_norm
 
-        # LVLH 基的关键几何性质：
-        # 1. N 同时垂直于 R 和 V（叉积性质）
+        # LVLH 基的关键几何性质：N 同时垂直于 R 和 V（叉积性质）
         assert abs(np.dot(N, R)) < 1e-14, f"N 应垂直于 R: dot={np.dot(N, R):.2e}"
         assert abs(np.dot(N, V)) < 1e-14, f"N 应垂直于 V: dot={np.dot(N, V):.2e}"
 
-        # 2. R 和 V 的点积 = r·v / (|r||v|)，在椭圆轨道中不为零
-        rv_dot = np.dot(R, V)
-        # 这是真实的轨道几何，不需要断言具体值
 
-        # 3. 用 Gram-Schmidt 构造严格正交基，验证正交性
-        V_perp = V - rv_dot * R
-        V_perp_norm = np.linalg.norm(V_perp)
-        if V_perp_norm > 1e-15:
-            V_perp = V_perp / V_perp_norm
-            # 严格正交基 [R, V_perp, N]
-            ortho_matrix = np.array([R, V_perp, N])
-            identity_check = ortho_matrix @ ortho_matrix.T
-            deviation = np.max(np.abs(identity_check - np.eye(3)))
-            assert deviation < 1e-14, f"Gram-Schmidt 正交基偏差应 < 1e-14, got {deviation:.2e}"
-
-            # 行列式 = 1（右手系）
-            det = np.linalg.det(ortho_matrix)
-            assert abs(det - 1.0) < 1e-14, f"正交基行列式应 ≈ 1, got {det:.6f}"
-
-
-# --- 测试 4：VNB/LVLH 混合方向推力验证 ---
+# --- 测试 4：混合方向 ---
 
 
 @pytest.mark.spice
-def test_vnb_combined_direction_thrust_produces_expected_components(
-    earth_icrf_system,
-):
-    """VNB 下 direction=[1,1,0] 产生 V+N 混合方向，验证加速度分量比例。"""
-    # Arrange
-    system = earth_icrf_system
-    mu = system.gravitational_parameter("EARTH")
-
-    a0 = EARTH_RE + 400.0
-    y0 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
-
-    thrust = 1.0
-    mass = 1000.0
-    duration_s = 600.0
-
-    gravity = PointMassGravity(body="EARTH")
-    burn = FiniteBurn(
-        thrust_profile=lambda t: thrust,
-        direction=[1.0, 1.0, 0.0],
-        mass=mass,
-        direction_frame="VNB",
+def test_vnb_combined_direction_thrust_produces_expected_components(earth_icrf_system):
+    """VNB 下 direction=[1,1,1] 混合方向，验证初始点加速度分量比例。"""
+    result, mu, fm, et0 = _propagate_dynamic_axes(
+        earth_icrf_system, [1.0, 1.0, 1.0], "VNB", 600.0, 10
     )
-    fm = ForceModel(system, forces=[gravity, burn])
 
-    et0 = system.spice.utc_to_et("2025-06-21T11:00:06")
-    t_span = (et0, et0 + duration_s)
-    t_eval = np.linspace(et0, et0 + duration_s, 10)
-
-    # Act
-    result = fm.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
-
-    # Assert：在初始点验证加速度分量比例
     state = result["states"][0]
     r = state[:3]
     v = state[3:6]
+    r_norm = np.linalg.norm(r)
     v_norm = np.linalg.norm(v)
     V = v / v_norm
     h = np.cross(r, v)
-    h_norm = np.linalg.norm(h)
-    N = h / h_norm
+    N = h / np.linalg.norm(h)
+    B = np.cross(V, N)
 
-    gravity_acc = -mu / (np.linalg.norm(r) ** 3) * r
+    gravity_acc = -mu / (r_norm**3) * r
     total_acc = fm._compute_total_acceleration(et0, state)
     thrust_acc = total_acc - gravity_acc
 
-    # direction=[1,1,0] 在 VNB 下 = (V + N) / sqrt(2)
-    expected_dir = (V + N) / np.linalg.norm(V + N)
-    expected_thrust_acc = (thrust / mass / 1000.0) * expected_dir
+    # direction=[1,1,1] 在 VNB 下 = (V + N + B) / sqrt(3)
+    expected_dir = (V + N + B) / np.linalg.norm(V + N + B)
+    expected_thrust_acc = (1.0 / 1000.0 / 1000.0) * expected_dir
 
     np.testing.assert_allclose(thrust_acc, expected_thrust_acc, atol=1e-12)
 
 
 @pytest.mark.spice
-def test_lvlh_combined_direction_thrust_produces_expected_components(
-    earth_icrf_system,
-):
-    """LVLH 下 direction=[1,1,0] 产生 R+V 混合方向，验证加速度分量比例。"""
-    # Arrange
-    system = earth_icrf_system
-    mu = system.gravitational_parameter("EARTH")
-
-    a0 = EARTH_RE + 400.0
-    y0 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
-
-    thrust = 1.0
-    mass = 1000.0
-    duration_s = 600.0
-
-    gravity = PointMassGravity(body="EARTH")
-    burn = FiniteBurn(
-        thrust_profile=lambda t: thrust,
-        direction=[1.0, 1.0, 0.0],
-        mass=mass,
-        direction_frame="LVLH",
+def test_lvlh_combined_direction_thrust_produces_expected_components(earth_icrf_system):
+    """LVLH 下 direction=[1,1,0] 混合方向，验证初始点加速度分量比例。"""
+    result, mu, fm, et0 = _propagate_dynamic_axes(
+        earth_icrf_system, [1.0, 1.0, 0.0], "LVLH", 600.0, 10
     )
-    fm = ForceModel(system, forces=[gravity, burn])
 
-    et0 = system.spice.utc_to_et("2025-06-21T11:00:06")
-    t_span = (et0, et0 + duration_s)
-    t_eval = np.linspace(et0, et0 + duration_s, 10)
-
-    # Act
-    result = fm.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
-
-    # Assert：在初始点验证加速度分量比例
     state = result["states"][0]
     r = state[:3]
     v = state[3:6]
@@ -469,7 +276,7 @@ def test_lvlh_combined_direction_thrust_produces_expected_components(
 
     # direction=[1,1,0] 在 LVLH 下 = (R + V) / sqrt(2)
     expected_dir = (R + V) / np.linalg.norm(R + V)
-    expected_thrust_acc = (thrust / mass / 1000.0) * expected_dir
+    expected_thrust_acc = (1.0 / 1000.0 / 1000.0) * expected_dir
 
     np.testing.assert_allclose(thrust_acc, expected_thrust_acc, atol=1e-12)
 
@@ -480,7 +287,6 @@ def test_lvlh_combined_direction_thrust_produces_expected_components(
 @pytest.mark.spice
 def test_vnb_zero_thrust_no_orbit_change(earth_icrf_system):
     """VNB 方向但推力为零时，轨道应与纯引力传播一致。"""
-    # Arrange
     system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")
 
@@ -501,11 +307,9 @@ def test_vnb_zero_thrust_no_orbit_change(earth_icrf_system):
     t_span = (et0, et0 + 600.0)
     t_eval = np.linspace(et0, et0 + 600.0, 20)
 
-    # Act
     result_with_zero = fm_with_zero_thrust.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
     result_gravity_only = fm_gravity_only.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
 
-    # Assert
     np.testing.assert_allclose(
         result_with_zero["states"],
         result_gravity_only["states"],

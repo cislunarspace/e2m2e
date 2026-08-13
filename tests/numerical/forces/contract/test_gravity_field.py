@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.forces import GravityField
+from tests.numerical.forces.conftest import FakeSystem
 
 pytestmark = pytest.mark.force
 
@@ -36,14 +37,7 @@ def test_gravity_field_degree_zero_rust_spec_matches_point_mass(minimal_gravity_
     """degree=0 的 GravityField spec 与 PointMassGravity 物理等价（同 mu）。"""
     from e2m2e.algorithm.forces import PointMassGravity
 
-    class _FakeSystem:
-        coordinate_system = object()
-        origin = "EARTH"
-
-        def gravitational_parameter(self, body):
-            return 398600.4415
-
-    system = _FakeSystem()
+    system = FakeSystem()
     gf = GravityField(
         body="EARTH",
         degree=0,

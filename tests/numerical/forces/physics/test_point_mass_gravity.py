@@ -8,36 +8,14 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.forces import ForceModel
+from tests.numerical.forces.conftest import FakeSystem
 
 pytestmark = pytest.mark.force
 
 
-class _FakeSystem:
-    """仅用于传播测试的最小 System 桩。"""
-
-    def __init__(self):
-        self.coordinate_system = object()
-        self.origin = "EARTH"
-
-    @property
-    def frame(self):
-        from e2m2e.mbse.data.enums import ReferenceFrame
-
-        return ReferenceFrame.J2000
-
-    @property
-    def unit_system(self):
-        from e2m2e.mbse.data.enums import UnitSystem
-
-        return UnitSystem.SI
-
-    def gravitational_parameter(self, body):
-        return 398600.4415
-
-
 def test_point_mass_gravity_rust_propagation_matches_two_body_solution(point_mass_force):
     """Rust compiled 传播点质量圆轨道，一个周期后回到初值（二体闭式解）。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system, forces=[point_mass_force])
 
     mu = point_mass_force.mu
@@ -55,7 +33,7 @@ def test_point_mass_gravity_rust_propagation_matches_two_body_solution(point_mas
 
 def test_propagate_energy_conservation(point_mass_force):
     """点质量传播中比机械能应近似守恒。"""
-    system = _FakeSystem()
+    system = FakeSystem()
     fm = ForceModel(system, forces=[point_mass_force])
 
     mu = point_mass_force.mu

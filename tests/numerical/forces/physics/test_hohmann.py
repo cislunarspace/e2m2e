@@ -8,30 +8,9 @@ import pytest
 
 from e2m2e.algorithm.forces import ForceModel
 from e2m2e.algorithm.forces.thrust import ImpulsiveBurn
+from tests.numerical.forces.conftest import FakeSystem
 
 pytestmark = pytest.mark.force
-
-
-class _FakeSystem:
-    """仅用于传播测试的最小 System 桩。"""
-
-    def __init__(self):
-        self.coordinate_system = object()
-
-    @property
-    def frame(self):
-        from e2m2e.mbse.data.enums import ReferenceFrame
-
-        return ReferenceFrame.J2000
-
-    @property
-    def unit_system(self):
-        from e2m2e.mbse.data.enums import UnitSystem
-
-        return UnitSystem.SI
-
-    def gravitational_parameter(self, body):
-        return 398600.4415
 
 
 def test_hohmann_transfer_two_burns(point_mass_force):
@@ -50,7 +29,7 @@ def test_hohmann_transfer_two_burns(point_mass_force):
     # 初始：r1 圆轨道近地点 [r1,0,0]，速度 [0, v_circ1, 0]
     y0 = np.array([r1, 0.0, 0.0, 0.0, v_circ1, 0.0])
 
-    fm = ForceModel(_FakeSystem(), forces=[point_mass_force])
+    fm = ForceModel(FakeSystem(), forces=[point_mass_force])
 
     # 第一段：施加 Δv1 @ t0，传半周期到远地点
     burn1 = ImpulsiveBurn(epoch=0.0, delta_v=np.array([0.0, dv1, 0.0]))

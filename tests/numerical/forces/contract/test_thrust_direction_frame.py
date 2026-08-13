@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.forces import FiniteBurn
+from tests.numerical.forces.conftest import FakeSystem
 
 pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
 
@@ -21,15 +22,6 @@ pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
 def _make_state(r, v):
     """构造 6 维状态向量。"""
     return np.array([*r, *v], dtype=float)
-
-
-class _FakeSystem:
-    """最小 System 桩。"""
-
-    coordinate_system = object()
-
-    def gravitational_parameter(self, body):
-        return 398600.4415
 
 
 # --- direction_frame 参数校验 ---
@@ -90,7 +82,7 @@ def test_finite_burn_none_frame_fixed_direction():
         mass=1000.0,
     )
     state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, _FakeSystem())
+    acc = burn.compute_acceleration(0.0, state, FakeSystem())
 
     # 10N / 1000kg = 0.01 m/s² = 1e-5 km/s²，方向 [1,0,0]
     np.testing.assert_allclose(acc, [1e-5, 0.0, 0.0])
@@ -105,7 +97,7 @@ def test_finite_burn_none_frame_callable_direction():
         mass=1000.0,
     )
     state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, _FakeSystem())
+    acc = burn.compute_acceleration(0.0, state, FakeSystem())
 
     np.testing.assert_allclose(acc, [0.0, 1e-5, 0.0])
 
@@ -124,7 +116,7 @@ def test_finite_burn_vnb_velocity_direction():
     )
     # 状态：r=[7000,0,0], v=[0,7.5,0] → V 方向为 [0,1,0]
     state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, _FakeSystem())
+    acc = burn.compute_acceleration(0.0, state, FakeSystem())
 
     # 推力沿 V 方向 = [0,1,0]，大小 1e-5 km/s²
     np.testing.assert_allclose(acc, [0.0, 1e-5, 0.0], atol=1e-12)
@@ -141,7 +133,7 @@ def test_finite_burn_vnb_normal_direction():
     )
     # r=[7000,0,0], v=[0,7.5,0] → r×v = [0,0,52500] → N = [0,0,1]
     state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, _FakeSystem())
+    acc = burn.compute_acceleration(0.0, state, FakeSystem())
 
     np.testing.assert_allclose(acc, [0.0, 0.0, 1e-5], atol=1e-12)
 
@@ -157,7 +149,7 @@ def test_finite_burn_vnb_binormal_direction():
     )
     # r=[7000,0,0], v=[0,7.5,0] → V=[0,1,0], N=[0,0,1], B=V×N=[1,0,0]
     state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, _FakeSystem())
+    acc = burn.compute_acceleration(0.0, state, FakeSystem())
 
     np.testing.assert_allclose(acc, [1e-5, 0.0, 0.0], atol=1e-12)
 
@@ -175,7 +167,7 @@ def test_finite_burn_vnb_combined_direction():
     # direction=[1,1,1] 在 VNB 下 = V + N + B = [0,1,0] + [0,0,1] + [1,0,0] = [1,1,1]
     # 归一化后 = [1,1,1]/sqrt(3)
     state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, _FakeSystem())
+    acc = burn.compute_acceleration(0.0, state, FakeSystem())
 
     expected_dir = np.array([1.0, 1.0, 1.0]) / np.sqrt(3.0)
     expected = 1e-5 * expected_dir
@@ -196,7 +188,7 @@ def test_finite_burn_lvlh_radial_direction():
     )
     # r=[7000,0,0] → R=[1,0,0]
     state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, _FakeSystem())
+    acc = burn.compute_acceleration(0.0, state, FakeSystem())
 
     np.testing.assert_allclose(acc, [1e-5, 0.0, 0.0], atol=1e-12)
 
@@ -212,7 +204,7 @@ def test_finite_burn_lvlh_velocity_direction():
     )
     # v=[0,7.5,0] → V=[0,1,0]
     state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, _FakeSystem())
+    acc = burn.compute_acceleration(0.0, state, FakeSystem())
 
     np.testing.assert_allclose(acc, [0.0, 1e-5, 0.0], atol=1e-12)
 
@@ -228,7 +220,7 @@ def test_finite_burn_lvlh_cross_track_direction():
     )
     # r=[7000,0,0], v=[0,7.5,0] → R=[1,0,0], V=[0,1,0], N=R×V=[0,0,1]
     state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, _FakeSystem())
+    acc = burn.compute_acceleration(0.0, state, FakeSystem())
 
     np.testing.assert_allclose(acc, [0.0, 0.0, 1e-5], atol=1e-12)
 
@@ -244,7 +236,7 @@ def test_finite_burn_lvlh_3d_position():
     )
     # r=[1000,2000,3000], v=[1,2,3]
     state = _make_state([1000.0, 2000.0, 3000.0], [1.0, 2.0, 3.0])
-    acc = burn.compute_acceleration(0.0, state, _FakeSystem())
+    acc = burn.compute_acceleration(0.0, state, FakeSystem())
 
     r = np.array([1000.0, 2000.0, 3000.0])
     r_hat = r / np.linalg.norm(r)
@@ -265,7 +257,7 @@ def test_finite_burn_vnb_with_callable_direction():
         direction_frame="VNB",
     )
     state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, _FakeSystem())
+    acc = burn.compute_acceleration(0.0, state, FakeSystem())
 
     # V 方向 = [0,1,0]
     np.testing.assert_allclose(acc, [0.0, 1e-5, 0.0], atol=1e-12)
@@ -281,7 +273,7 @@ def test_finite_burn_lvlh_with_callable_direction():
         direction_frame="LVLH",
     )
     state = _make_state([7000.0, 0.0, 0.0], [0.0, 7.5, 0.0])
-    acc = burn.compute_acceleration(0.0, state, _FakeSystem())
+    acc = burn.compute_acceleration(0.0, state, FakeSystem())
 
     # N = R × V = [0,0,1]
     np.testing.assert_allclose(acc, [0.0, 0.0, 1e-5], atol=1e-12)
@@ -301,7 +293,7 @@ def test_finite_burn_vnb_zero_velocity_raises():
     )
     state = _make_state([7000.0, 0.0, 0.0], [0.0, 0.0, 0.0])
     with pytest.raises(ValueError, match="velocity"):
-        burn.compute_acceleration(0.0, state, _FakeSystem())
+        burn.compute_acceleration(0.0, state, FakeSystem())
 
 
 @pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
@@ -315,7 +307,7 @@ def test_finite_burn_lvlh_zero_position_raises():
     )
     state = _make_state([0.0, 0.0, 0.0], [0.0, 7.5, 0.0])
     with pytest.raises(ValueError, match="position"):
-        burn.compute_acceleration(0.0, state, _FakeSystem())
+        burn.compute_acceleration(0.0, state, FakeSystem())
 
 
 # --- 关机时 direction_frame 不触发计算 ---
@@ -332,6 +324,6 @@ def test_finite_burn_zero_thrust_skips_direction_frame():
     )
     # 即使 v=0（VNB 会抛），thrust=0 也应直接返回零
     state = _make_state([7000.0, 0.0, 0.0], [0.0, 0.0, 0.0])
-    acc = burn.compute_acceleration(0.0, state, _FakeSystem())
+    acc = burn.compute_acceleration(0.0, state, FakeSystem())
 
     np.testing.assert_array_equal(acc, np.zeros(3))

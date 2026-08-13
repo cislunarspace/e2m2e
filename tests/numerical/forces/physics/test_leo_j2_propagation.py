@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.forces import ForceModel, GravityField
+from e2m2e.data.constants.bodies import EARTH
 from tests.numerical.forces.conftest import keplerian_to_cartesian
 
 pytestmark = pytest.mark.force
@@ -22,8 +23,11 @@ def test_leo_j2_one_day_raan_drift(earth_icrf_system):
     """LEO 1 天传播，RAAN 长期变化率与 J2 解析公式一致（误差 < 1%）。"""
     system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")
-    R_e = 6378.1363
-    j2 = 0.001082626173852189  # EGM96 J2
+    # 解析公式的两个模型常量取自包内默认重力文件（EGM96-to10）：
+    # 参考半径在 constants 层有对应字段；J2 暂无字段（生产代码从系数文件读），
+    # 此处保留 EGM96 值并标注来源。
+    R_e = EARTH.gravity_ref_radius_km  # EGM96 参考半径（= constants 层同值）
+    j2 = 0.001082626173852189  # EGM96 J2 带谐系数
 
     a = 6778.0  # km (~400 km altitude)
     e = 0.001
@@ -69,7 +73,7 @@ def test_leo_j2_one_day_raan_drift(earth_icrf_system):
 
 @pytest.mark.spice
 def test_leo_solid_tide_orbit_difference(earth_icrf_system):
-    """AC6: LEO 1 天传播,固体潮 ON vs OFF 产生非零轨道差异(自洽性)。
+    """固体潮 ON vs OFF 产生非零轨道差异（自洽性，验收标准 AC6）。
 
     精度要求低:只验证潮汐改变轨道(非零差异),不设硬门槛。需要 ITRF93
     BPC 内核以查 Sun/Moon 在地固系的位置。

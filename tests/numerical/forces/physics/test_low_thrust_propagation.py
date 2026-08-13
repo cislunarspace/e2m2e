@@ -18,6 +18,7 @@ pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
 
 
 @pytest.mark.spice
+@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
 def test_low_thrust_circular_orbit_semi_major_axis_rate(earth_icrf_system):
     """低推力圆轨道提升：半长轴变化率与解析公式误差 < 5%。"""
     system = earth_icrf_system

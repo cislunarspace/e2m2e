@@ -17,6 +17,7 @@ pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
 
 
 @pytest.mark.spice
+@pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
 def test_low_thrust_config_round_trip(earth_icrf_system):
     """FiniteBurn 配置往返后，低推力传播结果一致。"""
     system = earth_icrf_system

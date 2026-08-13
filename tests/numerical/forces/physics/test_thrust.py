@@ -12,30 +12,9 @@ import pytest
 
 from e2m2e.algorithm.forces import ForceModel
 from e2m2e.algorithm.forces.thrust import FiniteBurn
+from tests.numerical.forces.conftest import FakeSystem
 
 pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
-
-
-class _FakeSystem:
-    """仅用于传播测试的最小 System 桩。"""
-
-    def __init__(self):
-        self.coordinate_system = object()
-
-    @property
-    def frame(self):
-        from e2m2e.mbse.data.enums import ReferenceFrame
-
-        return ReferenceFrame.J2000
-
-    @property
-    def unit_system(self):
-        from e2m2e.mbse.data.enums import UnitSystem
-
-        return UnitSystem.SI
-
-    def gravitational_parameter(self, body):
-        return 398600.4415
 
 
 @pytest.mark.xfail(reason="预留 #407：FiniteBurn 恒质量低推力从未实现")
@@ -51,7 +30,7 @@ def test_finite_burn_spiral_raises_semi_major_axis(point_mass_force):
         direction=lambda t, s: s[3:6],  # 沿速度方向（可调用）
         mass=1000.0,  # kg
     )
-    fm = ForceModel(_FakeSystem(), forces=[point_mass_force, burn])
+    fm = ForceModel(FakeSystem(), forces=[point_mass_force, burn])
 
     period = 2.0 * np.pi * np.sqrt(r0**3 / mu)
     n_orbits = 3
