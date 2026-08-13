@@ -172,17 +172,9 @@ pub fn batch_synodic_to_j2000_py(
     for i in 0..n {
         let et = et0 + t_syn[i] * t_c;
         let (rot, rate, lc) = rotation_and_rate(et)?;
-        let s = &states_syn[6 * i..6 * i + 6];
-        // position_in = (r_syn + offset)·l_c
-        let p = [(s[0] + mu) * lc, s[1] * lc, s[2] * lc];
-        // velocity_in = v_syn·l_c / t_c
-        let v = [s[3] * lc / t_c, s[4] * lc / t_c, s[5] * lc / t_c];
-        let pos = mat3_mul_vec(&rot, &p);
-        let rp = mat3_mul_vec(&rot, &v);
-        let rdot_p = mat3_mul_vec(&rate, &p);
-        let vel = [rp[0] + rdot_p[0], rp[1] + rdot_p[1], rp[2] + rdot_p[2]];
-        out[6 * i..6 * i + 3].copy_from_slice(&pos);
-        out[6 * i + 3..6 * i + 6].copy_from_slice(&vel);
+        let s: [f64; 6] = states_syn[6 * i..6 * i + 6].try_into().expect("len 6");
+        let res = syn_to_j2000(&rot, &rate, lc, mu, t_c, &s);
+        out[6 * i..6 * i + 6].copy_from_slice(&res);
     }
     Ok(out)
 }
