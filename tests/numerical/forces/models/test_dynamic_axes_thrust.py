@@ -12,73 +12,14 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
-from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
-from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
-from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces import FiniteBurn, ForceModel, PointMassGravity
-from e2m2e.data.kernels.manager import SPICEManager
+from tests.numerical.forces.conftest import (
+    EARTH_RE,
+    keplerian_to_cartesian,
+    semi_major_axis,
+)
 
 pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
-
-
-_EARTH_R_KM = 6378.137
-_MU_EARTH = 398600.4415  # km³/s²
-
-
-def _keplerian_to_cartesian(a, e, i, raan, argp, nu, mu):
-    """将开普勒根数转为笛卡尔状态。"""
-    p = a * (1 - e**2)
-    r = p / (1 + e * np.cos(nu))
-
-    i = np.radians(i)
-    raan = np.radians(raan)
-    argp = np.radians(argp)
-    nu = np.radians(nu)
-
-    r_pqw = np.array([r * np.cos(nu), r * np.sin(nu), 0.0])
-    v_pqw = np.array(
-        [
-            -np.sqrt(mu / p) * np.sin(nu),
-            np.sqrt(mu / p) * (e + np.cos(nu)),
-            0.0,
-        ]
-    )
-
-    R3_raan = np.array(
-        [
-            [np.cos(raan), -np.sin(raan), 0.0],
-            [np.sin(raan), np.cos(raan), 0.0],
-            [0.0, 0.0, 1.0],
-        ]
-    )
-    R1_i = np.array(
-        [
-            [1.0, 0.0, 0.0],
-            [0.0, np.cos(i), -np.sin(i)],
-            [0.0, np.sin(i), np.cos(i)],
-        ]
-    )
-    R3_argp = np.array(
-        [
-            [np.cos(argp), -np.sin(argp), 0.0],
-            [np.sin(argp), np.cos(argp), 0.0],
-            [0.0, 0.0, 1.0],
-        ]
-    )
-    R = R3_raan @ R1_i @ R3_argp
-
-    r_eci = R @ r_pqw
-    v_eci = R @ v_pqw
-    return np.concatenate([r_eci, v_eci])
-
-
-def _semi_major_axis(state, mu):
-    """从状态向量用能量公式计算半长轴。"""
-    r = np.linalg.norm(state[:3])
-    v = np.linalg.norm(state[3:6])
-    energy = v**2 / 2.0 - mu / r
-    return -mu / (2.0 * energy)
 
 
 def _eccentricity(state, mu):
@@ -99,38 +40,18 @@ def _orbital_energy(state, mu):
     return v**2 / 2.0 - mu / r
 
 
-@pytest.fixture
-def earth_ephemeris_system(spice_kernel_path):
-    """Earth-centered J2000 ephemeris system for dynamic axes thrust tests."""
-    spice = SPICEManager()
-    spice.load_kernel(spice_kernel_path)
-    try:
-        system = EphemerisSystem(
-            bodies=["EARTH"],
-            spice=spice,
-            origin="EARTH",
-        )
-        system.coordinate_system = CoordinateSystem(
-            axes=ICRSAxes(),
-            origin=CelestialBodyOrigin(body="EARTH", spice=spice),
-        )
-        yield system
-    finally:
-        spice.unload_kernel(spice_kernel_path)
-
-
 # --- 测试 1：VNB 沿速度方向推力 ---
 
 
 @pytest.mark.spice
-def test_vnb_velocity_direction_thrust_increases_semi_major_axis(earth_ephemeris_system):
+def test_vnb_velocity_direction_thrust_increases_semi_major_axis(earth_icrf_system):
     """VNB 下 direction=[1,0,0] 沿速度方向推力，验证半长轴与轨道能量增加。"""
     # Arrange
-    system = earth_ephemeris_system
+    system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")
 
-    a0 = _EARTH_R_KM + 400.0  # 近圆 LEO，400 km 高度
-    y0 = _keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
+    a0 = EARTH_RE + 400.0  # 近圆 LEO，400 km 高度
+    y0 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
 
     thrust = 1.0  # N
     mass = 1000.0  # kg
@@ -153,8 +74,8 @@ def test_vnb_velocity_direction_thrust_increases_semi_major_axis(earth_ephemeris
     result = fm.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
 
     # Assert：半长轴增加
-    a_initial = _semi_major_axis(result["states"][0], mu)
-    a_final = _semi_major_axis(result["states"][-1], mu)
+    a_initial = semi_major_axis(result["states"][0], mu)
+    a_final = semi_major_axis(result["states"][-1], mu)
     assert a_final > a_initial, f"半长轴应增加: initial={a_initial:.3f} km, final={a_final:.3f} km"
 
     # Assert：轨道能量增加
@@ -167,15 +88,15 @@ def test_vnb_velocity_direction_thrust_increases_semi_major_axis(earth_ephemeris
 
 @pytest.mark.spice
 def test_vnb_velocity_direction_thrust_acceleration_aligns_with_velocity(
-    earth_ephemeris_system,
+    earth_icrf_system,
 ):
     """VNB 沿速度方向推力，验证惯性系中推力加速度方向与速度方向点积 ≈ 1。"""
     # Arrange
-    system = earth_ephemeris_system
+    system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")
 
-    a0 = _EARTH_R_KM + 400.0
-    y0 = _keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
+    a0 = EARTH_RE + 400.0
+    y0 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
 
     thrust = 1.0
     mass = 1000.0
@@ -222,14 +143,14 @@ def test_vnb_velocity_direction_thrust_acceleration_aligns_with_velocity(
 
 
 @pytest.mark.spice
-def test_lvlh_radial_direction_thrust_increases_eccentricity(earth_ephemeris_system):
+def test_lvlh_radial_direction_thrust_increases_eccentricity(earth_icrf_system):
     """LVLH 下 direction=[1,0,0] 径向推力，验证偏心率随时间增加。"""
     # Arrange
-    system = earth_ephemeris_system
+    system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")
 
-    a0 = _EARTH_R_KM + 400.0
-    y0 = _keplerian_to_cartesian(a0, 0.001, 0.0, 0.0, 0.0, 0.0, mu)
+    a0 = EARTH_RE + 400.0
+    y0 = keplerian_to_cartesian(a0, 0.001, 0.0, 0.0, 0.0, 0.0, mu)
 
     thrust = 1.0
     mass = 1000.0
@@ -265,15 +186,15 @@ def test_lvlh_radial_direction_thrust_increases_eccentricity(earth_ephemeris_sys
 
 @pytest.mark.spice
 def test_lvlh_radial_direction_thrust_acceleration_aligns_with_position(
-    earth_ephemeris_system,
+    earth_icrf_system,
 ):
     """LVLH 径向推力，验证惯性系中推力加速度方向与位置向量方向点积 ≈ 1。"""
     # Arrange
-    system = earth_ephemeris_system
+    system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")
 
-    a0 = _EARTH_R_KM + 400.0
-    y0 = _keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
+    a0 = EARTH_RE + 400.0
+    y0 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
 
     thrust = 1.0
     mass = 1000.0
@@ -316,14 +237,14 @@ def test_lvlh_radial_direction_thrust_acceleration_aligns_with_position(
 
 
 @pytest.mark.spice
-def test_vnb_rotation_matrix_orthogonality_during_propagation(earth_ephemeris_system):
+def test_vnb_rotation_matrix_orthogonality_during_propagation(earth_icrf_system):
     """VNB 推力传播过程中，动态坐标系转换矩阵保持正交（R @ R.T ≈ I）。"""
     # Arrange
-    system = earth_ephemeris_system
+    system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")
 
-    a0 = _EARTH_R_KM + 400.0
-    y0 = _keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
+    a0 = EARTH_RE + 400.0
+    y0 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
 
     thrust = 1.0
     mass = 1000.0
@@ -374,14 +295,14 @@ def test_vnb_rotation_matrix_orthogonality_during_propagation(earth_ephemeris_sy
 
 
 @pytest.mark.spice
-def test_lvlh_rotation_matrix_orthogonality_during_propagation(earth_ephemeris_system):
+def test_lvlh_rotation_matrix_orthogonality_during_propagation(earth_icrf_system):
     """LVLH 推力传播过程中，动态坐标系转换矩阵保持正交（R @ R.T ≈ I）。"""
     # Arrange
-    system = earth_ephemeris_system
+    system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")
 
-    a0 = _EARTH_R_KM + 400.0
-    y0 = _keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
+    a0 = EARTH_RE + 400.0
+    y0 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
 
     thrust = 1.0
     mass = 1000.0
@@ -450,15 +371,15 @@ def test_lvlh_rotation_matrix_orthogonality_during_propagation(earth_ephemeris_s
 
 @pytest.mark.spice
 def test_vnb_combined_direction_thrust_produces_expected_components(
-    earth_ephemeris_system,
+    earth_icrf_system,
 ):
     """VNB 下 direction=[1,1,0] 产生 V+N 混合方向，验证加速度分量比例。"""
     # Arrange
-    system = earth_ephemeris_system
+    system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")
 
-    a0 = _EARTH_R_KM + 400.0
-    y0 = _keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
+    a0 = EARTH_RE + 400.0
+    y0 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
 
     thrust = 1.0
     mass = 1000.0
@@ -503,15 +424,15 @@ def test_vnb_combined_direction_thrust_produces_expected_components(
 
 @pytest.mark.spice
 def test_lvlh_combined_direction_thrust_produces_expected_components(
-    earth_ephemeris_system,
+    earth_icrf_system,
 ):
     """LVLH 下 direction=[1,1,0] 产生 R+V 混合方向，验证加速度分量比例。"""
     # Arrange
-    system = earth_ephemeris_system
+    system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")
 
-    a0 = _EARTH_R_KM + 400.0
-    y0 = _keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
+    a0 = EARTH_RE + 400.0
+    y0 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
 
     thrust = 1.0
     mass = 1000.0
@@ -557,14 +478,14 @@ def test_lvlh_combined_direction_thrust_produces_expected_components(
 
 
 @pytest.mark.spice
-def test_vnb_zero_thrust_no_orbit_change(earth_ephemeris_system):
+def test_vnb_zero_thrust_no_orbit_change(earth_icrf_system):
     """VNB 方向但推力为零时，轨道应与纯引力传播一致。"""
     # Arrange
-    system = earth_ephemeris_system
+    system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")
 
-    a0 = _EARTH_R_KM + 400.0
-    y0 = _keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
+    a0 = EARTH_RE + 400.0
+    y0 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
 
     gravity = PointMassGravity(body="EARTH")
     burn_zero = FiniteBurn(

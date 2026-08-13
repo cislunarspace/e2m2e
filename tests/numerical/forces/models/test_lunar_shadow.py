@@ -8,37 +8,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
-from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
-from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
-from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces.shadow import ConicalShadowModel
-from e2m2e.data.kernels.manager import SPICEManager
 
 pytestmark = pytest.mark.force
 
 
 _MOON_R_KM = 1737.4
-
-
-@pytest.fixture
-def earth_icrf_system(spice_kernel_path):
-    """地球中心 ICRF 传播系统（加载地月日三星历）。"""
-    spice = SPICEManager()
-    spice.load_kernel(spice_kernel_path)
-    try:
-        system = EphemerisSystem(
-            bodies=["EARTH", "MOON", "SUN"],
-            spice=spice,
-            origin="EARTH",
-        )
-        system.coordinate_system = CoordinateSystem(
-            axes=ICRSAxes(),
-            origin=CelestialBodyOrigin(body="EARTH", spice=spice),
-        )
-        yield system
-    finally:
-        spice.unload_kernel(spice_kernel_path)
 
 
 def _anti_sun_sc_near_moon(system, et: float, alt_km: float = 100.0) -> np.ndarray:

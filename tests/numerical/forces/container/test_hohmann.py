@@ -36,7 +36,7 @@ class _FakeSystem:
 
 def test_hohmann_transfer_two_burns(point_mass_force):
     """霍曼转移：Δv1@近地点 → 半周期 → 实测远地点反算 Δv2 → 总 Δv<1% + 末态圆。"""
-    mu = 398600.4415
+    mu = point_mass_force.mu
     r1, r2 = 6678.0, 42164.0  # LEO 300km → GEO
     v_circ1 = np.sqrt(mu / r1)
     v_circ2 = np.sqrt(mu / r2)

@@ -18,7 +18,6 @@ from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
 from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
 from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
 from e2m2e.algorithm.dynamics.ephemeris_dynamics import EphemerisDynamics
-from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces import (
     ForceModel,
     GravityField,
@@ -170,28 +169,6 @@ class TestCustomForceStmCapability:
 # =============================================================================
 # 球谐引力 STM 通路（GravityField 走 Rust 内有限差分雅可比）
 # =============================================================================
-@pytest.fixture
-def body_fixed_system(spice_kernel_path):
-    """加载 body-fixed 内核的 ICRS 系统（GravityField 需要 ITRF93/MOON_PA）。"""
-    from kernel_helpers import load_body_fixed_kernels, unload_kernels
-
-    from e2m2e.data.kernels.manager import SPICEManager
-
-    spice = SPICEManager()
-    spice.load_kernel(spice_kernel_path)
-    bf_kernels = load_body_fixed_kernels(spice)
-    try:
-        system = EphemerisSystem(bodies=["EARTH", "MOON", "SUN"], spice=spice, origin="EARTH")
-        system.coordinate_system = CoordinateSystem(
-            axes=ICRSAxes(),
-            origin=CelestialBodyOrigin(body="EARTH", spice=spice),
-        )
-        yield system, spice
-    finally:
-        unload_kernels(spice, bf_kernels)
-        spice.unload_kernel(spice_kernel_path)
-
-
 class TestGravityFieldSTM:
     """含球谐引力的 ForceModel STM 通路验证。
 
@@ -205,11 +182,11 @@ class TestGravityFieldSTM:
     """
 
     def test_gravity_field_stm_propagates_and_is_reasonable(
-        self, body_fixed_system, reference_epoch
+        self, earth_icrf_system, reference_epoch
     ):
         """含球谐的 ForceModel with_stm=True 跑通，STM 有限且满足定义。"""
-        system, spice = body_fixed_system
-        et0 = spice.utc_to_et(reference_epoch)
+        system = earth_icrf_system
+        et0 = system.spice.utc_to_et(reference_epoch)
 
         fm = ForceModel(
             system,
@@ -242,14 +219,14 @@ class TestGravityFieldSTM:
         rel_err = np.linalg.norm(predicted - actual) / np.linalg.norm(actual)
         assert rel_err < 1e-3, f"球谐 STM 预测偏差过大: rel_err={rel_err:.2e}"
 
-    def test_j2_stm_matches_point_mass_plus_perturbation(self, body_fixed_system, reference_epoch):
+    def test_j2_stm_matches_point_mass_plus_perturbation(self, earth_icrf_system, reference_epoch):
         """地球 J2 的 STM 应接近纯点质量 STM（J2 是小摄动）。
 
         两者 STM 应在 1e-3 量级一致（J2 对 1 小时弧段的 STM 贡献很小）。
         这验证球谐雅可比兜底没有引入量级错误。
         """
-        system, spice = body_fixed_system
-        et0 = spice.utc_to_et(reference_epoch)
+        system = earth_icrf_system
+        et0 = system.spice.utc_to_et(reference_epoch)
 
         # 点质量地球（解析雅可比）
         fm_pm = ForceModel(

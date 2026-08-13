@@ -127,7 +127,7 @@ def test_finite_burn_validation():
 
 def test_finite_burn_spiral_raises_semi_major_axis(point_mass_force):
     """沿速度方向低推力传播 → 半长轴持续提升（电推进螺旋趋势）。"""
-    mu = 398600.4415
+    mu = point_mass_force.mu
     r0 = 6678.0  # LEO 300km
     v_circ = np.sqrt(mu / r0)
     y0 = np.array([r0, 0.0, 0.0, 0.0, v_circ, 0.0])

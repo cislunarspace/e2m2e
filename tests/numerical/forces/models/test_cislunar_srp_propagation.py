@@ -8,45 +8,13 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
-from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
-from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
-from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces import ForceModel, GravityField
 from e2m2e.algorithm.forces.shadow import ConicalShadowModel
 from e2m2e.algorithm.forces.srp import SolarRadiationPressure
 from e2m2e.data.constants import SOLAR_PRESSURE_1AU
-from e2m2e.data.kernels.manager import SPICEManager
+from tests.numerical.forces.conftest import EARTH_MU, EARTH_RE
 
 pytestmark = pytest.mark.force
-
-
-_MU_EARTH = 398600.4415  # km³/s²
-_EARTH_R_KM = 6378.137
-
-
-@pytest.fixture
-def earth_icrf_system(spice_kernel_path):
-    """地球中心 ICRF 传播系统。"""
-    from kernel_helpers import load_body_fixed_kernels, unload_kernels
-
-    spice = SPICEManager()
-    spice.load_kernel(spice_kernel_path)
-    bf_kernels = load_body_fixed_kernels(spice)
-    try:
-        system = EphemerisSystem(
-            bodies=["EARTH", "MOON", "SUN"],
-            spice=spice,
-            origin="EARTH",
-        )
-        system.coordinate_system = CoordinateSystem(
-            axes=ICRSAxes(),
-            origin=CelestialBodyOrigin(body="EARTH", spice=spice),
-        )
-        yield system
-    finally:
-        unload_kernels(spice, bf_kernels)
-        spice.unload_kernel(spice_kernel_path)
 
 
 @pytest.mark.spice
@@ -67,8 +35,8 @@ def test_equatorial_leo_crosses_earth_shadow(earth_icrf_system) -> None:
     sun_dir = sun_pos / np.linalg.norm(sun_pos)
 
     # 赤道圆轨 400 km，初值在日侧正午
-    a = _EARTH_R_KM + 400.0
-    v_circ = np.sqrt(_MU_EARTH / a)
+    a = EARTH_RE + 400.0
+    v_circ = np.sqrt(EARTH_MU / a)
     r0 = sun_dir * a
     # 顺行：赤道面内垂直日向（z 轴为轨道法向）
     v0 = np.array([-sun_dir[1], sun_dir[0], 0.0]) * v_circ
@@ -81,7 +49,7 @@ def test_equatorial_leo_crosses_earth_shadow(earth_icrf_system) -> None:
     fm = ForceModel(system, forces=[gravity, srp])
 
     # 传播 1.5 圈（半圈到反日点入影，再半圈到正午出影后又入影）
-    period = 2.0 * np.pi * np.sqrt(a**3 / _MU_EARTH)
+    period = 2.0 * np.pi * np.sqrt(a**3 / EARTH_MU)
     t_span = (et0, et0 + 1.5 * period)
     t_eval = np.linspace(*t_span, 400)
     result = fm.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)

@@ -1,101 +1,14 @@
-"""可变质量低推力 7D 传播验证。
-
-对照 ``docs/plans/lowthrust-foundation-prd.md`` 的验收标准：半长轴变化率
-对标解析解、质量消耗对标解析值、确认走 Rust 7D 路径。与
-``test_low_thrust_propagation.py``（恒定质量 ``FiniteBurn``）互补，验证
-``VariableMassFiniteBurn`` 把质量纳入状态后的受控动力学。
-"""
-
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
-from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
-from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
-from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces import ForceModel, GravityField, VariableMassFiniteBurn
-from e2m2e.data.kernels.manager import SPICEManager
+from tests.numerical.forces.conftest import (
+    EARTH_RE,
+    keplerian_to_cartesian,
+    semi_major_axis,
+)
 
 pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
-
-
-def _keplerian_to_cartesian(a, e, i, raan, argp, nu, mu):
-    """将开普勒根数转为笛卡尔状态。"""
-    p = a * (1 - e**2)
-    r = p / (1 + e * np.cos(nu))
-
-    i = np.radians(i)
-    raan = np.radians(raan)
-    argp = np.radians(argp)
-    nu = np.radians(nu)
-
-    r_pqw = np.array([r * np.cos(nu), r * np.sin(nu), 0.0])
-    v_pqw = np.array(
-        [
-            -np.sqrt(mu / p) * np.sin(nu),
-            np.sqrt(mu / p) * (e + np.cos(nu)),
-            0.0,
-        ]
-    )
-
-    R3_raan = np.array(
-        [
-            [np.cos(raan), -np.sin(raan), 0.0],
-            [np.sin(raan), np.cos(raan), 0.0],
-            [0.0, 0.0, 1.0],
-        ]
-    )
-    R1_i = np.array(
-        [
-            [1.0, 0.0, 0.0],
-            [0.0, np.cos(i), -np.sin(i)],
-            [0.0, np.sin(i), np.cos(i)],
-        ]
-    )
-    R3_argp = np.array(
-        [
-            [np.cos(argp), -np.sin(argp), 0.0],
-            [np.sin(argp), np.cos(argp), 0.0],
-            [0.0, 0.0, 1.0],
-        ]
-    )
-    R = R3_raan @ R1_i @ R3_argp
-
-    r_eci = R @ r_pqw
-    v_eci = R @ v_pqw
-    return np.concatenate([r_eci, v_eci])
-
-
-def _semi_major_axis(state, mu):
-    """从状态向量用能量公式计算半长轴。"""
-    r = np.linalg.norm(state[:3])
-    v = np.linalg.norm(state[3:6])
-    energy = v**2 / 2.0 - mu / r
-    return -mu / (2.0 * energy)
-
-
-@pytest.fixture
-def earth_ephemeris_system(spice_kernel_path):
-    """Earth-centered J2000 ephemeris system for low-thrust tests."""
-    from kernel_helpers import load_body_fixed_kernels, unload_kernels
-
-    spice = SPICEManager()
-    spice.load_kernel(spice_kernel_path)
-    bf_kernels = load_body_fixed_kernels(spice)
-    try:
-        system = EphemerisSystem(
-            bodies=["EARTH"],
-            spice=spice,
-            origin="EARTH",
-        )
-        system.coordinate_system = CoordinateSystem(
-            axes=ICRSAxes(),
-            origin=CelestialBodyOrigin(body="EARTH", spice=spice),
-        )
-        yield system
-    finally:
-        unload_kernels(spice, bf_kernels)
-        spice.unload_kernel(spice_kernel_path)
 
 
 def _build_lowthrust_problem(system, thrust, isp, mass, direction_kind="velocity"):
@@ -107,9 +20,9 @@ def _build_lowthrust_problem(system, thrust, isp, mass, direction_kind="velocity
         - "fixed": 固定方向向量 [0,1,0]，to_rust_spec 非 None，走 Rust 7D 路径。
     """
     mu = system.gravitational_parameter("EARTH")
-    r_earth = 6378.137
+    r_earth = EARTH_RE
     a0 = r_earth + 300.0
-    y0_6 = _keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
+    y0_6 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
 
     if direction_kind == "velocity":
 
@@ -129,12 +42,12 @@ def _build_lowthrust_problem(system, thrust, isp, mass, direction_kind="velocity
 
 
 @pytest.mark.spice
-def test_variable_mass_events_are_rejected_before_rust_propagation(earth_ephemeris_system):
+def test_variable_mass_events_are_rejected_before_rust_propagation(earth_icrf_system):
     """可变质量低推力带 events 时必须在进入 Rust 路径前显式报错。"""
     fm, y0 = _build_lowthrust_problem(
-        earth_ephemeris_system, thrust=0.1, isp=3000.0, mass=1000.0, direction_kind="fixed"
+        earth_icrf_system, thrust=0.1, isp=3000.0, mass=1000.0, direction_kind="fixed"
     )
-    et0 = earth_ephemeris_system.spice.utc_to_et("2025-06-21T11:00:06")
+    et0 = earth_icrf_system.spice.utc_to_et("2025-06-21T11:00:06")
 
     with pytest.raises(NotImplementedError, match="事件传播"):
         fm.propagate(
@@ -145,9 +58,9 @@ def test_variable_mass_events_are_rejected_before_rust_propagation(earth_ephemer
 
 
 @pytest.mark.spice
-def test_variable_mass_thrust_semi_major_axis_rate(earth_ephemeris_system):
+def test_variable_mass_thrustsemi_major_axis_rate(earth_icrf_system):
     """可变质量低推力圆轨道提升：半长轴变化率与解析公式误差 < 5%。"""
-    system = earth_ephemeris_system
+    system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")
 
     thrust = 0.1  # N
@@ -164,7 +77,7 @@ def test_variable_mass_thrust_semi_major_axis_rate(earth_ephemeris_system):
 
     result = fm.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
 
-    a_final = _semi_major_axis(result["states"][-1], mu)
+    a_final = semi_major_axis(result["states"][-1], mu)
     a_theory = (y0[0] ** 1.5 + 1.5 * np.sqrt(mu) * (thrust / mass) * duration_s) ** (2.0 / 3.0)
 
     relative_error = abs((a_final - a_theory) / a_theory)
@@ -175,9 +88,9 @@ def test_variable_mass_thrust_semi_major_axis_rate(earth_ephemeris_system):
 
 
 @pytest.mark.spice
-def test_variable_mass_consumption_matches_analytic(earth_ephemeris_system):
+def test_variable_mass_consumption_matches_analytic(earth_icrf_system):
     """质量消耗对标解析值 Δm = −T·t_f/(Isp·g0)，误差 < 1e-6 kg。"""
-    system = earth_ephemeris_system
+    system = earth_icrf_system
 
     thrust = 0.5  # N
     mass = 1000.0  # kg
@@ -202,9 +115,9 @@ def test_variable_mass_consumption_matches_analytic(earth_ephemeris_system):
 
 
 @pytest.mark.spice
-def test_variable_mass_uses_rust_path(earth_ephemeris_system):
+def test_variable_mass_uses_rust_path(earth_icrf_system):
     """固定方向的 VariableMassFiniteBurn 走 Rust 7D 路径（结果含 n_steps 键）。"""
-    system = earth_ephemeris_system
+    system = earth_icrf_system
 
     thrust = 0.1
     mass = 1000.0
@@ -227,9 +140,9 @@ def test_variable_mass_uses_rust_path(earth_ephemeris_system):
 
 
 @pytest.mark.spice
-def test_variable_mass_callable_direction_rust_rejects_unsupported_force(earth_ephemeris_system):
+def test_variable_mass_callable_direction_rust_rejects_unsupported_force(earth_icrf_system):
     """Rust 不支持可调用方向时显式拒绝，不隐式回退 Python。"""
-    system = earth_ephemeris_system
+    system = earth_icrf_system
 
     thrust = 0.1
     mass = 1000.0
@@ -250,9 +163,9 @@ def test_variable_mass_callable_direction_rust_rejects_unsupported_force(earth_e
 
 
 @pytest.mark.spice
-def test_variable_mass_zero_thrust_no_fuel_consumption(earth_ephemeris_system):
+def test_variable_mass_zero_thrust_no_fuel_consumption(earth_icrf_system):
     """零推力时质量守恒（边界情形）。"""
-    system = earth_ephemeris_system
+    system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")
 
     thrust = 0.0
@@ -273,6 +186,6 @@ def test_variable_mass_zero_thrust_no_fuel_consumption(earth_ephemeris_system):
         f"零推力下质量应守恒: measured={final_mass:.9f}, expected={mass}"
     )
     # 半长轴也应不变（纯二体圆轨道）
-    a0 = _semi_major_axis(y0, mu)
-    a_final = _semi_major_axis(result["states"][-1], mu)
+    a0 = semi_major_axis(y0, mu)
+    a_final = semi_major_axis(result["states"][-1], mu)
     assert abs(a_final - a0) / a0 < 1e-6

@@ -10,36 +10,11 @@ import numpy as np
 import pytest
 from e2m2e._integrators import srp_acceleration
 
-from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
-from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
-from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
-from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces.shadow import ConicalShadowModel
 from e2m2e.data.constants import AU_KM, SOLAR_PRESSURE_1AU
 from e2m2e.data.constants.bodies import EARTH, SUN
-from e2m2e.data.kernels.manager import SPICEManager
 
 pytestmark = pytest.mark.force
-
-
-@pytest.fixture
-def earth_icrf_system(spice_kernel_path):
-    """地球中心 ICRF 传播系统（地月日三星历）。"""
-    spice = SPICEManager()
-    spice.load_kernel(spice_kernel_path)
-    try:
-        system = EphemerisSystem(
-            bodies=["EARTH", "MOON", "SUN"],
-            spice=spice,
-            origin="EARTH",
-        )
-        system.coordinate_system = CoordinateSystem(
-            axes=ICRSAxes(),
-            origin=CelestialBodyOrigin(body="EARTH", spice=spice),
-        )
-        yield system
-    finally:
-        spice.unload_kernel(spice_kernel_path)
 
 
 def _sun_pos_rel_earth(system, et):

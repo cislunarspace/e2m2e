@@ -12,43 +12,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
-from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
-from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
-from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces import ForceModel, PointMassGravity
 from e2m2e.algorithm.forces.atmosphere import ExponentialAtmosphere
 from e2m2e.algorithm.forces.drag import DragModel
-from e2m2e.data.kernels.manager import SPICEManager
+from tests.numerical.forces.conftest import EARTH_MU, EARTH_RE
 
 pytestmark = [pytest.mark.force, pytest.mark.spice]
-
-
-_MU_EARTH = 398600.4415
-
-
-@pytest.fixture
-def earth_icrf_system(spice_kernel_path):
-    """地球中心 ICRF 传播系统。"""
-    from kernel_helpers import load_body_fixed_kernels, unload_kernels
-
-    spice = SPICEManager()
-    spice.load_kernel(spice_kernel_path)
-    bf_kernels = load_body_fixed_kernels(spice)
-    try:
-        system = EphemerisSystem(
-            bodies=["EARTH"],
-            spice=spice,
-            origin="EARTH",
-        )
-        system.coordinate_system = CoordinateSystem(
-            axes=ICRSAxes(),
-            origin=CelestialBodyOrigin(body="EARTH", spice=spice),
-        )
-        yield system
-    finally:
-        unload_kernels(spice, bf_kernels)
-        spice.unload_kernel(spice_kernel_path)
 
 
 def test_drag_propagation_decreases_orbital_energy(earth_icrf_system):
@@ -58,13 +27,13 @@ def test_drag_propagation_decreases_orbital_energy(earth_icrf_system):
     et0 = spice.utc_to_et("2025-06-21T11:00:06")
 
     # 400 km 圆轨道（ITRF 系内阻力显著）
-    r = 6378.137 + 400.0
-    v = np.sqrt(_MU_EARTH / r)
+    r = EARTH_RE + 400.0
+    v = np.sqrt(EARTH_MU / r)
     y0 = np.array([r, 0.0, 0.0, 0.0, v, 0.0])
 
     atm = ExponentialAtmosphere()
     drag = DragModel(atmosphere=atm, area=10.0, mass=1000.0, cd=2.2)
-    gravity = PointMassGravity(body="EARTH", mu=_MU_EARTH)
+    gravity = PointMassGravity(body="EARTH", mu=EARTH_MU)
     fm = ForceModel(system, forces=[gravity, drag])
     fm.rtol = 1e-10
     fm.atol = 1e-10
@@ -78,13 +47,13 @@ def test_drag_propagation_decreases_orbital_energy(earth_icrf_system):
     def energy(state):
         r_norm = np.linalg.norm(state[:3])
         v_norm = np.linalg.norm(state[3:6])
-        return 0.5 * v_norm**2 - _MU_EARTH / r_norm
+        return 0.5 * v_norm**2 - EARTH_MU / r_norm
 
     energies = np.array([energy(s) for s in states])
     assert energies[-1] < energies[0], "阻力应使比机械能下降"
 
     def semi_major_axis(state):
-        return -_MU_EARTH / (2.0 * energy(state))
+        return -EARTH_MU / (2.0 * energy(state))
 
     a0 = semi_major_axis(states[0])
     a1 = semi_major_axis(states[-1])

@@ -39,7 +39,7 @@ def test_propagate_circular_orbit_one_period(point_mass_force):
     system = _FakeSystem()
     fm = ForceModel(system, forces=[point_mass_force])
 
-    mu = 398600.4415
+    mu = point_mass_force.mu
     r = 6778.0  # km
     v = np.sqrt(mu / r)
     period = 2.0 * np.pi * np.sqrt(r**3 / mu)
@@ -57,7 +57,7 @@ def test_propagate_energy_conservation(point_mass_force):
     system = _FakeSystem()
     fm = ForceModel(system, forces=[point_mass_force])
 
-    mu = 398600.4415
+    mu = point_mass_force.mu
     r = 6778.0
     v = np.sqrt(mu / r) * 1.1  # 稍快，椭圆轨道
     y0 = np.array([r, 0.0, 0.0, 0.0, v, 0.0])

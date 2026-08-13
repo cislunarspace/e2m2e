@@ -1,9 +1,13 @@
-"""Rust 星历预采样缓存验证。
+"""Rust 星历预采样缓存绑定契约测试（ADR 0016）。
 
-对照 ``docs/plans/rust-ephem-cache-prd.md``：
+验证 ``e2m2e.integrators`` 的 ``enable_ephem_cache`` / ``disable_ephem_cache``
+绑定 API：
 - 激活缓存 vs 未激活，传播末态数值一致（< 1e-6 km）
 - 未激活时零回归（与现有行为逐字一致）
 - 缓存对含第三体的传播同样有效
+
+归位说明：本文件验证的是星历缓存基础设施（pyo3 绑定层），力模型只是
+传播载体，故位于 integrators/bindings/ 而非 forces/。
 """
 
 import numpy as np
@@ -17,7 +21,7 @@ from e2m2e.algorithm.forces import ForceModel, GravityField, ThirdBodyGravity
 from e2m2e.data.kernels.manager import SPICEManager
 from e2m2e.integrators import disable_ephem_cache, enable_ephem_cache
 
-pytestmark = pytest.mark.force
+pytestmark = pytest.mark.integrator
 
 
 def _semi_major_axis(state, mu):

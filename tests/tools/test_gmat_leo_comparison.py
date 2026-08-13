@@ -1,13 +1,10 @@
-"""GMAT LEO 对比脚本生成与基本行为测试。
-
-验证脚本格式、力模型配置与报告解析。
-"""
+"""GMAT LEO 对比脚本生成与基本行为测试（scripts/ 工具）。"""
 
 from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.force
+pytestmark = pytest.mark.aux
 
 
 @pytest.fixture
@@ -21,7 +18,7 @@ def test_generate_gmat_script_creates_files(output_dir: Path) -> None:
     """脚本生成器应创建 .script 文件和报告路径。"""
     import sys
 
-    sys.path.insert(0, str(Path(__file__).parents[3] / "scripts"))
+    sys.path.insert(0, str(Path(__file__).parents[2] / "scripts"))
     from generate_gmat_leo_script import generate_gmat_script
 
     script_path = generate_gmat_script(output_dir)
@@ -41,7 +38,7 @@ def test_generate_gmat_script_force_model_config(output_dir: Path) -> None:
     """生成的脚本应包含正确的力模型参数。"""
     import sys
 
-    sys.path.insert(0, str(Path(__file__).parents[3] / "scripts"))
+    sys.path.insert(0, str(Path(__file__).parents[2] / "scripts"))
     from generate_gmat_leo_script import generate_gmat_script
 
     script_path = generate_gmat_script(
@@ -68,7 +65,7 @@ def test_compare_script_warns_when_gmat_report_missing(
     """缺少 GMAT 报告时 compare 脚本应打印友好提示并退出。"""
     import sys
 
-    sys.path.insert(0, str(Path(__file__).parents[3] / "scripts"))
+    sys.path.insert(0, str(Path(__file__).parents[2] / "scripts"))
     from compare_with_gmat import main
 
     sys.argv = [
@@ -93,7 +90,7 @@ def test_propagate_e2m2e_runs_with_full_force_model(
     """e2m2e 传播函数应能用完整力模型跑完 1 天。"""
     import sys
 
-    sys.path.insert(0, str(Path(__file__).parents[3] / "scripts"))
+    sys.path.insert(0, str(Path(__file__).parents[2] / "scripts"))
     from compare_with_gmat import _propagate_e2m2e
 
     data = _propagate_e2m2e(output_dir, include_drag=True, include_srp=True)
@@ -107,7 +104,7 @@ def test_parse_gmat_report_parses_space_delimited_rows(output_dir: Path) -> None
     """GMAT 报告解析器应能解析带表头的空格分隔数据。"""
     import sys
 
-    sys.path.insert(0, str(Path(__file__).parents[3] / "scripts"))
+    sys.path.insert(0, str(Path(__file__).parents[2] / "scripts"))
     from compare_with_gmat import _parse_gmat_report
 
     report_file = output_dir / "dummy_report.txt"

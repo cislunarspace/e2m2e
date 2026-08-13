@@ -16,10 +16,9 @@ from e2m2e.algorithm.forces.ecom_srp import EcomSolarRadiationPressure
 from e2m2e.algorithm.forces.point_mass_gravity import PointMassGravity
 from e2m2e.algorithm.forces.shadow import ConicalShadowModel
 from e2m2e.algorithm.forces.srp import SolarRadiationPressure
+from tests.numerical.forces.conftest import EARTH_MU
 
 pytestmark = [pytest.mark.force, pytest.mark.spice]
-
-_EARTH_MU = 398600.4418
 
 
 @pytest.fixture
@@ -30,7 +29,7 @@ def ecom_system(spice_eph_system):
 
 
 def _propagate(system, force, t_eval):
-    model = ForceModel(system, [PointMassGravity("EARTH", mu=_EARTH_MU), force])
+    model = ForceModel(system, [PointMassGravity("EARTH", mu=EARTH_MU), force])
     state = np.array([42164.0, 0.0, 0.0, 0.0, 3.074666284127684, 0.0])
     return model.propagate(state, (float(t_eval[0]), float(t_eval[-1])), t_eval=t_eval)
 
@@ -69,7 +68,7 @@ class TestEcomCompiledPropagation:
         t_eval = np.array([0.0, 300.0, 900.0])
         ecom = EcomSolarRadiationPressure(dyb=[0.0] * 9)
         result = _propagate(ecom_system, ecom, t_eval)
-        baseline = ForceModel(ecom_system, [PointMassGravity("EARTH", mu=_EARTH_MU)]).propagate(
+        baseline = ForceModel(ecom_system, [PointMassGravity("EARTH", mu=EARTH_MU)]).propagate(
             np.array([42164.0, 0.0, 0.0, 0.0, 3.074666284127684, 0.0]),
             (0.0, 900.0),
             t_eval=t_eval,

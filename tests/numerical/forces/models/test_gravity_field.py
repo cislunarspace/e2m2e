@@ -97,7 +97,9 @@ def test_gravity_field_to_rust_spec_solid_and_pole_returns_none():
 # 天体无关改造(issue #187):按 body 切换 body-fixed frame 与默认重力文件
 # ----------------------------------------------------------------------------
 
-_KERNELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "kernels")
+_KERNELS_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "kernels"
+)
 
 
 class _SystemStub:

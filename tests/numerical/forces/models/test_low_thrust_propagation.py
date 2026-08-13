@@ -7,104 +7,25 @@
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
-from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
-from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
-from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces import FiniteBurn, ForceModel, GravityField
-from e2m2e.data.kernels.manager import SPICEManager
+from tests.numerical.forces.conftest import (
+    EARTH_RE,
+    keplerian_to_cartesian,
+    semi_major_axis,
+)
 
 pytestmark = [pytest.mark.force, pytest.mark.low_thrust]
 
 
-def _keplerian_to_cartesian(a, e, i, raan, argp, nu, mu):
-    """将开普勒根数转为笛卡尔状态。"""
-    p = a * (1 - e**2)
-    r = p / (1 + e * np.cos(nu))
-
-    i = np.radians(i)
-    raan = np.radians(raan)
-    argp = np.radians(argp)
-    nu = np.radians(nu)
-
-    r_pqw = np.array([r * np.cos(nu), r * np.sin(nu), 0.0])
-    v_pqw = np.array(
-        [
-            -np.sqrt(mu / p) * np.sin(nu),
-            np.sqrt(mu / p) * (e + np.cos(nu)),
-            0.0,
-        ]
-    )
-
-    R3_raan = np.array(
-        [
-            [np.cos(raan), -np.sin(raan), 0.0],
-            [np.sin(raan), np.cos(raan), 0.0],
-            [0.0, 0.0, 1.0],
-        ]
-    )
-    R1_i = np.array(
-        [
-            [1.0, 0.0, 0.0],
-            [0.0, np.cos(i), -np.sin(i)],
-            [0.0, np.sin(i), np.cos(i)],
-        ]
-    )
-    R3_argp = np.array(
-        [
-            [np.cos(argp), -np.sin(argp), 0.0],
-            [np.sin(argp), np.cos(argp), 0.0],
-            [0.0, 0.0, 1.0],
-        ]
-    )
-    R = R3_raan @ R1_i @ R3_argp
-
-    r_eci = R @ r_pqw
-    v_eci = R @ v_pqw
-    return np.concatenate([r_eci, v_eci])
-
-
-def _semi_major_axis(state, mu):
-    """从状态向量用能量公式计算半长轴。"""
-    r = np.linalg.norm(state[:3])
-    v = np.linalg.norm(state[3:6])
-    energy = v**2 / 2.0 - mu / r
-    return -mu / (2.0 * energy)
-
-
-@pytest.fixture
-def earth_ephemeris_system(spice_kernel_path):
-    """Earth-centered J2000 ephemeris system for low-thrust tests."""
-    from kernel_helpers import load_body_fixed_kernels, unload_kernels
-
-    spice = SPICEManager()
-    spice.load_kernel(spice_kernel_path)
-    bf_kernels = load_body_fixed_kernels(spice)
-    try:
-        system = EphemerisSystem(
-            bodies=["EARTH"],
-            spice=spice,
-            origin="EARTH",
-        )
-        system.coordinate_system = CoordinateSystem(
-            axes=ICRSAxes(),
-            origin=CelestialBodyOrigin(body="EARTH", spice=spice),
-        )
-        yield system
-    finally:
-        unload_kernels(spice, bf_kernels)
-        spice.unload_kernel(spice_kernel_path)
-
-
 @pytest.mark.spice
-def test_low_thrust_circular_orbit_semi_major_axis_rate(earth_ephemeris_system):
+def test_low_thrust_circular_orbitsemi_major_axis_rate(earth_icrf_system):
     """低推力圆轨道提升：半长轴变化率与解析公式误差 < 5%。"""
-    system = earth_ephemeris_system
+    system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")
 
-    r_earth = 6378.137
+    r_earth = EARTH_RE
     a0 = r_earth + 300.0
-    y0 = _keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
+    y0 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
 
     thrust = 0.1  # N
     mass = 1000.0  # kg
@@ -127,7 +48,7 @@ def test_low_thrust_circular_orbit_semi_major_axis_rate(earth_ephemeris_system):
 
     result = fm.propagate(y0, t_span, t_eval=t_eval, max_steps=200_000)
 
-    a_history = np.array([_semi_major_axis(s, mu) for s in result["states"]])
+    a_history = np.array([semi_major_axis(s, mu) for s in result["states"]])
     a_final = a_history[-1]
 
     # 解析解：a(t) = (a0^(3/2) + 3/2 * sqrt(mu) * (F/m) * t)^(2/3)
@@ -141,14 +62,14 @@ def test_low_thrust_circular_orbit_semi_major_axis_rate(earth_ephemeris_system):
 
 
 @pytest.mark.spice
-def test_low_thrust_config_round_trip(earth_ephemeris_system):
+def test_low_thrust_config_round_trip(earth_icrf_system):
     """FiniteBurn 配置往返后，低推力传播结果一致。"""
-    system = earth_ephemeris_system
+    system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")
 
-    r_earth = 6378.137
+    r_earth = EARTH_RE
     a0 = r_earth + 300.0
-    y0 = _keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
+    y0 = keplerian_to_cartesian(a0, 0.0, 0.0, 0.0, 0.0, 0.0, mu)
 
     thrust = 0.1
     mass = 1000.0

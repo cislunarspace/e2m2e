@@ -8,85 +8,10 @@ Rust ``propagate_compiled`` 承载。本文件保留配置 round-trip 与 Rust �
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.coordinate.coordinate_system import CoordinateSystem
-from e2m2e.algorithm.coordinate.standard_axes import ICRSAxes
-from e2m2e.algorithm.coordinate.standard_origins import CelestialBodyOrigin
-from e2m2e.algorithm.dynamics.ephemeris_system import EphemerisSystem
 from e2m2e.algorithm.forces import ForceModel, GravityField, RelativisticCorrection
-from e2m2e.data.kernels.manager import SPICEManager
+from tests.numerical.forces.conftest import EARTH_RE, keplerian_to_cartesian
 
 pytestmark = pytest.mark.force
-
-
-def _keplerian_to_cartesian(a, e, i, raan, argp, nu, mu):
-    """将开普勒根数转为笛卡尔状态。"""
-    p = a * (1 - e**2)
-    r = p / (1 + e * np.cos(nu))
-
-    i = np.radians(i)
-    raan = np.radians(raan)
-    argp = np.radians(argp)
-    nu = np.radians(nu)
-
-    r_pqw = np.array([r * np.cos(nu), r * np.sin(nu), 0.0])
-    v_pqw = np.array(
-        [
-            -np.sqrt(mu / p) * np.sin(nu),
-            np.sqrt(mu / p) * (e + np.cos(nu)),
-            0.0,
-        ]
-    )
-
-    R3_raan = np.array(
-        [
-            [np.cos(raan), -np.sin(raan), 0.0],
-            [np.sin(raan), np.cos(raan), 0.0],
-            [0.0, 0.0, 1.0],
-        ]
-    )
-    R1_i = np.array(
-        [
-            [1.0, 0.0, 0.0],
-            [0.0, np.cos(i), -np.sin(i)],
-            [0.0, np.sin(i), np.cos(i)],
-        ]
-    )
-    R3_argp = np.array(
-        [
-            [np.cos(argp), -np.sin(argp), 0.0],
-            [np.sin(argp), np.cos(argp), 0.0],
-            [0.0, 0.0, 1.0],
-        ]
-    )
-    R = R3_raan @ R1_i @ R3_argp
-
-    r_eci = R @ r_pqw
-    v_eci = R @ v_pqw
-    return np.concatenate([r_eci, v_eci])
-
-
-@pytest.fixture
-def earth_ephemeris_system(spice_kernel_path):
-    """Earth-centered J2000 ephemeris system for relativistic tests."""
-    from kernel_helpers import load_body_fixed_kernels, unload_kernels
-
-    spice = SPICEManager()
-    spice.load_kernel(spice_kernel_path)
-    bf_kernels = load_body_fixed_kernels(spice)
-    try:
-        system = EphemerisSystem(
-            bodies=["EARTH", "SUN"],
-            spice=spice,
-            origin="EARTH",
-        )
-        system.coordinate_system = CoordinateSystem(
-            axes=ICRSAxes(),
-            origin=CelestialBodyOrigin(body="EARTH", spice=spice),
-        )
-        yield system
-    finally:
-        unload_kernels(spice, bf_kernels)
-        spice.unload_kernel(spice_kernel_path)
 
 
 # 地球角动量矢量近似值 (km²/s)，与 GMAT 自动计算结果同量级。
@@ -125,14 +50,14 @@ def test_config_round_trip():
 
 
 @pytest.mark.spice
-def test_gps_relativistic_position_difference_magnitude(earth_ephemeris_system):
+def test_gps_relativistic_position_difference_magnitude(earth_icrf_system):
     """GPS 轨道 1 天传播，相对论修正导致可观测的终端位置漂移。"""
-    system = earth_ephemeris_system
+    system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")
 
     # GPS 类轨道
     a0 = 26560.0
-    y0 = _keplerian_to_cartesian(a0, 0.0, 55.0, 0.0, 0.0, 0.0, mu)
+    y0 = keplerian_to_cartesian(a0, 0.0, 55.0, 0.0, 0.0, 0.0, mu)
 
     et0 = system.spice.utc_to_et("2025-06-21T11:00:06")
     t_span = (et0, et0 + 86400.0)
@@ -157,14 +82,14 @@ def test_gps_relativistic_position_difference_magnitude(earth_ephemeris_system):
 
 
 @pytest.mark.spice
-def test_leo_relativistic_position_difference_magnitude(earth_ephemeris_system):
+def test_leo_relativistic_position_difference_magnitude(earth_icrf_system):
     """LEO 轨道 1 天传播，相对论修正导致可观测的终端位置漂移。"""
-    system = earth_ephemeris_system
+    system = earth_icrf_system
     mu = system.gravitational_parameter("EARTH")
 
-    r_earth = 6378.137
+    r_earth = EARTH_RE
     a0 = r_earth + 400.0
-    y0 = _keplerian_to_cartesian(a0, 0.0, 51.6, 0.0, 0.0, 0.0, mu)
+    y0 = keplerian_to_cartesian(a0, 0.0, 51.6, 0.0, 0.0, 0.0, mu)
 
     et0 = system.spice.utc_to_et("2025-06-21T11:00:06")
     t_span = (et0, et0 + 86400.0)
@@ -189,7 +114,7 @@ def test_leo_relativistic_position_difference_magnitude(earth_ephemeris_system):
 
 
 @pytest.mark.spice
-def test_relativistic_cache_zero_ffi_and_consistency(earth_ephemeris_system):
+def test_relativistic_cache_zero_ffi_and_consistency(earth_icrf_system):
     """#268 验收 1+2（缓存路径）：relativity=1 传播全程零 cspice FFI，且与无缓存一致。
 
     - 启用星历缓存（含 de Sitter 的 EARTH/SUN 相对 SSB + LT 的 ITRF93→J2000 sxform）
@@ -204,14 +129,14 @@ def test_relativistic_cache_zero_ffi_and_consistency(earth_ephemeris_system):
         reset_ephem_ffi_call_count,
     )
 
-    system = earth_ephemeris_system
+    system = earth_icrf_system
     mu_earth = system.gravitational_parameter("EARTH")
     mu_sun = system.gravitational_parameter("SUN")
 
     # LEO 轨道
-    r_earth = 6378.137
+    r_earth = EARTH_RE
     a0 = r_earth + 400.0
-    y0 = _keplerian_to_cartesian(a0, 0.0, 51.6, 0.0, 0.0, 0.0, mu_earth)
+    y0 = keplerian_to_cartesian(a0, 0.0, 51.6, 0.0, 0.0, 0.0, mu_earth)
 
     et0 = system.spice.utc_to_et("2025-06-21T11:00:06")
     t_eval = np.array([et0, et0 + 3600.0])
