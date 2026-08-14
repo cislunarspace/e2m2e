@@ -8,7 +8,7 @@ import pytest
 from e2m2e.algorithm.transfer import WsbSearchParams, WsbTransferDetails
 from e2m2e.data.templates import ConvergenceState, FailureCause
 
-pytestmark = pytest.mark.data
+pytestmark = pytest.mark.interface
 
 
 def test_wsb_transfer_details_preserves_payload_and_status_triplet():

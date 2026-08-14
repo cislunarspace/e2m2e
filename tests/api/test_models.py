@@ -166,6 +166,11 @@ class TestControlOrbitRequest:
             == accepted
         )
 
+    def test_control_mode_four_is_allowed_at_api_boundary(self):
+        # mode 4 在 API 层放行，engine_layout 校验留算法层
+        request = ControlOrbitRequest(input_ephemeris="x", control_mode=4)
+        assert request.control_mode == 4
+
     @pytest.mark.parametrize(
         ("field", "value"),
         [
@@ -236,6 +241,12 @@ class TestOtherRequests:
 
 
 class TestFamilyGenerationRequest:
+    def test_halo_defaults(self):
+        request = FamilyGenerationRequest(orbit_type="HALO")
+        assert request.libration_point == 2
+        assert request.max_amplitude_km == 30000.0
+        assert request.n_orbits == 50
+
     def test_halo_defaults_and_point_dependent_limit(self):
         request = FamilyGenerationRequest(orbit_type="HALO", libration_point=1)
         assert request.max_amplitude_km == 25000.0

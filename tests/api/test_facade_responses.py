@@ -61,8 +61,8 @@ def _make_design_result(*, with_system: bool = True):
 def _make_control_result(*, controlled: bool):
     return SimpleNamespace(
         num_failed=1,
-        status="converged" if controlled else "failed",
-        cause="none" if controlled else "unknown",
+        status=ConvergenceState.CONVERGED if controlled else ConvergenceState.FAILED,
+        cause=FailureCause.NONE if controlled else FailureCause.UNKNOWN,
         message="任务完成" if controlled else "全部蒙特卡洛样本失败",
         sk_statistic=SKStatistic(rows=np.zeros((2, 3)), num_failed=1),
         maneuvers=ManeuverTable(mjd_tdb=np.array([60000.0]), delta_v_mps=np.array([1.0])),
