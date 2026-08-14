@@ -68,6 +68,9 @@ ADR 0001 已撤销装饰性的 Protocol 接缝。MBSE 通过两个登记表和�
 | 文档 | 内容 |
 |------|------|
 | [数据层 BDD](generated/bdd-data.md) | 数据容器与 SPICE 内核管理组件 |
+| [数值层 BDD](generated/bdd-numerical.md) | Rust 数值计算门面 |
 | [算法层 BDD](generated/bdd-algorithm.md) | 动力学、修正、延拓与稳定性组件 |
+| [接口层 BDD](generated/bdd-api.md) | Facade、CLI 与 MCP 接口 |
+| [工具层 BDD](generated/bdd-tools.md) | 日志等辅助工具 |
 | [功能需求](generated/requirements.md) | 需求图及代码满足关系 |
 | [追溯矩阵](generated/traceability-matrix.md) | 需求、代码模块和测试文件的关联 |

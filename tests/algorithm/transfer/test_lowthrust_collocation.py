@@ -1,7 +1,7 @@
 """低推力 Hermite-Simpson 配点求解器验证。
 
-对照 ``docs/plans/lowthrust-collocation-prd.md``：HS 缺陷约束正确性、min-fuel
-闭环收敛、对标直接打靶。纯二体（PointMassGravity，无需 SPICE）。
+对照 ``docs/plans/lowthrust-collocation-prd.md``：HS 缺陷约束正确性与 min-fuel
+闭环收敛。纯二体（PointMassGravity，无需 SPICE）。
 """
 
 from types import SimpleNamespace

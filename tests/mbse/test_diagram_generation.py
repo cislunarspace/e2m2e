@@ -13,7 +13,10 @@ pytestmark = pytest.mark.aux
 PROJECT_ROOT = Path(__file__).parents[2]
 GENERATED_DOCUMENTS = {
     "bdd-data.md",
+    "bdd-numerical.md",
     "bdd-algorithm.md",
+    "bdd-api.md",
+    "bdd-tools.md",
     "requirements.md",
     "traceability-matrix.md",
 }

@@ -31,7 +31,7 @@ class Component:
     module_path: str
     protocols: list[str] = field(default_factory=list)
     dependencies: list[str] = field(default_factory=list)
-    layer: str = "core"
+    layer: str = "mbse"
     description: str = ""
 
     def __post_init__(self):
@@ -41,20 +41,13 @@ class Component:
 
 
 class ComponentRegistry:
-    """组件注册表
+    """组件注册表。
 
-    集中管理所有组件定义，支持按层、按接口查询。
+    调用方持有注册表生命周期，避免模型装配和测试共享可变全局状态。
     """
 
-    _instance: ComponentRegistry | None = None
-    _components: dict[str, Component]
-
-    def __new__(cls) -> ComponentRegistry:
-        """单例模式：全局共享同一个注册表实例，避免多次注册丢失"""
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._components = {}
-        return cls._instance
+    def __init__(self) -> None:
+        self._components: dict[str, Component] = {}
 
     def register(self, component: Component) -> None:
         """注册一个组件"""

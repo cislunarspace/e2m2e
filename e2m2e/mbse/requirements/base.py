@@ -70,20 +70,13 @@ class Requirement:
 
 
 class RequirementRegistry:
-    """需求注册表（单例模式）
+    """需求注册表。
 
-    集中管理所有需求定义，支持按分类、层次、追溯关系查询。
+    调用方持有注册表生命周期，支持按分类、层次和追溯关系查询。
     """
 
-    _instance: RequirementRegistry | None = None
-    _requirements: dict[str, Requirement]
-
-    def __new__(cls) -> RequirementRegistry:
-        """单例模式：全局共享同一个注册表实例，确保需求注册全局一致"""
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._requirements = {}
-        return cls._instance
+    def __init__(self) -> None:
+        self._requirements: dict[str, Requirement] = {}
 
     def register(self, requirement: Requirement) -> None:
         """注册一个需求"""

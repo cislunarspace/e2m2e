@@ -1,7 +1,7 @@
 """Q-law 低推力初猜生成器验证。
 
-对照 ``docs/plans/qlaw-prd.md``：Q 单调下降、根数朝目标收敛、Q-law 初猜比
-满推力初猜约束残差更小。纯二体（PointMassGravity，无需 SPICE）。
+对照 ``docs/plans/qlaw-prd.md``：Q 值下降与轨道根数朝目标收敛。纯二体
+（PointMassGravity，无需 SPICE）。
 """
 
 import numpy as np

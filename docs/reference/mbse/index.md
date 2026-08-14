@@ -11,7 +11,10 @@ e2m2e 基于模型的系统工程（Model-Based Systems Engineering, MBSE）模�
 
 system-overview
 generated/bdd-data
+generated/bdd-numerical
 generated/bdd-algorithm
+generated/bdd-api
+generated/bdd-tools
 generated/requirements
 activity-orbit-design
 activity-differential-correction
@@ -28,7 +31,10 @@ generated/traceability-matrix
 |------|------|
 | [系统总览](system-overview) | 块定义图（BDD）与组件架构 |
 | [BDD：数据层](generated/bdd-data) | 数据容器与内核管理组件 |
+| [BDD：数值层](generated/bdd-numerical) | Rust 数值计算门面 |
 | [BDD：算法层](generated/bdd-algorithm) | 动力学、修正与延拓组件 |
+| [BDD：接口层](generated/bdd-api) | Facade、CLI 与 MCP 接口 |
+| [BDD：工具层](generated/bdd-tools) | 日志等辅助工具 |
 | [功能需求](generated/requirements) | 功能需求登记与代码追溯 |
 
 ## 活动图

@@ -3,18 +3,16 @@
 from __future__ import annotations
 
 import importlib.util
-import re
 from pathlib import Path
 
 import pytest
 
 from e2m2e.mbse.architecture.components import ARCHITECTURE_LAYERS
+from e2m2e.mbse.requirements.base import REQUIREMENT_ID_PATTERN, VALID_VERIFICATION_METHODS
 
 pytestmark = pytest.mark.aux
 
 PROJECT_ROOT = Path(__file__).parents[2]
-REQUIREMENT_ID_PATTERN = re.compile(r"REQ-\d{3}")
-VALID_VERIFICATION_METHODS = {"test", "analysis", "inspection"}
 
 
 def test_default_model_has_complete_requirement_traceability(mbse_model):
