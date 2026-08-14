@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+ARCHITECTURE_LAYERS = ("data", "numerical", "algorithm", "api", "tools", "mbse")
+
 
 @dataclass(frozen=True)
 class Component:
@@ -18,10 +20,10 @@ class Component:
 
     Attributes:
         name: 组件名称（如 "CR3BP_Dynamics"）
-        module_path: 源代码模块路径（如 "e2m2e.core.dynamics"）
+        module_path: 源代码模块路径（如 "e2m2e.algorithm.dynamics"）
         protocols: 预留字段（ADR 0001 后为空列表）
         dependencies: 该组件依赖的其他组件名称
-        layer: 所属架构层（core/algorithms/transfer/visualization）
+        layer: 所属架构层（data/numerical/algorithm/api/tools/mbse）
         description: 组件功能简述
     """
 
@@ -34,10 +36,8 @@ class Component:
 
     def __post_init__(self):
         """校验架构层合法性"""
-        # mbse 层用于 MBSE 自身的架构组件（ComponentRegistry 等），不属于运行时四层架构
-        valid_layers = {"core", "algorithms", "transfer", "visualization", "mbse"}
-        if self.layer not in valid_layers:
-            raise ValueError(f"无效的架构层: {self.layer}，应为 {valid_layers}")
+        if self.layer not in ARCHITECTURE_LAYERS:
+            raise ValueError(f"无效的架构层: {self.layer}，应为 {ARCHITECTURE_LAYERS}")
 
 
 class ComponentRegistry:

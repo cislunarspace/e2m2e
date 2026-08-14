@@ -8,7 +8,11 @@
 from __future__ import annotations
 
 import enum
+import re
 from dataclasses import dataclass, field
+
+REQUIREMENT_ID_PATTERN = re.compile(r"REQ-\d{3}")
+VALID_VERIFICATION_METHODS = frozenset({"test", "analysis", "inspection"})
 
 
 class RequirementCategory(enum.Enum):
@@ -56,6 +60,13 @@ class Requirement:
     parent: str | None = None
     linked_code: list[str] = field(default_factory=list)
     linked_tests: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        """校验需求目录的稳定标识与验证方法。"""
+        if REQUIREMENT_ID_PATTERN.fullmatch(self.id) is None:
+            raise ValueError("需求 ID 必须匹配 REQ-001 格式")
+        if self.verification_method not in VALID_VERIFICATION_METHODS:
+            raise ValueError("verification_method 必须是 test、analysis 或 inspection 之一")
 
 
 class RequirementRegistry:
