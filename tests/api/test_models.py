@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import inspect
-
 import pytest
 from pydantic import ValidationError
 
+from api.conftest import control_orbit_business_parameters
 from e2m2e.api.models import (
     ControlOrbitRequest,
     ControlOrbitResponse,
@@ -134,20 +133,12 @@ class TestDesignOrbitRequest:
 
 class TestControlOrbitRequest:
     def test_algorithm_business_signature_is_present(self):
-        from e2m2e.algorithm.station_keeping import control_orbit
-
-        runtime = {"spice", "kernel_dir", "n_workers", "seed"}
-        business = {
-            name
-            for name in inspect.signature(control_orbit).parameters
-            if name != "input_ephemeris" and name not in runtime
-        }
-        assert business <= set(ControlOrbitRequest.model_fields)
+        business = control_orbit_business_parameters()
+        assert set(business) <= set(ControlOrbitRequest.model_fields)
 
         request = ControlOrbitRequest(input_ephemeris="x")
-        for name, parameter in inspect.signature(control_orbit).parameters.items():
-            if name in business:
-                assert getattr(request, name) == parameter.default
+        for name, parameter in business.items():
+            assert getattr(request, name) == parameter.default
 
     def test_defaults_and_schema_ranges(self):
         request = ControlOrbitRequest(input_ephemeris="x")

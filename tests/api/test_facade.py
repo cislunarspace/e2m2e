@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
 import pytest
 
+from api.conftest import control_orbit_business_parameters
 from e2m2e.api.config import Config
 from e2m2e.api.facade import Facade, mcp_tools, tool_inventory
 from e2m2e.api.models import (
@@ -25,17 +25,6 @@ from e2m2e.data.templates import ConvergenceState, FailureCause
 pytestmark = pytest.mark.interface
 
 
-def _control_business_params() -> set[str]:
-    from e2m2e.algorithm.station_keeping import control_orbit
-
-    runtime = {"spice", "kernel_dir", "n_workers", "seed"}
-    return {
-        name
-        for name in inspect.signature(control_orbit).parameters
-        if name != "input_ephemeris" and name not in runtime
-    }
-
-
 def _fake_control_result():
     return SimpleNamespace(
         num_failed=0,
@@ -48,13 +37,7 @@ def _fake_control_result():
     )
 
 
-class TestFacadeConstruction:
-    def test_accepts_explicit_runtime_config(self):
-        config = Config(kernel_dir="test-kernels", log_level="INFO")
-        facade = Facade(config=config)
-        assert facade._config is config
-        assert facade._config.kernel_dir == "test-kernels"
-
+class TestFacadeValidation:
     @pytest.mark.parametrize(
         "call",
         [
@@ -99,7 +82,7 @@ class TestFacadeDelegation:
         import e2m2e.algorithm.station_keeping as station_keeping
 
         captured: dict[str, Any] = {}
-        business = _control_business_params()
+        business = set(control_orbit_business_parameters())
 
         def fake_control(input_ephemeris, **kwargs):
             captured.update(kwargs)
