@@ -268,4 +268,3 @@ def test_metadata_records_pipeline_config(fast_pipeline):
     assert result.metadata["center_steps"] == ("invariant", "center")
     assert "qf_symplectic_error" in result.metadata
     assert "cm_hyperbolic_coupling" in result.metadata
-

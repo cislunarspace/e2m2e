@@ -549,4 +549,3 @@ def test_keep_criteria_predicates():
     # invariant 保留的项未必满足 center（center 更严）
     assert _is_invariant_term((0, 3, 0, 0, 1, 0))  # pow1==pow4==0
     assert not _is_center_term((0, 3, 0, 0, 1, 0))  # 但 pow2=3≠pow5=1
-

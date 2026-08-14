@@ -7,7 +7,7 @@
 - 结果具备 ``substitute_orbit`` / ``W_poly`` / ``Wdot_poly`` /
   ``tlist`` / ``shooting_result`` 等切片 #171 要求字段；
 - 在零初值 / 较小窗口下烟测通过；
-- NAFF 不可用时降级到 FFT 并发出警告；
+- 选定 NAFF 后端而不可用时抛错（ADR 0020 决策 4，不静默降级）；
 - :func:`multiple_shooting_newton` 在玩具动力学上能收敛；
 - :func:`solve_block_tridiagonal` 数值正确性。
 """
@@ -74,8 +74,8 @@ def tiny_corrector(l1_context) -> DynamicalSubstituteCorrector:
 
 
 @pytest.fixture
-def auto_corrector(l1_context) -> DynamicalSubstituteCorrector:
-    """``prefer='auto'`` 的 corrector，便于触发 NAFF → FFT 降级分支。"""
+def naff_corrector(l1_context) -> DynamicalSubstituteCorrector:
+    """显式选定 NAFF 后端的 corrector，用于验证资源缺失时的报错路径。"""
     return DynamicalSubstituteCorrector(
         context=l1_context,
         t_total=4.0,
@@ -83,7 +83,7 @@ def auto_corrector(l1_context) -> DynamicalSubstituteCorrector:
         dense_step=0.2,
         max_iter=3,
         tolerance=1e-6,
-        prefer="auto",
+        prefer="naff",
         spice_optional=True,
     )
 
@@ -167,24 +167,16 @@ def test_reduce_metadata_records_window(tiny_corrector):
     assert result.metadata["n_segments"] >= 1
 
 
-def test_reduce_falls_back_to_fft_when_naff_missing(
-    auto_corrector, monkeypatch: pytest.MonkeyPatch
+def test_reduce_prefer_naff_raises_when_naff_unavailable(
+    naff_corrector, monkeypatch: pytest.MonkeyPatch
 ):
-    """``reduce`` 在 NAFF 不可用时降级到 FFT，并把后端记录到结果。"""
+    """显式选定 NAFF 后端而二进制不可用时，``reduce`` 抛错而非静默降级。"""
     monkeypatch.setattr(
         "e2m2e.algorithm.normal_form.fft._resolve_naff_binary",
         lambda: None,
     )
-    monkeypatch.setattr(
-        "e2m2e.algorithm.normal_form.fft.naff_available",
-        lambda: False,
-    )
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        result = auto_corrector.reduce()
-    assert result.backend == "fft"
-    # 至少一条 NAFF 警告
-    assert any("NAFF" in str(w.message) for w in caught)
+    with pytest.raises(RuntimeError, match="NAFF"):
+        naff_corrector.reduce()
 
 
 def test_reduce_result_residual_property(tiny_corrector):
@@ -384,7 +376,6 @@ def test_reduce_works_without_spice_kernels(tiny_corrector, monkeypatch):
     assert result.spice_available is False
     assert result.tlist.size > 0
     assert result.Xlist.size > 0
-
 
 
 # ---------------------------------------------------------------------------

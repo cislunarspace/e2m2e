@@ -647,4 +647,3 @@ def test_lazy_export_via_package(l1_context):
 
     assert LibrationCatalogData is not None
     assert LibrationCatalogTransformer is not None
-
