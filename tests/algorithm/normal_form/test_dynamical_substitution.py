@@ -10,9 +10,6 @@
 - NAFF 不可用时降级到 FFT 并发出警告；
 - :func:`multiple_shooting_newton` 在玩具动力学上能收敛；
 - :func:`solve_block_tridiagonal` 数值正确性。
-
-完整 ``L1DynSubs.npz`` 回归留给后续切片（需要 SPICE 内核与完整
-``T_total = 0.1·2^16`` 窗口）。
 """
 
 from __future__ import annotations
@@ -354,8 +351,8 @@ def test_ode_substitute_solver_rejects_bad_shape():
 # ---------------------------------------------------------------------------
 
 
-def test_default_constants_match_qiao():
-    """默认窗口/间距与 qiao Code05 一致。"""
+def test_default_window_constants():
+    """默认窗口/间距与 constants 出处（Code05）的约定一致。"""
     assert pytest.approx(0.1 * (2**16)) == DEFAULT_TOTAL_TU
     assert pytest.approx(0.8) == DEFAULT_NODE_STEP
 
@@ -388,32 +385,6 @@ def test_reduce_works_without_spice_kernels(tiny_corrector, monkeypatch):
     assert result.tlist.size > 0
     assert result.Xlist.size > 0
 
-
-# ---------------------------------------------------------------------------
-# 验收标准 #2：L1_Halo_Large 的 W_poly 与 qiao L1DynSubs.npz 回归一致
-# ---------------------------------------------------------------------------
-
-
-def test_W_poly_regression_against_qiao_L1DynSubs_npz():
-    """与 qiao ``L1DynSubs.npz`` 的逐系数回归。
-
-    该回归需要 qiao 参考数据（``L1DynSubs.npz``，体积大，本仓库未引入）
-    以及完整 ``T_total = 0.1·2^16`` 窗口的星历模型积分。两者在 CI 环境
-    均不可得，故以 ``pytest.skip`` 守卫占位。
-
-    解锁条件（任一）：
-    1. 将 qiao ``L1DynSubs.npz`` 放入 ``tests/algorithm/normal_form/data/``；
-    2. 提供 SPICE 内核（``.tls`` + ``.bsp``）并在长窗口下跑 reduce。
-
-    fixture 就绪后，本测试应加载 npz 中的 ``W_poly``，与
-    ``DynamicalSubstituteCorrector(...).reduce()`` 的 ``result.W_poly``
-    逐线性项做 ``np.testing.assert_allclose``。
-    """
-    import os
-
-    fixture = os.path.join(os.path.dirname(__file__), "data", "L1DynSubs.npz")
-    if not os.path.exists(fixture):
-        pytest.skip("qiao L1DynSubs.npz 未引入仓库；W_poly 逐系数回归待 fixture 就绪")
 
 
 # ---------------------------------------------------------------------------

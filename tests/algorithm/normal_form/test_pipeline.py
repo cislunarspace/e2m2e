@@ -11,10 +11,8 @@
 - 输入校验：非法 orbit 形状直接抛 :class:`ValueError`；
 - lazy export 经包顶层可导入。
 
-qiao ``L1_Halo_Large`` fixture 一致性回归用 ``pytest.skip`` 守卫——该
-``.npz`` 本仓库未引入，需 SPICE 内核 + 长窗口才能解锁。SPICE leapseconds
-不可用时底层自动降级到纯 CR3BP，smoke 测试在该降级下仍能通过（与
-``test_dynamical_substitution.py`` 一致）。
+SPICE leapseconds 不可用时底层自动降级到纯 CR3BP，smoke 测试在该降级下
+仍能通过（与 ``test_dynamical_substitution.py`` 一致）。
 """
 
 from __future__ import annotations
@@ -271,31 +269,3 @@ def test_metadata_records_pipeline_config(fast_pipeline):
     assert "qf_symplectic_error" in result.metadata
     assert "cm_hyperbolic_coupling" in result.metadata
 
-
-# ---------------------------------------------------------------------------
-# 验收标准 #3：L1_Halo_Large fixture 与 qiao 一致性回归（skip 守卫）
-# ---------------------------------------------------------------------------
-
-
-def test_qiao_L1_Halo_Large_regression_is_skipped_without_fixture():
-    """与 qiao ``L1_Halo_Large`` 输出的表征参数一致性回归。
-
-    该回归需要：
-
-    1. qiao ``L1_rho2param_data.npz``（或等价 fixture）放入
-       ``tests/algorithm/normal_form/data/``；
-    2. SPICE 内核（``.tls`` + ``.bsp``）+ 完整 ``T_total = 0.1·2^16`` 窗口，
-       使动力学替代走星历模型而非纯 CR3BP 退路。
-
-    两者在 CI 环境均不可得，故以 ``pytest.skip`` 守卫占位。fixture 就绪后，
-    本测试应加载 npz 中的 ``rho2param`` 参考输出，与
-    ``NormalFormPipeline(context).reduce(x0).catalog_transformer.rho_to_param``
-    的结果逐分量做 ``np.testing.assert_allclose``。
-    """
-    from pathlib import Path
-
-    fixture = Path(__file__).parent / "data" / "L1_rho2param_data.npz"
-    if not fixture.exists():
-        pytest.skip(
-            "qiao L1_Halo_Large fixture 未引入仓库；表征参数一致性回归待 fixture + SPICE 内核就绪"
-        )
