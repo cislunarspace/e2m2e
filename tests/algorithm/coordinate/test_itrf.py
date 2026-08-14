@@ -324,8 +324,8 @@ class TestStandardIcrfPreset:
         assert isinstance(cs.axes, ICRSAxes)
         assert isinstance(cs.origin, InertialOrigin)
 
-    def test_standard_icrf_importable_from_core_top_level(self):
-        """standard_icrf 可从 e2m2e.core 顶层导入(与 standard_itrf 对齐)。"""
+    def test_standard_icrf_importable_from_algorithm_coordinate(self):
+        """standard_icrf 可从 e2m2e.algorithm.coordinate 顶层导入(与 standard_itrf 对齐)。"""
         from e2m2e.algorithm.coordinate import standard_icrf as imported
 
         assert imported is standard_icrf

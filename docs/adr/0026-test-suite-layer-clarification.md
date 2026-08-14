@@ -33,7 +33,7 @@
 ### 变更
 
 - `tests/algorithm/forces/` 删除；`test_atmosphere.py` 移入 `tests/numerical/forces/contract/`。
-- normal_form：`corrector.py` 活 import 重映射为 `e2m2e.algorithm.dynamics.CR3BP_System`；`_ephemeris.py`、`fft.py`、`legendre.py`、`catalog.py`、`hamiltonian.py`、`coord_trans/`、`dynamical_substitution.py`、`multiple_shooting.py` 的旧路径交叉引用重映射（合计 14 处 `e2m2e.algorithms` → `e2m2e.algorithm`、1 处 `e2m2e.core.SPICEManager` → `e2m2e.data.kernels.manager.SPICEManager`）。
+- normal_form：`corrector.py` 活 import 重映射为 `e2m2e.algorithm.dynamics.CR3BP_System`；`_ephemeris.py`、`fft.py`、`legendre.py`、`catalog.py`、`hamiltonian.py`、`coord_trans/`、`dynamical_substitution.py`、`multiple_shooting.py` 的旧路径交叉引用重映射（合计 12 处 `e2m2e.algorithms` → `e2m2e.algorithm`、1 处 `e2m2e.core.SPICEManager` → `e2m2e.data.kernels.manager.SPICEManager`）。
 - forces/transfer/proximity：`thrust.py`、`exceptions.py`、`lowthrust_shooting.py`、`relative_dynamics.py` 的 `e2m2e.core.*` 交叉引用重映射到现行路径。
 
 ### 不变
