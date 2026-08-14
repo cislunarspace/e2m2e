@@ -148,6 +148,8 @@ class TestControlOrbitRequest:
         assert properties["num_controls"]["maximum"] == 10000
         assert properties["num_monte_carlo"]["maximum"] == 1000
         assert properties["control_interval"]["exclusiveMinimum"] == 0
+        assert properties["position_accuracy"]["exclusiveMinimum"] == 0
+        assert properties["earth_degree"]["minimum"] == 2
         assert properties["special_damping_factor"]["maximum"] == 1.0
 
     @pytest.mark.parametrize(

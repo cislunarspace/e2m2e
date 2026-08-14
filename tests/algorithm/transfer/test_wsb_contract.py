@@ -8,7 +8,9 @@ import pytest
 from e2m2e.algorithm.transfer import WsbSearchParams, WsbTransferDetails
 from e2m2e.data.templates import ConvergenceState, FailureCause
 
-pytestmark = pytest.mark.interface
+# 结果容器的数据结构与默认值契约：按验证对象归 data（ADR 0021 理由 5）；
+# 目录镜像源位于 transfer（ADR 0021 决策 2：目录导航、marker 标功能类）。
+pytestmark = pytest.mark.data
 
 
 def test_wsb_transfer_details_preserves_payload_and_status_triplet():
