@@ -26,6 +26,7 @@ def _time_ephemeris_available() -> bool:
     return os.path.exists(os.path.join(SPICE_KERNEL_DIR, "de440t.bsp"))
 
 
+@pytest.mark.spice
 @requires_spice
 class TestSpacetimeConvertSynodic:
     def test_j2000_to_synodic_and_back(self, spice_manager, earth_moon_system):
@@ -77,6 +78,7 @@ _time_ephemeris_available_mark = pytest.mark.skipif(
 )
 
 
+@pytest.mark.spice
 @_time_ephemeris_available_mark
 class TestSpacetimeConvertGcrsEbcrs:
     def test_gcrs_to_ebcrs_round_trip(self):

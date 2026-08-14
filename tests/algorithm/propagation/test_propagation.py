@@ -60,6 +60,7 @@ class TestExtractBodies:
         assert _extract_bodies({"version": 1, "forces": [{"params": {"mu": 1.0}}]}) == []
 
 
+@pytest.mark.spice
 @requires_spice
 class TestPropagateOrbit:
     def test_default_three_body(self, spice_manager, reference_epoch):

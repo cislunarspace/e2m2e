@@ -149,6 +149,7 @@ def test_dynamic_param_names_cover_eval_params_keys():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.spice
 @requires_spice
 def test_evaluate_hamiltonian_runs(spice_manager, l1_hamiltonian, l1_context):
     """对一组时刻求值 Hamilton 量，运行无异常。"""
@@ -169,6 +170,7 @@ def test_evaluate_hamiltonian_runs(spice_manager, l1_hamiltonian, l1_context):
         pytest.fail("常数项 (0,0,0,0,0,0) 不在 evaled.powers 中")
 
 
+@pytest.mark.spice
 @requires_spice
 def test_hamiltonian_constant_term_matches_point_mass_definition(
     spice_manager, l1_hamiltonian, l1_context
@@ -197,6 +199,7 @@ def test_hamiltonian_constant_term_matches_point_mass_definition(
         assert h0[i] == pytest.approx(expected, rel=1e-9)
 
 
+@pytest.mark.spice
 @requires_spice
 def test_build_evaluate_l1_order4_within_timeout(spice_manager, l1_context):
     """构造 + 一次 evaluate 不应超过 30 s（SPICE 内核已加载）。"""

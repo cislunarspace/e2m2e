@@ -58,3 +58,17 @@ ADR 0021 把测试分类轴从速度换成"验证什么"，并定下目录镜像
 - 删除硬编码外部输出值后，对应系数的回归保护依赖定义级断言的构造质量；定义断言构造错误的风险由同 commit 评审承担。
 - 约 20 个 API 校验用例的移动与追溯矩阵更新为一次性成本。
 - `prefer` 废 `auto` 是公开行为变更：依赖默认 NAFF→FFT 静默回退的调用方需显式传 `fft`。
+
+## 修订（2026-08-14，#425 实施）
+
+决策 4 的落点两处细化：
+
+1. 通用探测实现在 `tests/kernel_helpers.py`（`spice_kernels_available()` +
+   `requires_spice` 标记），不在 `tests/conftest.py`。理由：`SPICE_KERNEL_DIR`
+   与内核加载助手本就在 kernel_helpers，探测与其同源；且被整合的五处原是
+   模块级 skipif（供 pytestmark 列表使用），fixture 在 collection 期不生效，
+   无法满足该用法。规则补一句：凡带 `requires_spice` 的用例必须同时携带
+   `spice` 正交标记，否则 `-m spice` 选择集漏测。
+2. `test_dynamical_substitution.py` 的完整窗口验收用例保留运行期探测
+   （试调 `eval_params` 判内核池是否已加载），与文件存在性探测语义不同，
+   不属于本次收敛对象；其解锁条件由 #426 跟踪。
