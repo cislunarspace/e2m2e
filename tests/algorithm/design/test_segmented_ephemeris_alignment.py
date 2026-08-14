@@ -30,7 +30,7 @@ import numpy as np
 import pytest
 
 from e2m2e.algorithm.design import design_orbit
-from e2m2e.api.models import DesignOrbitRequest
+from tests.algorithm.design.conftest import make_design_request
 
 _SPICE_KERNEL_DIR = os.environ.get(
     "SPICE_KERNEL_DIR",
@@ -56,7 +56,7 @@ N_EXPECTED = int(DURATION_SEC / OUTPUT_STEP_SEC) + 1
 def halo_result():
     """GUI 默认参数的 30 天 Halo segmented 设计，模块内复用一次。"""
     return design_orbit(
-        DesignOrbitRequest(
+        make_design_request(
             orbit_type="HALO",
             collinear_point=2,
             amplitude=30000.0,
@@ -92,7 +92,7 @@ LONG_DURATION_SEC = 43 * 86400.0  # 3 圈（n_rev=3），但超出最后打靶�
 def halo_result_long():
     """43 天 Halo segmented 设计：et_grid 尾部落入无节点覆盖窗口。"""
     return design_orbit(
-        DesignOrbitRequest(
+        make_design_request(
             orbit_type="HALO",
             collinear_point=2,
             amplitude=30000.0,
@@ -124,7 +124,7 @@ MERGE_DURATION_SEC = 60 * 86400.0  # 5 圈（n_rev=5），2 段 + 1 合并层
 def halo_result_merge():
     """60 天 Halo segmented 设计：走合并层（#400 回归）。"""
     return design_orbit(
-        DesignOrbitRequest(
+        make_design_request(
             orbit_type="HALO",
             collinear_point=2,
             amplitude=30000.0,
@@ -164,7 +164,7 @@ def halo_result_multilayer():
     3 层合并（5 段 → 3 → 2 → 1）全程收敛，覆盖合并层 2/3 的深层路径。
     """
     return design_orbit(
-        DesignOrbitRequest(
+        make_design_request(
             orbit_type="HALO",
             collinear_point=2,
             amplitude=30000.0,
