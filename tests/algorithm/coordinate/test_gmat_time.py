@@ -5,7 +5,12 @@ import pytest
 
 from e2m2e.algorithm.coordinate.gmat_time import TimeSystemConverter
 from e2m2e.algorithm.coordinate.xys import ErfaXysProvider
-from e2m2e.data.frames import CoordinateDataError, TaiUtcTable, gmat_fixture_path
+from e2m2e.data.frames import (
+    JD_MJD_OFFSET,
+    CoordinateDataError,
+    TaiUtcTable,
+    gmat_fixture_path,
+)
 
 pytestmark = pytest.mark.data
 
@@ -35,17 +40,21 @@ def test_time_converter_keeps_et_as_its_public_epoch():
     assert converter.et_to_tt_mjd(0.0) == pytest.approx(51544.5, abs=1e-8)
 
 
-@pytest.mark.parametrize(
-    ("tt_mjd", "expected"),
-    [
-        (51544.5, (-2.694638014904722e-05, -2.8004721164764934e-05, -1.0133965177563803e-08)),
-        (57754.0, (0.0016391211394910907, -4.7004517266413526e-05, 3.543052006656307e-08)),
-        (61203.0, (0.002582493526172671, 2.9498181435383408e-05, -3.3505790903890935e-08)),
-    ],
-)
-def test_erfa_xys_matches_iau_2006_2000a_reference(tt_mjd, expected):
-    """参考值来自 SOFA iauXys06a，是 IAU 模型定义而非软件输出基线。"""
-    assert ErfaXysProvider().xys(tt_mjd) == pytest.approx(expected)
+def test_erfa_xys_converts_tt_mjd_and_returns_plain_floats(monkeypatch):
+    """适配器只负责 TT MJD→JD 转换与结果归一化，不以 pyerfa 输出作判据。"""
+    observed = {}
+
+    def xys06a(jd_part1, jd_part2):
+        observed["arguments"] = (jd_part1, jd_part2)
+        return np.float64(1.0), np.float64(2.0), np.float64(3.0)
+
+    monkeypatch.setattr("e2m2e.algorithm.coordinate.xys.erfa.xys06a", xys06a)
+
+    result = ErfaXysProvider().xys(51544.5)
+
+    assert observed["arguments"] == (51544.5 + JD_MJD_OFFSET, 0.0)
+    assert result == (1.0, 2.0, 3.0)
+    assert all(isinstance(value, float) for value in result)
 
 
 def test_erfa_xys_rejects_non_finite_epoch():

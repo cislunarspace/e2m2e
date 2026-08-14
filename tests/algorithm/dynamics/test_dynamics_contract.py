@@ -20,6 +20,17 @@ def sample_state():
     return np.array([0.8, 0.0, 0.0, 0.0, 0.1, 0.0])
 
 
+def _periodic_orbit():
+    from e2m2e.data.types.orbit import Orbit
+
+    orbit = Orbit(
+        states=np.array([[0.8, 0.0, 0.0, 0.0, 0.1, 0.0]]),
+        times=np.array([0.0]),
+    )
+    orbit.period = 1.0
+    return orbit
+
+
 def test_dynamics_initializes_the_default_integrator_contract(dynamics):
     assert isinstance(dynamics, CR3BP_Dynamics)
     assert dynamics.rtol == 1e-12
@@ -75,25 +86,17 @@ def test_collision_detection_is_disabled_by_default(dynamics, sample_state):
 
 
 def test_orbit_state_at_initial_epoch_matches_the_input_state(earth_moon_dynamics):
-    from e2m2e.data.types.orbit import Orbit
-
-    states = np.array([[0.8, 0.0, 0.0, 0.0, 0.1, 0.0]])
-    orbit = Orbit(states=states, times=np.array([0.0]))
-    orbit.period = 1.0
+    orbit = _periodic_orbit()
 
     state = earth_moon_dynamics.propagate_orbit_state_at_time(orbit, 0.0)
 
-    assert_allclose(state, states[0], rtol=1e-9, atol=1e-12)
+    assert_allclose(state, orbit.states[0], rtol=1e-9, atol=1e-12)
 
 
 def test_orbit_state_at_time_returns_a_finite_state(earth_moon_dynamics):
-    from e2m2e.data.types.orbit import Orbit
-
-    states = np.array([[0.8, 0.0, 0.0, 0.0, 0.1, 0.0]])
-    orbit = Orbit(states=states, times=np.array([0.0]))
-    orbit.period = 1.0
-
-    state = earth_moon_dynamics.propagate_orbit_state_at_time(orbit, 0.05, integration_dt=0.005)
+    state = earth_moon_dynamics.propagate_orbit_state_at_time(
+        _periodic_orbit(), 0.05, integration_dt=0.005
+    )
 
     assert state.shape == (6,)
     assert np.all(np.isfinite(state))
