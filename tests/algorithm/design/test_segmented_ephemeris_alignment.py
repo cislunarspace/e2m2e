@@ -24,26 +24,17 @@ ValueError。
 
 from __future__ import annotations
 
-import os
-
 import numpy as np
 import pytest
+from kernel_helpers import requires_spice
 
 from e2m2e.algorithm.design import design_orbit
 from tests.algorithm.design.conftest import make_design_request
 
-_SPICE_KERNEL_DIR = os.environ.get(
-    "SPICE_KERNEL_DIR",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "kernels"),
-)
-_SPICE_AVAILABLE = os.path.isdir(_SPICE_KERNEL_DIR) and any(
-    f.endswith(".bsp") for f in os.listdir(_SPICE_KERNEL_DIR)
-)
-
 pytestmark = [
     pytest.mark.orchestration,
     pytest.mark.spice,
-    pytest.mark.skipif(not _SPICE_AVAILABLE, reason="SPICE kernels not available"),
+    requires_spice,
 ]
 
 DURATION_SEC = 30 * 86400.0

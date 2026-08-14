@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import os
 import time
 
 import numpy as np
 import pytest
+from kernel_helpers import requires_spice
 
 # sympy 是 normal-form optional dep；未安装时整个文件 skip（不 error）。
 pytest.importorskip("sympy")
@@ -55,34 +55,7 @@ def l1_hamiltonian(l1_context, l1_legendre) -> Hamiltonian:
 
 
 # ---------------------------------------------------------------------------
-# SPICE 内核可用性检测
-# ---------------------------------------------------------------------------
-
-_SPICE_KERNEL_DIR = os.environ.get(
-    "SPICE_KERNEL_DIR",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "kernels"),
-)
-
-
-def _has_spice_kernels() -> bool:
-    """检查 SPICE ``.tls`` + ``.bsp`` 都可用。"""
-    if not os.path.isdir(_SPICE_KERNEL_DIR):
-        return False
-    has_tls = any(f.endswith(".tls") for f in os.listdir(_SPICE_KERNEL_DIR))
-    has_bsp = any(f.endswith(".bsp") for f in os.listdir(_SPICE_KERNEL_DIR))
-    return has_tls and has_bsp
-
-
-_has_spice = _has_spice_kernels()
-
-requires_spice = pytest.mark.skipif(
-    not _has_spice,
-    reason="SPICE kernels (.tls + .bsp) not available",
-)
-
-
-# ---------------------------------------------------------------------------
-# 构造烟测（纯符号，不需 SPICE）
+# 构造烟测（纯符号，不需 SPICE）；SPICE 通用可用性探测见 kernel_helpers
 # ---------------------------------------------------------------------------
 
 
