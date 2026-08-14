@@ -36,8 +36,8 @@ class DiagramGenerator:
             requirements: 需求注册表实例，默认使用全局单例
             components: 组件注册表实例，默认使用全局单例
         """
-        self.requirements = requirements or RequirementRegistry()
-        self.components = components or ComponentRegistry()
+        self.requirements = requirements if requirements is not None else RequirementRegistry()
+        self.components = components if components is not None else ComponentRegistry()
 
     def generate_bdd(self, layer: str | None = None) -> str:
         """生成 BDD (Block Definition Diagram) — Mermaid classDiagram

@@ -6,7 +6,9 @@ from pathlib import Path
 
 import pytest
 
+from e2m2e.mbse.architecture import ComponentRegistry
 from e2m2e.mbse.diagrams import DiagramGenerator
+from e2m2e.mbse.requirements import RequirementRegistry
 
 pytestmark = pytest.mark.aux
 
@@ -20,6 +22,18 @@ GENERATED_DOCUMENTS = {
     "requirements.md",
     "traceability-matrix.md",
 }
+
+
+def test_generator_preserves_explicit_empty_registries(tmp_path):
+    """显式传入的空模型不会被默认注册表替换。"""
+    requirements = RequirementRegistry()
+    components = ComponentRegistry()
+
+    generator = DiagramGenerator(requirements=requirements, components=components)
+
+    assert generator.requirements is requirements
+    assert generator.components is components
+    assert generator.generate_all(str(tmp_path)) == []
 
 
 def test_default_model_generates_documented_artifacts(mbse_model, tmp_path):
