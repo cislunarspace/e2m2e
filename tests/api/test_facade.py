@@ -103,6 +103,9 @@ class TestFacadeDelegation:
         assert captured["kernel_dir"] == "configured-kernels"
         assert captured["control_interval"] == 45.0
         assert captured["feedback_arc"] == 20.0
+        assert captured["position_accuracy"] == 123.0
+        assert captured["thrust_mean"] == 8.0
+        assert captured["tight_tolerance_km"] == 0.5
         assert captured["num_controls"] == 120
 
 
@@ -166,6 +169,10 @@ class TestFacadeCallChains:
     def test_invalid_family_input_is_translated_to_orbit_error(self, params):
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
             Facade().orbit_family_generation(**params)
+
+    def test_invalid_family_libration_point_type_is_translated_to_orbit_error(self):
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            Facade().orbit_family_generation(orbit_type="HALO", libration_point="bad")
 
 
 class TestFacadeToolInventory:

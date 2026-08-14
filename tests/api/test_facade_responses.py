@@ -135,6 +135,13 @@ class TestDesignResponse:
         assert response.times == [0.0, 1.234]
         assert response.mu == pytest.approx(Datum.DE421.mu)
         assert response.ephemeris is not None
+        assert response.ephemeris["position_km"] == [
+            [0.0, 1.0, 2.0],
+            [3.0, 4.0, 5.0],
+            [6.0, 7.0, 8.0],
+        ]
+        assert response.ephemeris["velocity_mps"] == [[1000.0, 1000.0, 1000.0]] * 3
+        assert response.ephemeris["times_jd_tdb"] is None
         assert set(response.ephemeris) == {
             "year",
             "month",
@@ -147,6 +154,19 @@ class TestDesignResponse:
             "synodic_position",
             "times_jd_tdb",
         }
+
+    def test_translates_ephemeris_jd_when_populated(self, monkeypatch):
+        import e2m2e.algorithm.design as design
+
+        result = _make_design_result()
+        result.ephemeris = _make_ephemeris(with_jd=True)
+        monkeypatch.setattr(design, "design_orbit", lambda *args, **kwargs: result)
+        response = Facade().design_orbit(orbit_type="DRO")
+
+        assert response.ephemeris is not None
+        assert response.ephemeris["times_jd_tdb"] == pytest.approx(
+            [2460310.0, 2460310.5, 2460311.0]
+        )
 
     def test_allows_missing_system_mu(self, monkeypatch):
         import e2m2e.algorithm.design as design
@@ -181,6 +201,10 @@ class TestControlResponse:
         assert response.mu == pytest.approx(Datum.DE421.mu)
         if controlled:
             assert response.controlled_ephemeris is not None
+            assert response.controlled_ephemeris["synodic_position"] == [[0.5, 0.5, 0.5]] * 2
             assert response.controlled_ephemeris["times_jd_tdb"] is None
         else:
             assert response.controlled_ephemeris is None
+
+        assert response.sk_statistic == {"rows": [[0.0] * 3] * 2, "num_failed": 1}
+        assert response.maneuvers == {"mjd_tdb": [60000.0], "delta_v_mps": [1.0]}
