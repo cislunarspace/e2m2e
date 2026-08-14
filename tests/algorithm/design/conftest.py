@@ -283,16 +283,3 @@ def corrected_dpo(_corrected_dpo_cached):
 def corrected_triangular_l4(_corrected_triangular_l4_cached):
     orbit, result = _corrected_triangular_l4_cached
     return copy.deepcopy(orbit), result
-
-
-@pytest.fixture(scope="module", autouse=True)
-def _clear_spice_pool_after_module():
-    """本目录集成测试经 ``design_orbit`` 把内核载入 SPICE 全局池且无人卸载；
-    模块结束清池，防止池状态泄漏给同 worker 顺序执行的后续模块
-    （xdist loadscope 下同进程复用）。泄漏曾使 normal_form 的探测式
-    路径选择在本机走到星历分支，导致流水线 roundtrip 测试失败。
-    """
-    yield
-    from e2m2e.data.kernels._spice_loader import get_spiceypy
-
-    get_spiceypy().kclear()

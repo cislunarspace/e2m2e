@@ -59,32 +59,48 @@ def l1_context(earth_moon_system):
 
 
 @pytest.fixture
-def tiny_corrector(l1_context) -> DynamicalSubstituteCorrector:
+def l1_context_cr3bp(l1_context):
+    """显式纯 CR3BP 上下文（force_cr3bp=True，不探 SPICE）。
+
+    tiny/naff corrector 的烟测以纯 CR3BP 为前提；显式声明使结果与同
+    worker 内其他模块留下的内核池状态无关（ADR 0020：显式选择）。
+    """
+    from e2m2e.algorithm.normal_form import NormalFormContext
+
+    return NormalFormContext(
+        system=l1_context.system,
+        libration_point=l1_context.libration_point,
+        epoch=l1_context.epoch,
+        order=l1_context.order,
+        force_cr3bp=True,
+    )
+
+
+@pytest.fixture
+def tiny_corrector(l1_context_cr3bp) -> DynamicalSubstituteCorrector:
     """极小窗口 corrector，让 ``reduce`` 在 < 5 s 完成（不依赖 SPICE）。"""
     return DynamicalSubstituteCorrector(
-        context=l1_context,
+        context=l1_context_cr3bp,
         t_total=4.0,
         node_step=0.8,
         dense_step=0.2,
         max_iter=3,
         tolerance=1e-6,
         prefer="fft",
-        spice_optional=True,
     )
 
 
 @pytest.fixture
-def naff_corrector(l1_context) -> DynamicalSubstituteCorrector:
+def naff_corrector(l1_context_cr3bp) -> DynamicalSubstituteCorrector:
     """显式选定 NAFF 后端的 corrector，用于验证资源缺失时的报错路径。"""
     return DynamicalSubstituteCorrector(
-        context=l1_context,
+        context=l1_context_cr3bp,
         t_total=4.0,
         node_step=0.8,
         dense_step=0.2,
         max_iter=3,
         tolerance=1e-6,
         prefer="naff",
-        spice_optional=True,
     )
 
 
@@ -354,8 +370,22 @@ def test_default_window_constants():
 # ---------------------------------------------------------------------------
 
 
-def test_reduce_works_without_spice_kernels(tiny_corrector, monkeypatch):
-    """``spice_optional=True`` 时即使 SPICE 不可用也应跑出合理结果。"""
+def test_reduce_works_without_spice_kernels(l1_context, monkeypatch):
+    """``spice_optional=True`` 时即使 SPICE 不可用也应跑出合理结果。
+
+    与 tiny_corrector 的显式 CR3BP 上下文不同，本测试针对探测回退分支
+    本身，故用未设 force_cr3bp 的上下文。
+    """
+    tiny_corrector = DynamicalSubstituteCorrector(
+        context=l1_context,
+        t_total=4.0,
+        node_step=0.8,
+        dense_step=0.2,
+        max_iter=3,
+        tolerance=1e-6,
+        prefer="fft",
+        spice_optional=True,
+    )
     # 强行让 _ephemeris.eval_params 抛 RuntimeError 模拟 SPICE 缺失
     import e2m2e.algorithm.normal_form.dynamical_substitution as ds
 
