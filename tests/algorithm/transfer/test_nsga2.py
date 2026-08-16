@@ -3,7 +3,16 @@
 import numpy as np
 import pytest
 
-from e2m2e.algorithm.transfer.nsga2 import NSGA2Result, nsga2
+from e2m2e.algorithm.transfer.nsga2 import (
+    NSGA2Result,
+    _constrained_non_dominated_sort,
+    _environmental_selection,
+    nsga2,
+)
+from e2m2e.integrators import (
+    nsga2_environmental_selection_py,
+    nsga2_sort_py,
+)
 
 pytestmark = pytest.mark.orchestration
 
@@ -171,3 +180,49 @@ class TestNSGA2Parallel:
         r_serial = nsga2(schaffer, bounds=[(-5, 5)], pop_size=50, n_gen=20, seed=42, n_workers=1)
         r_parallel = nsga2(schaffer, bounds=[(-5, 5)], pop_size=50, n_gen=20, seed=42, n_workers=2)
         np.testing.assert_allclose(r_serial.f, r_parallel.f)
+
+
+class TestNSGA2RustBackend:
+    """Rust 演化算子与 Python 参照路径的等价性。"""
+
+    def test_deterministic_operators_match_python(self):
+        """约束排序、拥挤度与精英保留在固定输入下逐项一致。"""
+        fit = np.array(
+            [
+                [1.0, 4.0],
+                [2.0, 3.0],
+                [3.0, 2.0],
+                [4.0, 1.0],
+                [0.5, 0.5],
+                [5.0, 5.0],
+            ]
+        )
+        viol = np.array([0.0, 0.0, 0.0, 0.0, 0.2, 0.4])
+
+        py_rank, py_crowd = _constrained_non_dominated_sort(fit, viol)
+        rust_rank, rust_crowd = nsga2_sort_py(fit.tolist(), viol.tolist())
+        np.testing.assert_array_equal(rust_rank, py_rank)
+        np.testing.assert_allclose(rust_crowd, py_crowd)
+
+        expected = _environmental_selection(py_rank, py_crowd, 4)
+        actual = nsga2_environmental_selection_py(py_rank.tolist(), py_crowd.tolist(), 4)
+        np.testing.assert_array_equal(actual, expected)
+
+    def test_full_evolution_matches_python_backend(self):
+        """同一随机种子和参数下，Rust 与 Python 演化结果相同。"""
+        kwargs = {
+            "bounds": [(-5.0, 5.0)],
+            "pop_size": 40,
+            "n_gen": 15,
+            "seed": 42,
+            "n_workers": 1,
+        }
+        python = nsga2(schaffer, backend="python", **kwargs)
+        rust = nsga2(schaffer, backend="rust", **kwargs)
+
+        np.testing.assert_allclose(rust.x, python.x, rtol=1e-12, atol=1e-14)
+        np.testing.assert_allclose(rust.f, python.f, rtol=1e-12, atol=1e-14)
+        np.testing.assert_array_equal(rust.rank, python.rank)
+        np.testing.assert_allclose(rust.crowding, python.crowding)
+        assert rust.n_eval == python.n_eval
+        assert rust.history == python.history
