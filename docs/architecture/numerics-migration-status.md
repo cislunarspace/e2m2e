@@ -24,9 +24,14 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | `algorithm/forces`（数值） | Rust（`e2m2e-forces`） | — |
 | `algorithm/transfer/lambert.py` | Rust（`e2m2e-propagation`） | — |
 | `algorithm/transfer/search_parallel.py`（网格搜索） | Rust（`e2m2e-integrators`） | — |
+| `algorithm/transfer/wsb.py`（WSB 网格候选评估） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #447 |
+| `algorithm/transfer/low_energy.py`（流形截面态配对） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #447 |
 | `algorithm/solver/differential_correction.py`（CR3BP 数值内核） | Rust（`e2m2e-integrators`） | #441 |
 | `algorithm/solver`（星历修正路径） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/solver/continuation.py`（PAL 数值内核） | Rust（`e2m2e-forces`） | #443 |
+| `algorithm/transfer/qlaw.py`（反馈积分与 Q 函数；Python 仅组装初猜） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #442 |
+| `algorithm/transfer/nsga2.py`（演化算子；Python 保留评估与编排） | Rust（`e2m2e-integrators`） | #444 |
+| `algorithm/transfer/lowthrust_shooting.py`、`lowthrust_collocation.py`（直接法数值评估） | Rust（`e2m2e-integrators`；SLSQP 编排留 Python） | #445 |
 | `algorithm/design`（打靶/传播路径） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/coordinate/synodic_j2000.py`（批量转换） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/proximity/relative_dynamics.py`（传播） | Rust（`e2m2e-integrators`） | — |
@@ -37,12 +42,8 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 
 | 模块 | 数值内核 | 工作 issue |
 |---|---|---|
-| `algorithm/solver/MultipleShooting` 类（transfer/hohmann） | Python | 本轮未完成，待单独迁移 |
-| `algorithm/transfer/qlaw.py` | Python（步进已 Rust） | #442 |
-| `algorithm/transfer/nsga2.py` | Python | #444 |
-| `algorithm/transfer/lowthrust_shooting.py`、`lowthrust_collocation.py` | Python（传播已 Rust） | #445 |
+| `algorithm/solver/MultipleShooting` 类（transfer/hohmann） | Python | 待单独迁移 |
 | `algorithm/transfer/porkchop.py` | Python（Lambert 已 Rust） | #446 |
-| `algorithm/transfer/wsb.py`、`low_energy.py`（WSB/低能转移） | Python（传播已 Rust） | #447 |
 | `algorithm/manifold/manifolds.py` | Python | #448 |
 | `algorithm/normal_form`（FFT/多项式/化简、多重打靶 Newton） | Python（积分已 Rust） | #449 |
 
@@ -93,6 +94,31 @@ to_rust_spec 序列化"配置面。`forces` 的层级归属（数值层配置面
 Python 侧保留 `TransferSearch` 编排、后端分发与 6 个几何 thin-wrapper
 （monkeypatch 缝，见 ADR 0017）。
 
+**`algorithm/transfer/wsb.py`（WSB 网格候选评估）。** TLI 参数化、BCR4BP
+传播、近月点检测与插值、H2、到达态/Delta-v 计算和候选筛选在
+`e2m2e-forces` 的纯 Rust 核执行，经 `e2m2e-integrators` 用 Rayon 分发。
+Python 保留系统/参数校验和领域结果组装；默认 Rust，Python 仅作显式等价性
+对照，绝不自动回退。工作项：#447。
+
+**`algorithm/transfer/low_energy.py`（流形截面态配对）。** 两组截面态的
+笛卡尔积、位置/速度范数、加权拼接代价和稳定排序在 `e2m2e-forces` 的
+纯 Rust 核执行，经 `e2m2e-integrators` 暴露。流形管管理、四分支编排和
+ThreeBodyLambert 闭合仍在 Python；流形种子、STM 转运和管传播属于 #448。
+默认 Rust，Python 仅作显式等价性对照。工作项：#447。
+
+**`algorithm/transfer/qlaw.py`。** Q-law 反馈律积分、开普勒根数转换、Gauss
+方程、Q 函数与推力方向在 Rust 内核完成，经 `qlaw_propagate_py` 与
+`qlaw_segment_direction_py` 暴露。Python 侧只解析动力学参数、从连续轨迹
+重采样并组装 `LowThrustSegment`；独立公开的 `rv_to_keplerian` 保持既有兼容
+行为，不构成反馈积分降级路径。
+
+**`algorithm/transfer/lowthrust_shooting.py`、`lowthrust_collocation.py`。**
+低推力直接打靶的多段受控传播、灵敏度链式组装，以及 Hermite-Simpson 配点的
+批量缺陷求值在 `e2m2e-integrators` 的 Rust 入口完成。Python 侧保留问题构造、
+SLSQP 外层编排、初猜与结果解释；`backend="python"` 提供原有实现作为等价性
+对照和降级路径。对照测试见
+`tests/algorithm/transfer/test_lowthrust_rust_backend.py`。迁移完成于 #445。
+
 **`algorithm/solver`（星历修正路径）。** 多重打靶迭代
 `multiple_shooting_correct_py` 在 Rust，segmented 与稳定轨道修正默认走它。
 `MultipleShooting` 类（transfer/hohmann 仍使用）本身还是 Python 实现，见
@@ -104,14 +130,21 @@ Newton 修正、线性求解与收敛状态机经
 `differential_correction_cr3bp_py` 在 Rust 执行。Python 不再保留微分修正
 数值后端；CR3BP 修正入口统一走 Rust。
 
+**`algorithm/transfer/nsga2.py`。** 约束非支配排序、拥挤度距离、锦标赛和
+环境选择、SBX 交叉及多项式变异在 `e2m2e-integrators` 的 `nsga2` 模块，经
+`nsga2_*_py` 暴露。Python 保留目标函数回调、`ProcessPoolExecutor` 并行评估、
+NumPy 随机数生成、逐代评估与 `NSGA2Result` 组装；`backend="python"` 保留原
+实现作对照与降级。随机抽样由 Python 按既有条件分支顺序生成并交给 Rust，因此
+两后端同种子演化等价。工作项：#444。
+
 **`algorithm/solver/continuation.py`（PAL 数值内核）。** 伪弧长延拓的 XZ
 对称约束 F/dF 组装、切向量（零空间）与 PAL 牛顿迭代在 `e2m2e-forces`
 crate（`pal_continuation` 模块），经 `pal_f_df_tangent_py` /
 `pal_newton_step_py` 暴露。`pseudo_arclength_continuation` 双后端：默认
-Rust，`backend="python"` 走 numpy 参照路径（对照与降级；等价性对照见
-`tests/algorithm/design/continuation/test_halo_pal_rust_equivalence.py`）。初始
-切向量两后端统一由 Python 参照计算（零空间符号约定在 SVD 与 Rust 广义
-叉积间无保证，首步延拓方向须由同一实现锁定）。外层逐轨编排（物理合理性
+rust，`backend="python"` 走 numpy 参照路径（对照与降级；等价性对照见
+`tests/algorithm/design/continuation/test_halo_pal_rust_equivalence.py`）。
+初始切向量两后端统一由 Python 参照计算（零空间符号约定在 SVD 与 Rust
+广义叉积间无保证，首步延拓方向须由同一实现锁定）。外层逐轨编排（物理合理性
 检查、方向反馈、停滞检测）留 Python，微分修正数值内核已下沉，见已下沉
 #441。`family/halo_family.py` 是纯编排，无独立数值内核，登记在有意留
 Python 节。
@@ -136,36 +169,16 @@ Rust（`solve_ivp_events`）。
 
 ## 迁移中
 
-ADR 0011 明示的过渡状态，每个条目有独立工作项；本轮只完成
-`DifferentialCorrection` 的 CR3BP 单段数值内核下沉。`MultipleShooting` 是支持多种
-动力学模型的泛型 Python 类，仍未完成迁移，不能复用本轮 CR3BP 内核。
+ADR 0011 明示的过渡状态，每个条目有独立工作项。`MultipleShooting` 是支持多种
+动力学模型的泛型 Python 类，不能复用 CR3BP 微分修正内核；后续需单独评估和迁移。
 
 **`algorithm/solver/MultipleShooting` 类。** transfer/hohmann 使用的多重
-打靶类仍是泛型 Python 实现，本轮 #441 不包含它；后续需单独评估和迁移。
-
-**`algorithm/transfer/qlaw.py`。** Q-law 反馈律的积分步进已 Rust
-（`rk_step`），Q 函数评估与反馈循环仍是 Python。ADR 0011 明示"Q-law"仍由
-Python 执行。工作项：#442。
-
-**`algorithm/transfer/nsga2.py`。** 非支配排序、拥挤度、演化循环纯 Python。
-ADR 0017 边界明确 nsga2"后续单独迁移"。工作项：#444。
-
-**`algorithm/transfer/lowthrust_shooting.py`、`lowthrust_collocation.py`。**
-低推力打靶/配点的迭代求解是 Python；底层 7D 可变质量传播已 Rust
-（`propagate_compiled_lowthrust`、`augmented_eom_7d_py`）。ADR 0011 明示
-"低推力打靶"仍由 Python 执行；ADR 0017 边界列 low-thrust 后续迁移。
-工作项：#445。
+打靶类仍是泛型 Python 实现，后续需单独评估和迁移。
 
 **`algorithm/transfer/porkchop.py`。** 网格循环与几何评估是 Python；
 网格上的 Lambert 求解已 Rust（`lambert_batch_py`）。ADR 0017 边界列
 porkchop 后续迁移，可复用 `transfer_grid_search` 的 Rayon 分发范式。
 工作项：#446。
-
-**`algorithm/transfer/wsb.py`、`low_energy.py`（WSB/低能转移）。**
-`wsb.py` 的 BCR4BP 弹道搜索（sun_phase × departure_phase × tof 三维网格，
-ProcessPoolExecutor 并行）与 `low_energy.py` 的流形管配对、拼接代价评估
-是 Python；底层传播已 Rust。ADR 0017 边界列 wsb 后续迁移，可复用
-`transfer_grid_search` 的 Rayon 分发范式。工作项：#447。
 
 **`algorithm/manifold/manifolds.py`。** 单值矩阵特征分解、STM 转运、种子
 生成纯 Python（numpy）。ADR 0026 后续工作第三条点名的过渡状态之一。

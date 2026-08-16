@@ -16,8 +16,11 @@ pub mod frame_convert;
 #[cfg(feature = "spice")]
 pub mod homotopy;
 #[cfg(feature = "spice")]
+pub mod lowthrust;
+#[cfg(feature = "spice")]
 pub mod multiple_shooting;
 pub mod normal_form;
+pub mod nsga2;
 pub mod planar_pal;
 #[cfg(feature = "spice")]
 pub mod segmented_shooting;
@@ -340,6 +343,16 @@ const fn parse_abi_version(s: &str) -> u32 {
 /// - **v8** （#451）：新增 ``planar_full_period_pal_py`` 与
 ///   ``PlanarPalRustResult``，为 SPO/LPO 平面全周期伪弧长延拓提供 Rust
 ///   数值内核；与 #443 合并后统一递增 ABI。
+/// - **v9** （#442）：新增 ``qlaw_propagate_py`` 与
+///   ``qlaw_segment_direction_py``（Q-law 低推力初猜的反馈积分与 Q 函数
+///   评估内核）。
+/// - **v10** （#444）：新增 ``nsga2_*_py``（NSGA-II 约束排序、选择、
+///   SBX 交叉与多项式变异算子）。
+/// - **v11** （#445）：新增低推力打靶批量评估与配点缺陷批量评估入口，
+///   将低推力直接法的重复数值评估下沉 Rust。
+/// - **v12** （#447）：新增 WSB 三维网格搜索与低能转移流形截面态配对入口。
+/// - **v13** （#441）：新增 ``differential_correction_cr3bp_py``，将 CR3BP
+///   单段微分修正的残差、雅可比、Newton 修正与收敛状态机下沉 Rust。
 ///
 /// 「1→3 跳号」实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -2672,6 +2685,103 @@ fn check_collision_py(
     ))
 }
 
+/// Q-law 低推力反馈积分（完整热路径在 Rust，#442）。
+#[pyfunction]
+#[pyo3(signature = (t0, tf, y0, target_oe, mu, t_max, isp, h_init, tol, max_steps))]
+#[allow(clippy::too_many_arguments)]
+fn qlaw_propagate_py(
+    t0: f64,
+    tf: f64,
+    y0: Vec<f64>,
+    target_oe: Vec<f64>,
+    mu: f64,
+    t_max: f64,
+    isp: f64,
+    h_init: f64,
+    tol: f64,
+    max_steps: usize,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    if y0.len() != 7 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "y0 must have length 7, got {}",
+            y0.len()
+        )));
+    }
+    if target_oe.len() != 3 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "target_oe must have length 3, got {}",
+            target_oe.len()
+        )));
+    }
+    if h_init <= 0.0 || tol <= 0.0 || max_steps == 0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "h_init, tol and max_steps must be positive",
+        ));
+    }
+    let mut initial_state = [0.0; 7];
+    initial_state.copy_from_slice(&y0);
+    let mut target = [0.0; 3];
+    target.copy_from_slice(&target_oe);
+
+    let result = py.allow_threads(|| {
+        e2m2e_forces::qlaw::propagate(
+            t0,
+            tf,
+            initial_state,
+            target,
+            mu,
+            t_max,
+            isp,
+            h_init,
+            tol,
+            max_steps,
+        )
+    });
+    let (times, states) =
+        result.map_err(|error| propagate_error_to_pyerr(py, "Q-law propagation failed", error))?;
+    let output = PyDict::new(py);
+    output.set_item("time", times)?;
+    output.set_item("states", states)?;
+    Ok(output.into())
+}
+
+/// Q-law 段中点评估：Q 值、开普勒根数和惯性系推力方向。
+#[pyfunction]
+#[pyo3(signature = (state7, target_oe, mu, t_max))]
+fn qlaw_segment_direction_py(
+    state7: Vec<f64>,
+    target_oe: Vec<f64>,
+    mu: f64,
+    t_max: f64,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    if state7.len() != 7 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "state7 must have length 7, got {}",
+            state7.len()
+        )));
+    }
+    if target_oe.len() != 3 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "target_oe must have length 3, got {}",
+            target_oe.len()
+        )));
+    }
+    let mut state = [0.0; 7];
+    state.copy_from_slice(&state7);
+    let mut target = [0.0; 3];
+    target.copy_from_slice(&target_oe);
+    let result = e2m2e_forces::qlaw::evaluate_segment(&state, target, mu, t_max);
+    let output = PyDict::new(py);
+    output.set_item("a", result.a)?;
+    output.set_item("e", result.e)?;
+    output.set_item("i", result.inclination)?;
+    output.set_item("q_value", result.q_value)?;
+    output.set_item("u_inertial", result.inertial_direction.to_vec())?;
+    Ok(output.into())
+}
+
 /// PAL 延拓：XZ 平面对称约束的 F/dF/切向量单次计算（#443）。
 ///
 /// 对应 Python `continuation.compute_F_and_dF_symmetric_xz_plane` +
@@ -2805,6 +2915,72 @@ fn pal_newton_step_py(
     Ok(dict.into())
 }
 
+/// WSB 候选结果（PyO3 绑定）。
+#[pyclass(frozen, get_all)]
+#[derive(Clone, Debug)]
+pub struct WsbCandidate {
+    pub sun_phase0: f64,
+    pub departure_phase: f64,
+    pub tof_sec: f64,
+    pub departure_state: Vec<f64>,
+    pub perilune_state: Vec<f64>,
+    pub perilune_alt_km: f64,
+    pub perilune_time_dim: f64,
+    pub arrival_state: Vec<f64>,
+    pub h2_kepler: f64,
+    pub dv_departure: f64,
+    pub dv_arrival: f64,
+    pub total_dv: f64,
+    pub arrival_time_dim: f64,
+}
+
+impl From<e2m2e_forces::wsb::WsbCandidate> for WsbCandidate {
+    fn from(candidate: e2m2e_forces::wsb::WsbCandidate) -> Self {
+        Self {
+            sun_phase0: candidate.sun_phase0,
+            departure_phase: candidate.departure_phase,
+            tof_sec: candidate.tof_sec,
+            departure_state: candidate.departure_state.to_vec(),
+            perilune_state: candidate.perilune_state.to_vec(),
+            perilune_alt_km: candidate.perilune_alt_km,
+            perilune_time_dim: candidate.perilune_time_dim,
+            arrival_state: candidate.arrival_state.to_vec(),
+            h2_kepler: candidate.h2_kepler,
+            dv_departure: candidate.dv_departure,
+            dv_arrival: candidate.dv_arrival,
+            total_dv: candidate.total_dv,
+            arrival_time_dim: candidate.arrival_time_dim,
+        }
+    }
+}
+
+/// 低能转移流形截面态配对结果（PyO3 绑定）。
+#[pyclass(frozen, get_all)]
+#[derive(Clone, Debug)]
+pub struct LowEnergyPatchCandidate {
+    pub i_a: usize,
+    pub i_b: usize,
+    pub state_a: Vec<f64>,
+    pub state_b: Vec<f64>,
+    pub delta_r: f64,
+    pub delta_v: f64,
+    pub cost: f64,
+}
+
+impl From<e2m2e_forces::low_energy_patch::LowEnergyPatchCandidate> for LowEnergyPatchCandidate {
+    fn from(candidate: e2m2e_forces::low_energy_patch::LowEnergyPatchCandidate) -> Self {
+        Self {
+            i_a: candidate.i_a,
+            i_b: candidate.i_b,
+            state_a: candidate.state_a.to_vec(),
+            state_b: candidate.state_b.to_vec(),
+            delta_r: candidate.delta_r,
+            delta_v: candidate.delta_v,
+            cost: candidate.cost,
+        }
+    }
+}
+
 /// 单候选点评估结果（PyO3 绑定）。
 ///
 /// 字段对齐 Python `search_single_departure` 组装的候选解 dict
@@ -2921,6 +3097,219 @@ fn spawn_progress_drainer(
         }
         None => (None, None),
     }
+}
+
+/// Python 接口：WSB 三维网格搜索。
+///
+/// BCR4BP 传播、近月点检测、H₂、到达态插值与候选筛选全程在 Rust 执行；
+/// ``parallel``/``n_workers`` 只控制 Rust 内核，Rust worker 不回调 Python。
+#[pyfunction]
+#[pyo3(signature = (departure_state, target_state, mu, mu_sun, sun_distance, sun_angular_rate, sun_phase_min, sun_phase_max, n_sun_phase, departure_phase_min, departure_phase_max, n_departure_phase, tof_min_sec, tof_max_sec, n_tof, perilune_alt_min, perilune_alt_max, max_total_dv, h2_energy_threshold, n_propagation_samples, rtol, atol, max_step, secondary_radius_km, characteristic_length_km, characteristic_time_sec, *, parallel=None, n_workers=None, progress_callback=None))]
+#[allow(clippy::too_many_arguments)]
+fn wsb_search_py(
+    departure_state: Vec<f64>,
+    target_state: Vec<f64>,
+    mu: f64,
+    mu_sun: f64,
+    sun_distance: f64,
+    sun_angular_rate: f64,
+    sun_phase_min: f64,
+    sun_phase_max: f64,
+    n_sun_phase: usize,
+    departure_phase_min: f64,
+    departure_phase_max: f64,
+    n_departure_phase: usize,
+    tof_min_sec: f64,
+    tof_max_sec: f64,
+    n_tof: usize,
+    perilune_alt_min: f64,
+    perilune_alt_max: f64,
+    max_total_dv: f64,
+    h2_energy_threshold: f64,
+    n_propagation_samples: usize,
+    rtol: f64,
+    atol: f64,
+    max_step: f64,
+    secondary_radius_km: f64,
+    characteristic_length_km: f64,
+    characteristic_time_sec: f64,
+    parallel: Option<bool>,
+    n_workers: Option<usize>,
+    progress_callback: Option<PyObject>,
+    py: Python<'_>,
+) -> PyResult<(Vec<WsbCandidate>, usize)> {
+    if departure_state.len() != 6 || target_state.len() != 6 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "departure_state 与 target_state 必须都是长度 6 的状态",
+        ));
+    }
+    if n_sun_phase == 0 || n_departure_phase == 0 || n_tof == 0 || n_propagation_samples == 0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "WSB 网格计数必须全部大于 0",
+        ));
+    }
+
+    let mut departure = [0.0_f64; 6];
+    let mut target = [0.0_f64; 6];
+    departure.copy_from_slice(&departure_state);
+    target.copy_from_slice(&target_state);
+    let params = e2m2e_forces::wsb::WsbSearchParams {
+        sun_phase_min,
+        sun_phase_max,
+        n_sun_phase,
+        departure_phase_min,
+        departure_phase_max,
+        n_departure_phase,
+        tof_min_sec,
+        tof_max_sec,
+        n_tof,
+        perilune_alt_min,
+        perilune_alt_max,
+        max_total_dv,
+        h2_energy_threshold,
+        n_propagation_samples,
+        rtol,
+        atol,
+        max_step,
+        secondary_radius_km,
+        characteristic_length_km,
+        characteristic_time_sec,
+    };
+    let use_parallel =
+        parallel.unwrap_or_else(|| std::env::var("E2M2E_WSB_PARALLEL").map_or(true, |v| v != "0"));
+    let pool = match n_workers {
+        Some(n) if use_parallel => Some(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(n.max(1))
+                .build()
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?,
+        ),
+        _ => None,
+    };
+
+    let result = py.allow_threads(move || {
+        let (tx, drainer) = spawn_progress_drainer(progress_callback);
+        let work = || {
+            if use_parallel {
+                e2m2e_forces::wsb::wsb_search_parallel(
+                    &departure,
+                    &target,
+                    mu,
+                    mu_sun,
+                    sun_distance,
+                    sun_angular_rate,
+                    &params,
+                    tx.as_ref(),
+                )
+            } else {
+                e2m2e_forces::wsb::wsb_search_serial(
+                    &departure,
+                    &target,
+                    mu,
+                    mu_sun,
+                    sun_distance,
+                    sun_angular_rate,
+                    &params,
+                    tx.as_ref(),
+                )
+            }
+        };
+        let result = if let Some(pool) = pool.as_ref() {
+            pool.install(work)
+        } else {
+            work()
+        };
+        drop(tx);
+        if let Some(drainer) = drainer {
+            let _ = drainer.join();
+        }
+        result
+    });
+
+    let result = result.map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
+    Ok((
+        result
+            .candidates
+            .into_iter()
+            .map(WsbCandidate::from)
+            .collect(),
+        result.n_propagation_failures,
+    ))
+}
+
+/// Python 接口：低能转移流形截面态配对。
+///
+/// Python 侧先解析庞加莱截面并收集穿越态，本函数只接收展平 POD 状态，完成
+/// 笛卡尔积、位置/速度范数、加权代价与稳定排序。计算全程在
+/// ``py.allow_threads`` 内，不会让 Rayon worker 回调 Python。
+#[pyfunction]
+#[pyo3(signature = (states_a, states_b, weight_r, weight_v, *, parallel=None, n_workers=None, progress_callback=None))]
+#[allow(clippy::too_many_arguments)]
+fn low_energy_patch_py(
+    states_a: Vec<f64>,
+    states_b: Vec<f64>,
+    weight_r: f64,
+    weight_v: f64,
+    parallel: Option<bool>,
+    n_workers: Option<usize>,
+    progress_callback: Option<PyObject>,
+    py: Python<'_>,
+) -> PyResult<Vec<LowEnergyPatchCandidate>> {
+    if !states_a.len().is_multiple_of(6) || !states_b.len().is_multiple_of(6) {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "states_a 与 states_b 展平长度必须是 6 的倍数",
+        ));
+    }
+
+    let use_parallel = parallel
+        .unwrap_or_else(|| std::env::var("E2M2E_LOW_ENERGY_PARALLEL").map_or(true, |v| v != "0"));
+    let pool = match n_workers {
+        Some(n) if use_parallel => Some(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(n.max(1))
+                .build()
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?,
+        ),
+        _ => None,
+    };
+
+    let candidates = py.allow_threads(move || {
+        let (tx, drainer) = spawn_progress_drainer(progress_callback);
+        let work = || {
+            if use_parallel {
+                e2m2e_forces::low_energy_patch::low_energy_patch_parallel(
+                    &states_a,
+                    &states_b,
+                    weight_r,
+                    weight_v,
+                    tx.as_ref(),
+                )
+            } else {
+                e2m2e_forces::low_energy_patch::low_energy_patch_serial(
+                    &states_a,
+                    &states_b,
+                    weight_r,
+                    weight_v,
+                    tx.as_ref(),
+                )
+            }
+        };
+        let candidates = if let Some(pool) = pool.as_ref() {
+            pool.install(work)
+        } else {
+            work()
+        };
+        drop(tx);
+        if let Some(drainer) = drainer {
+            let _ = drainer.join();
+        }
+        candidates
+    });
+
+    Ok(candidates
+        .into_iter()
+        .map(LowEnergyPatchCandidate::from)
+        .collect())
 }
 
 /// Python 接口：转移网格搜索（串行版，阶段 B）。
@@ -3294,10 +3683,33 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(detect_intersection_py, m)?)?;
     m.add_function(wrap_pyfunction!(detect_local_minimum_py, m)?)?;
     m.add_function(wrap_pyfunction!(check_collision_py, m)?)?;
+    m.add_function(wrap_pyfunction!(qlaw_propagate_py, m)?)?;
+    m.add_function(wrap_pyfunction!(qlaw_segment_direction_py, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(
+        lowthrust::lowthrust_shooting_evaluate_py,
+        m
+    )?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(
+        lowthrust::lowthrust_collocation_defects_py,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(nsga2::nsga2_sort_py, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        nsga2::nsga2_environmental_selection_py,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(nsga2::nsga2_tournament_selection_py, m)?)?;
+    m.add_function(wrap_pyfunction!(nsga2::nsga2_variation_py, m)?)?;
     m.add_function(wrap_pyfunction!(pal_f_df_tangent_py, m)?)?;
     m.add_function(wrap_pyfunction!(pal_newton_step_py, m)?)?;
+    m.add_function(wrap_pyfunction!(wsb_search_py, m)?)?;
+    m.add_function(wrap_pyfunction!(low_energy_patch_py, m)?)?;
     m.add_function(wrap_pyfunction!(transfer_grid_search_serial_py, m)?)?;
     m.add_function(wrap_pyfunction!(transfer_grid_search_py, m)?)?;
+    m.add_class::<WsbCandidate>()?;
+    m.add_class::<LowEnergyPatchCandidate>()?;
     m.add_class::<TransferPointResult>()?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(spice_poc_body_position, m)?)?;
