@@ -10,6 +10,8 @@ use pyo3::types::PyTuple;
 use pyo3::types::{PyDict, PyList};
 
 #[cfg(feature = "spice")]
+pub mod differential_correction;
+#[cfg(feature = "spice")]
 pub mod frame_convert;
 #[cfg(feature = "spice")]
 pub mod homotopy;
@@ -3340,6 +3342,11 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(propagate_with_state_py, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_compiled_stm_py, m)?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(
+        differential_correction::differential_correction_cr3bp_py,
+        m
+    )?)?;
     #[cfg(feature = "spice")]
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(

@@ -24,6 +24,7 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | `algorithm/forces`（数值） | Rust（`e2m2e-forces`） | — |
 | `algorithm/transfer/lambert.py` | Rust（`e2m2e-propagation`） | — |
 | `algorithm/transfer/search_parallel.py`（网格搜索） | Rust（`e2m2e-integrators`） | — |
+| `algorithm/solver/differential_correction.py`（CR3BP 数值内核） | Rust（`e2m2e-integrators`） | #441 |
 | `algorithm/solver`（星历修正路径） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/solver/continuation.py`（PAL 数值内核） | Rust（`e2m2e-forces`） | #443 |
 | `algorithm/design`（打靶/传播路径） | Rust（`e2m2e-integrators`） | — |
@@ -36,7 +37,7 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 
 | 模块 | 数值内核 | 工作 issue |
 |---|---|---|
-| `algorithm/solver/differential_correction.py`、`MultipleShooting` 类 | Python | #441 |
+| `algorithm/solver/MultipleShooting` 类（transfer/hohmann） | Python | 本轮未完成，待单独迁移 |
 | `algorithm/transfer/qlaw.py` | Python（步进已 Rust） | #442 |
 | `algorithm/transfer/nsga2.py` | Python | #444 |
 | `algorithm/transfer/lowthrust_shooting.py`、`lowthrust_collocation.py` | Python（传播已 Rust） | #445 |
@@ -94,20 +95,25 @@ Python 侧保留 `TransferSearch` 编排、后端分发与 6 个几何 thin-wrap
 
 **`algorithm/solver`（星历修正路径）。** 多重打靶迭代
 `multiple_shooting_correct_py` 在 Rust，segmented 与稳定轨道修正默认走它。
-注意 `MultipleShooting` 类（transfer/hohmann 仍使用）本身还是 Python
-实现，见迁移中 #441。
+`MultipleShooting` 类（transfer/hohmann 仍使用）本身还是 Python 实现，见
+迁移中（待单独立项）。
+
+**`algorithm/solver/differential_correction.py`（CR3BP 数值内核）。** 对称性
+策略与 Orbit 编排留在 Python；半周期对称和全周期闭合的残差、STM 雅可比、
+Newton 修正、线性求解与收敛状态机经
+`differential_correction_cr3bp_py` 在 Rust 执行。Python 不再保留微分修正
+数值后端；CR3BP 修正入口统一走 Rust。
 
 **`algorithm/solver/continuation.py`（PAL 数值内核）。** 伪弧长延拓的 XZ
 对称约束 F/dF 组装、切向量（零空间）与 PAL 牛顿迭代在 `e2m2e-forces`
 crate（`pal_continuation` 模块），经 `pal_f_df_tangent_py` /
 `pal_newton_step_py` 暴露。`pseudo_arclength_continuation` 双后端：默认
-rust，`backend="python"` 走 numpy 参照路径（对照与降级；等价性对照见
-`tests/algorithm/design/continuation/test_halo_pal_rust_equivalence.py`）。
-初始切向量两后端统一由 Python 参照计算（零空间符号约定在 SVD 与 Rust
-广义叉积间无保证，首步延拓方向须由同一实现锁定）。外层逐轨编排（微分
-修正、物理合理性检查、方向反馈、停滞检测）留 Python；自然参数延拓的
-步进循环本身是编排，其热路径为微分修正，见迁移中 #441。
-`family/halo_family.py` 是纯编排，无独立数值内核，登记在有意留
+Rust，`backend="python"` 走 numpy 参照路径（对照与降级；等价性对照见
+`tests/algorithm/design/continuation/test_halo_pal_rust_equivalence.py`）。初始
+切向量两后端统一由 Python 参照计算（零空间符号约定在 SVD 与 Rust 广义
+叉积间无保证，首步延拓方向须由同一实现锁定）。外层逐轨编排（物理合理性
+检查、方向反馈、停滞检测）留 Python，微分修正数值内核已下沉，见已下沉
+#441。`family/halo_family.py` 是纯编排，无独立数值内核，登记在有意留
 Python 节。
 
 **`algorithm/design`（打靶/传播路径）。** 分段修正、多重打靶、段传播、
@@ -130,13 +136,12 @@ Rust（`solve_ivp_events`）。
 
 ## 迁移中
 
-ADR 0011 明示的过渡状态，每个条目有独立工作 issue，下沉方式照 ADR 0017
-先例（双后端共存 + 等价性对照，Python 路径保留作对照与降级）。
+ADR 0011 明示的过渡状态，每个条目有独立工作项；本轮只完成
+`DifferentialCorrection` 的 CR3BP 单段数值内核下沉。`MultipleShooting` 是支持多种
+动力学模型的泛型 Python 类，仍未完成迁移，不能复用本轮 CR3BP 内核。
 
-**`algorithm/solver/differential_correction.py` 与 `MultipleShooting` 类。**
-单段微分修正与 `MultipleShooting` 类是纯 Python；星历修正路径已有 Rust 版
-（见上），单段修正可评估与 `multiple_shooting_correct_py` 共用基础设施。
-工作项：#441。
+**`algorithm/solver/MultipleShooting` 类。** transfer/hohmann 使用的多重
+打靶类仍是泛型 Python 实现，本轮 #441 不包含它；后续需单独评估和迁移。
 
 **`algorithm/transfer/qlaw.py`。** Q-law 反馈律的积分步进已 Rust
 （`rk_step`），Q 函数评估与反馈循环仍是 Python。ADR 0011 明示"Q-law"仍由
