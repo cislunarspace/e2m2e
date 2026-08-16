@@ -333,8 +333,14 @@ def test_constant_method_is_symplectic_and_diagonalizes_cr3bp(l1_context, small_
     M = _cr3bp_hamiltonian_linearization(l1_context.libration_position, l1_context.mu)
 
     assert result.method == "constant"
+    assert result.M_samples is not None
     np.testing.assert_allclose(
         result.B_samples, np.broadcast_to(B, result.B_samples.shape), atol=1e-14
+    )
+    np.testing.assert_allclose(
+        result.M_samples,
+        np.broadcast_to(M, result.M_samples.shape),
+        atol=1e-10,
     )
     np.testing.assert_allclose(B.T @ J6 @ B, J6, atol=1e-10)
     np.testing.assert_allclose(M @ B, B @ result.D, atol=1e-10)
