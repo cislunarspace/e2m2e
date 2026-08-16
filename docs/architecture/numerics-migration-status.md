@@ -52,6 +52,7 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | `algorithm/transfer/nlp_*`、`transfer_optimization.py`（NLP 优化与编排） | Python | — |
 | `algorithm/family/*_initial_guess.py`、`strategies/`、`cr3bp_orbits.py`（初猜生成） | Python | — |
 | `algorithm/transfer` 二体/解析与编排模块 | Python（Lambert 已 Rust） | — |
+| `algorithm/transfer/search_geometry.py`、`search_progress.py`、`solution_database.py`（搜索辅助） | Python | — |
 | `algorithm/manifold/sections.py`（截面事件函数） | Python | — |
 | `algorithm/stability.py` | Python | — |
 | `algorithm/station_keeping`（控制律） | Python（传播已 Rust） | — |
@@ -71,12 +72,15 @@ Python 文件里有数值循环，先查它是否只是薄封装。
 **`algorithm/dynamics`（传播）。** CR3BP/BCR4BP/星历路径的传播数值在
 `e2m2e-integrators` crate（`propagate_cr3bp_py`、`propagate_bcr4bp_py`、
 `propagate_compiled_py` 等）。无事件时 CR3BP 直接走 Rust 快速路径，
-`dynamics.py` 只做问题构造与结果解释。依据 ADR 0002。
+`dynamics.py` 只做问题构造与结果解释。同包 `potential.py` 的伪势能
+Hessian 是 numpy 实现（供非传播路径共用），见有意留 Python 节。
+依据 ADR 0002。
 
 **`algorithm/forces`（数值）。** 力模型数值（球谐、潮汐、SRP、三体、大气）
 在 `e2m2e-forces` crate；`force_model.py` 等 Python 文件是"参数验证 +
 to_rust_spec 序列化"配置面。`forces` 的层级归属（数值层配置面还是算法层
-力模型定义）由 #429 独立评估，与本清单无关。
+力模型定义）由 #429 独立评估——那是层级议题，不改变"数值已下沉"的
+登记。
 
 **`algorithm/transfer/lambert.py`。** 二体 Lambert（Izzo）在
 `e2m2e-propagation` crate（`lambert.rs`），本文件是薄封装
@@ -181,6 +185,12 @@ Python 强项（`architecture-design-discussion.md` 共识，ADR 0017 边界固�
 理由：解析公式或编排，无"喂进数字就迭代"的热路径；其中 Lambert 求解已
 Rust。多脉冲 NLP 的节点优化属 NLP 范畴，见上。
 
+**`algorithm/transfer/search_geometry.py`、`search_progress.py`、
+`solution_database.py`（搜索辅助）。** 理由：`search_geometry.py` 是几何核的
+numpy 纯函数实现，ADR 0017 边界固化的 thin-wrapper / numpy 对照基准
+（monkeypatch 缝），必须与 Rust 几何核并存；`search_progress.py` 是 tqdm
+进度封装；`solution_database.py` 是解库查询与筛选（数据管理性质）。
+
 **`algorithm/stability.py`。** 理由：单值矩阵/Floquet 乘子分析是 numpy 特征
 分解，无性能热路径；传播经 `dynamics` 已 Rust。未列入迁移清单。
 
@@ -220,6 +230,9 @@ Rust，见上。
 
 - **状态词固定**：新登记项只能用"已下沉 / 迁移中 / 有意留 Python"三词，
   保证全文 grep 可枚举。
+- **粒度**：登记粒度到文件/路径。同一模块可拆多条（如 `algorithm/design`：
+  打靶/传播路径已下沉、编排有意留 Python；`algorithm/normal_form`：积分
+  路径已下沉、算法链迁移中），以速查表路径为准。
 - **迁移中条目**：issue 关闭（下沉完成或改判）时，把条目移到对应状态节，
   保留 issue 编号作为历史指针。
 - **有意留 Python 条目**：必须带理由，理由应引用 ADR 或文档决策，不写
