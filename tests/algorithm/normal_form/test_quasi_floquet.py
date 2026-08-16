@@ -343,7 +343,11 @@ def test_constant_method_is_symplectic_and_diagonalizes_cr3bp(l1_context, small_
         atol=1e-10,
     )
     np.testing.assert_allclose(B.T @ J6 @ B, J6, atol=1e-10)
-    np.testing.assert_allclose(M @ B, B @ result.D, atol=1e-10)
+    np.testing.assert_allclose(
+        result.M_samples @ result.B_samples,
+        result.B_samples @ result.D,
+        atol=1e-10,
+    )
 
 
 def test_cr3bp_hamiltonian_linearization_is_hamiltonian(l1_context):
