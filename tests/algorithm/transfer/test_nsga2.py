@@ -7,11 +7,15 @@ from e2m2e.algorithm.transfer.nsga2 import (
     NSGA2Result,
     _constrained_non_dominated_sort,
     _environmental_selection,
+    _polynomial_mutation,
+    _rust_variation,
+    _sbx_crossover,
     nsga2,
 )
 from e2m2e.integrators import (
     nsga2_environmental_selection_py,
     nsga2_sort_py,
+    nsga2_tournament_selection_py,
 )
 
 pytestmark = pytest.mark.orchestration
@@ -194,10 +198,11 @@ class TestNSGA2RustBackend:
                 [3.0, 2.0],
                 [4.0, 1.0],
                 [0.5, 0.5],
+                [1.0, 4.0],
                 [5.0, 5.0],
             ]
         )
-        viol = np.array([0.0, 0.0, 0.0, 0.0, 0.2, 0.4])
+        viol = np.array([0.0, 0.0, 0.0, 0.0, 0.2, 0.0, 0.4])
 
         py_rank, py_crowd = _constrained_non_dominated_sort(fit, viol)
         rust_rank, rust_crowd = nsga2_sort_py(fit.tolist(), viol.tolist())
@@ -207,6 +212,29 @@ class TestNSGA2RustBackend:
         expected = _environmental_selection(py_rank, py_crowd, 4)
         actual = nsga2_environmental_selection_py(py_rank.tolist(), py_crowd.tolist(), 4)
         np.testing.assert_array_equal(actual, expected)
+
+    def test_tournament_and_variation_match_python(self):
+        """固定父代和种子下，Rust 锦标赛、SBX 与变异逐项对拍。"""
+        rank = [0, 1, 0, 1]
+        crowd = [0.1, 0.9, 0.3, 0.2]
+        draws = [0, 1, 2, 3, 1, 2, 3, 0]
+        assert nsga2_tournament_selection_py(rank, crowd, draws) == [0, 2, 2, 0]
+
+        parents = np.array([[0.1, 0.8], [0.7, 0.2], [0.4, 0.5], [0.6, 0.3]])
+        lo = np.zeros(2)
+        hi = np.ones(2)
+        python_rng = np.random.default_rng(7)
+        rust_rng = np.random.default_rng(7)
+        expected = _polynomial_mutation(
+            _sbx_crossover(parents, lo, hi, 0.9, 20.0, python_rng),
+            lo,
+            hi,
+            0.5,
+            20.0,
+            python_rng,
+        )
+        actual = _rust_variation(parents, lo, hi, 0.9, 20.0, 0.5, 20.0, rust_rng)
+        np.testing.assert_allclose(actual, expected, rtol=1e-12, atol=1e-14)
 
     def test_full_evolution_matches_python_backend(self):
         """同一随机种子和参数下，Rust 与 Python 演化结果相同。"""

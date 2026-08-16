@@ -118,13 +118,6 @@ def nsga2(
         raise ValueError("bounds 不能为空")
     if backend not in ("rust", "python"):
         raise ValueError(f"backend 须为 rust 或 python，当前为 {backend!r}")
-    if backend == "rust":
-        require_rust_extension(
-            "nsga2_sort_py",
-            "nsga2_environmental_selection_py",
-            "nsga2_tournament_selection_py",
-            "nsga2_variation_py",
-        )
     n_dim = len(bounds)
     if pop_size < 4:
         raise ValueError(f"pop_size ({pop_size}) 须 >= 4")
@@ -135,6 +128,13 @@ def nsga2(
     hi = np.array([b[1] for b in bounds], dtype=float)
     if np.any(lo >= hi):
         raise ValueError("bounds 下界须严格小于上界")
+    if backend == "rust":
+        require_rust_extension(
+            "nsga2_sort_py",
+            "nsga2_environmental_selection_py",
+            "nsga2_tournament_selection_py",
+            "nsga2_variation_py",
+        )
 
     rng = np.random.default_rng(seed)
     n_eval = 0
