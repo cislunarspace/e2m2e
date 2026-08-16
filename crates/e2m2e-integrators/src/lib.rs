@@ -16,6 +16,7 @@ pub mod homotopy;
 #[cfg(feature = "spice")]
 pub mod multiple_shooting;
 pub mod normal_form;
+pub mod planar_pal;
 #[cfg(feature = "spice")]
 pub mod segmented_shooting;
 
@@ -334,6 +335,9 @@ const fn parse_abi_version(s: &str) -> u32 {
 ///   积分下沉）与 ``frame_convert`` 批量入口（坐标/历元/星历批量转换）。
 /// - **v7** （#443）：新增 ``pal_f_df_tangent_py`` + ``pal_newton_step_py``
 ///   （伪弧长延拓数值内核：F/dF/切向量计算与 PAL 牛顿迭代）。
+/// - **v8** （#451）：新增 ``planar_full_period_pal_py`` 与
+///   ``PlanarPalRustResult``，为 SPO/LPO 平面全周期伪弧长延拓提供 Rust
+///   数值内核；与 #443 合并后统一递增 ABI。
 ///
 /// 「1→3 跳号」实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -3365,6 +3369,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(frame_convert::batch_body_states_py, m)?)?;
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(frame_convert::batch_et_to_utc_py, m)?)?;
+    m.add_function(wrap_pyfunction!(planar_pal::planar_full_period_pal_py, m)?)?;
+    m.add_class::<planar_pal::PlanarPalRustResult>()?;
     m.add_class::<RkMethod>()?;
     m.add_class::<MultistepMethod>()?;
     m.add_class::<StepResult>()?;
