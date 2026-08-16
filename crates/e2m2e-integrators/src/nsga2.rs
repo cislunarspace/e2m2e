@@ -27,6 +27,16 @@ fn validate_population(fit: &[Vec<f64>], viol: &[f64]) -> PyResult<usize> {
     Ok(n_obj)
 }
 
+/// 对齐 NumPy 升序 argsort 的标量顺序：-0.0 与 0.0 相等，NaN 排在末尾。
+fn numpy_argsort_order(a: f64, b: f64) -> Ordering {
+    match a.partial_cmp(&b) {
+        Some(order) => order,
+        None if a.is_nan() && !b.is_nan() => Ordering::Greater,
+        None if !a.is_nan() && b.is_nan() => Ordering::Less,
+        None => Ordering::Equal,
+    }
+}
+
 fn dominates(a: &[f64], b: &[f64]) -> bool {
     a.iter().zip(b).all(|(x, y)| x <= y) && a.iter().zip(b).any(|(x, y)| x < y)
 }
@@ -142,7 +152,9 @@ fn crowding_distance(fit: &[Vec<f64>], rank: &[i64], n_obj: usize) -> Vec<f64> {
 
         for (objective, _) in fit[0].iter().enumerate().take(n_obj) {
             let mut order = indices.clone();
-            order.sort_unstable_by(|&a, &b| fit[a][objective].total_cmp(&fit[b][objective]));
+            order.sort_unstable_by(|&a, &b| {
+                numpy_argsort_order(fit[a][objective], fit[b][objective])
+            });
             crowd[order[0]] = f64::INFINITY;
             crowd[*order.last().expect("non-empty order")] = f64::INFINITY;
             let min = fit[order[0]][objective];

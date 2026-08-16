@@ -220,6 +220,13 @@ class TestNSGA2RustBackend:
         np.testing.assert_array_equal(rust_rank, py_rank)
         np.testing.assert_allclose(rust_crowd, py_crowd)
 
+        zero_fit = np.array([[-0.0, 1.0], [0.0, 1.0], [1.0, 0.0]])
+        zero_viol = np.zeros(3)
+        py_rank, py_crowd = _constrained_non_dominated_sort(zero_fit, zero_viol)
+        rust_rank, rust_crowd = nsga2_sort_py(zero_fit.tolist(), zero_viol.tolist())
+        np.testing.assert_array_equal(rust_rank, py_rank)
+        np.testing.assert_allclose(rust_crowd, py_crowd)
+
     def test_tournament_and_variation_match_python(self):
         """固定父代和种子下，Rust 锦标赛、SBX 与变异逐项对拍。"""
         rank = [0, 1, 0, 1]
