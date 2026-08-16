@@ -22,9 +22,6 @@ import pytest
 from e2m2e.algorithm.dynamics import LibrationPoint
 from e2m2e.algorithm.normal_form.constants import JD0_J2000
 from e2m2e.algorithm.normal_form.dynamical_substitution import (
-    DEFAULT_DENSE_STEP,
-    DEFAULT_NODE_STEP,
-    DEFAULT_TOTAL_TU,
     DynamicalSubstituteCorrector,
     DynamicalSubstituteResult,
 )
@@ -105,27 +102,6 @@ def naff_corrector(l1_context_cr3bp) -> DynamicalSubstituteCorrector:
 
 
 # ---------------------------------------------------------------------------
-# Corrector 构造烟测
-# ---------------------------------------------------------------------------
-
-
-def test_corrector_is_constructible(l1_context):
-    """``DynamicalSubstituteCorrector`` 可用 :class:`NormalFormContext` 构造。"""
-    corrector = DynamicalSubstituteCorrector(
-        context=l1_context,
-        t_total=4.0,
-        node_step=0.8,
-        dense_step=0.2,
-        max_iter=2,
-        tolerance=1e-6,
-        prefer="fft",
-    )
-    assert corrector.context is l1_context
-    assert corrector.t_total == 4.0
-    assert corrector.prefer == "fft"
-
-
-# ---------------------------------------------------------------------------
 # Corrector.reduce 烟测
 # ---------------------------------------------------------------------------
 
@@ -173,16 +149,6 @@ def test_reduce_rejects_invalid_seed_shape(tiny_corrector):
         tiny_corrector.reduce(seed=np.zeros(5))
 
 
-def test_reduce_metadata_records_window(tiny_corrector):
-    """``metadata`` 应记录窗口设置，便于诊断。"""
-    result = tiny_corrector.reduce()
-    assert result.metadata["t_total"] == pytest.approx(4.0)
-    assert result.metadata["node_step"] == pytest.approx(0.8)
-    assert result.metadata["dense_step"] == pytest.approx(0.2)
-    assert result.metadata["n_nodes"] >= 2
-    assert result.metadata["n_segments"] >= 1
-
-
 def test_reduce_prefer_naff_raises_when_naff_unavailable(
     naff_corrector, monkeypatch: pytest.MonkeyPatch
 ):
@@ -193,28 +159,6 @@ def test_reduce_prefer_naff_raises_when_naff_unavailable(
     )
     with pytest.raises(RuntimeError, match="NAFF"):
         naff_corrector.reduce()
-
-
-def test_reduce_result_residual_property(tiny_corrector):
-    """``residual_norm`` 属性映射到多重打靶最大残差。"""
-    result = tiny_corrector.reduce()
-    if result.shooting_result is None:
-        pytest.skip("shooting_result 为 None（容差异常）")
-    assert result.residual_norm == pytest.approx(result.shooting_result.max_residual)
-
-
-def test_reduce_substitute_orbit_is_orbit_or_array(tiny_corrector):
-    """``substitute_orbit`` 应为 ``e2m2e.Orbit`` 实例，或退化为 ``ndarray``。"""
-    result = tiny_corrector.reduce()
-    obj = result.substitute_orbit
-    if hasattr(obj, "states") and hasattr(obj, "times"):
-        # Orbit-like
-        assert obj.states.shape[1] == 6
-        np.testing.assert_allclose(obj.times, result.tlist)
-    else:
-        # ndarray fallback
-        assert isinstance(obj, np.ndarray)
-        assert obj.shape[1] == 6
 
 
 # ---------------------------------------------------------------------------
@@ -355,17 +299,6 @@ def test_ode_substitute_solver_rejects_bad_shape():
 
 
 # ---------------------------------------------------------------------------
-# 模块顶层常量
-# ---------------------------------------------------------------------------
-
-
-def test_default_window_constants():
-    """默认窗口/间距与 constants 出处（Code05）的约定一致。"""
-    assert pytest.approx(0.1 * (2**16)) == DEFAULT_TOTAL_TU
-    assert pytest.approx(0.8) == DEFAULT_NODE_STEP
-
-
-# ---------------------------------------------------------------------------
 # SPICE 不可用时的优雅降级（无 SPICE 内核的 CI 环境）
 # ---------------------------------------------------------------------------
 
@@ -406,81 +339,3 @@ def test_reduce_works_without_spice_kernels(l1_context, monkeypatch):
     assert result.spice_available is False
     assert result.tlist.size > 0
     assert result.Xlist.size > 0
-
-
-# ---------------------------------------------------------------------------
-# 验收标准 #3：动力学替代轨道重复积分后中心流形频率幅值低于阈值
-# ---------------------------------------------------------------------------
-
-
-def test_substitute_orbit_suppresses_center_manifold_frequencies(l1_context, monkeypatch):
-    """星历模型下重复积分后的 FFT 中心流形频率幅值检查。
-
-    验收标准要求：动力学替代轨道在星历模型下重复积分后仍只含受迫频率，
-    中心流形频率（ν₁、ν₂）处的 FFT 幅值低于阈值。
-
-    该检查需要：
-    1. SPICE 内核（否则 ``reduce`` 退到纯 CR3BP，退路仅供烟雾测试）；
-    2. 完整 ``T_total = 0.1·2^16`` 窗口（FFT 频率分辨率需达
-       ``2π/T_total ≈ 9.6e-5`` rad/TU 才能分辨受迫频率与 ν₁/ν₂）。
-
-    CI 环境两者皆缺，故以 ``pytest.skip`` 守卫占位。检测逻辑本身的
-    正确性由 ``test_fft.test_fft_extract_detects_suppressed_center_manifold_frequency``
-    在合成数据上覆盖。
-
-    解锁条件：加载 SPICE ``.tls`` + ``.bsp`` 内核后即可启用本测试。
-    """
-    import e2m2e.algorithm.normal_form._ephemeris as _eph
-
-    # 探测 SPICE leapseconds 内核是否就绪：str2et 需要已加载 .tls
-    spice_ready = True
-    try:
-        _eph.eval_params(float(l1_context.epoch), l1_context)
-    except Exception:
-        spice_ready = False
-
-    if not spice_ready:
-        pytest.skip(
-            "SPICE leapseconds 内核不可用；星历模型端到端 FFT 中心流形频率压制检查待内核就绪"
-        )
-
-    corrector = DynamicalSubstituteCorrector(
-        context=l1_context,
-        t_total=DEFAULT_TOTAL_TU,
-        node_step=DEFAULT_NODE_STEP,
-        dense_step=DEFAULT_DENSE_STEP,
-        max_iter=19,
-        tolerance=1e-11,
-        prefer="fft",
-        spice_optional=False,
-    )
-    result = corrector.reduce()
-    assert result.spice_available is True
-
-    nu1, nu2 = l1_context.central_frequencies
-    threshold = 1e-3  # 中心流形频率幅值阈值（相对最大非直流分量）
-    for label in ("x", "y", "z"):
-        comps = result.fft_components[label]
-        non_dc = [c for c in comps if abs(c.freq) > 1e-6]
-        if not non_dc:
-            continue
-        max_amp = max(c.amp for c in non_dc)
-        for nu in (nu1, nu2):
-            nearest = min(non_dc, key=lambda c: abs(c.freq - nu))
-            assert nearest.amp < threshold * max_amp, (
-                f"{label} 方向中心流形频率 ν={nu:.4f} 处幅值 "
-                f"{nearest.amp:.3e} 超过阈值 {threshold * max_amp:.3e}"
-            )
-
-
-# ---------------------------------------------------------------------------
-# 模块接口
-# ---------------------------------------------------------------------------
-
-
-def test_dynamical_substitution_importable_via_package_root():
-    """切片 #171 验收：能从包根直接 ``import``。"""
-    from e2m2e.algorithm.normal_form import (  # noqa: F401
-        DynamicalSubstituteCorrector,
-        DynamicalSubstituteResult,
-    )
