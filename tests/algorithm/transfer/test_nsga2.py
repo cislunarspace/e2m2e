@@ -213,6 +213,13 @@ class TestNSGA2RustBackend:
         actual = nsga2_environmental_selection_py(py_rank.tolist(), py_crowd.tolist(), 4)
         np.testing.assert_array_equal(actual, expected)
 
+        nan_viol = np.array([0.0, np.nan, 0.2])
+        nan_fit = np.array([[1.0, 2.0], [0.0, 0.0], [3.0, 4.0]])
+        py_rank, py_crowd = _constrained_non_dominated_sort(nan_fit, nan_viol)
+        rust_rank, rust_crowd = nsga2_sort_py(nan_fit.tolist(), nan_viol.tolist())
+        np.testing.assert_array_equal(rust_rank, py_rank)
+        np.testing.assert_allclose(rust_crowd, py_crowd)
+
     def test_tournament_and_variation_match_python(self):
         """固定父代和种子下，Rust 锦标赛、SBX 与变异逐项对拍。"""
         rank = [0, 1, 0, 1]

@@ -85,7 +85,9 @@ fn constrained_rank(fit: &[Vec<f64>], viol: &[f64]) -> Vec<i64> {
             rank[index] = feasible_rank[position];
         }
 
-        let infeasible: Vec<usize> = (0..n).filter(|&i| viol[i] > 0.0).collect();
+        let infeasible: Vec<usize> = (0..n)
+            .filter(|&i| matches!(viol[i].partial_cmp(&0.0), Some(Ordering::Greater) | None))
+            .collect();
         if !infeasible.is_empty() {
             let max_feasible_rank = *feasible_rank.iter().max().unwrap_or(&0);
             let mut order: Vec<usize> = (0..infeasible.len()).collect();
