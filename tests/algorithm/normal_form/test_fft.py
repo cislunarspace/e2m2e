@@ -256,8 +256,9 @@ def test_fft_extract_detects_suppressed_center_manifold_frequency():
     合成信号 ``cos(ω_forced·t) + ε·cos(ω_cm·t)``，其中 ``ω_cm`` 取
     L1 中心流形频率 ν₁≈2.3377，受迫分量幅值是中心流形的 100 倍。
     FFT 提取后，离 ν₁ 最近的分量幅值应低于主峰的 5%（即中心流形
-    频率被压制）。该测试覆盖"幅值低于阈值"的判定逻辑本身；不维护
-    依赖 qiao normal-form 流水线语义的完整窗口端到端对拍。
+    频率被压制）。该测试覆盖"幅值低于阈值"的判定逻辑本身；端到端
+    的动力学替代轨道 FFT 检查（依赖 e2m2e + SPICE + 完整窗口）见
+    ``test_dynamical_substitution``。
     """
     omega_forced = 0.9  # 受迫基频量级
     omega_cm = 2.33774371420711  # L1 中心流形频率 ν₁
