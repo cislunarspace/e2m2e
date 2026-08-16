@@ -33,6 +33,8 @@ if TYPE_CHECKING:
     hello_integrators: Any
     lambert_batch_py: Any
     lambert_izzo_py: Any
+    lowthrust_collocation_defects_py: Any
+    lowthrust_shooting_evaluate_py: Any
     pal_f_df_tangent_py: Any
     pal_newton_step_py: Any
     pole_tide: Any
@@ -99,6 +101,8 @@ _RUST_SYMBOLS = (
     "indirect_term_acceleration",
     "lambert_batch_py",
     "lambert_izzo_py",
+    "lowthrust_collocation_defects_py",
+    "lowthrust_shooting_evaluate_py",
     "multiple_shooting_correct_py",
     "pal_f_df_tangent_py",
     "pal_newton_step_py",
@@ -281,6 +285,8 @@ __all__ = [
     "initialize_cowell_history",
     "lambert_batch_py",
     "lambert_izzo_py",
+    "lowthrust_collocation_defects_py",
+    "lowthrust_shooting_evaluate_py",
     "MultistepMethod",
     "MultistepResult",
     "multistep_step",
