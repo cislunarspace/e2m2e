@@ -991,25 +991,22 @@ class QuasiFloquetReducer:
             M_stack = np.broadcast_to(M_H, B_samples.shape).copy()
         else:
             M_at, M_stack = _build_M_at(ds_result)
-
-        if self.method == "constant":
-            pass
-        elif self.method == "matrix":
-            B_samples = _solve_qf_matrix(
-                M_at, D, ds_result.tlist, rtol=self.rtol, atol=self.atol, segment=self.segment
-            )
-            if self.project:
-                B_samples = np.array([symplectic_project(B) for B in B_samples], dtype=float)
-        elif self.method == "multipoint":
-            # 多点打靶（qiao Code08）：segment 作 node_step，默认 0.8。
-            node_step = 0.8 if self.segment is None else float(self.segment)
-            B_samples = _solve_qf_multipoint(
-                M_at, D, ds_result.tlist, node_step=node_step, rtol=self.rtol, atol=self.atol
-            )
-            if self.project:
-                B_samples = np.array([symplectic_project(B) for B in B_samples], dtype=float)
-        else:
-            B_samples = _solve_qf_lie(M_at, D, ds_result.tlist, rtol=self.rtol, atol=self.atol)
+            if self.method == "matrix":
+                B_samples = _solve_qf_matrix(
+                    M_at, D, ds_result.tlist, rtol=self.rtol, atol=self.atol, segment=self.segment
+                )
+                if self.project:
+                    B_samples = np.array([symplectic_project(B) for B in B_samples], dtype=float)
+            elif self.method == "multipoint":
+                # 多点打靶（qiao Code08）：segment 作 node_step，默认 0.8。
+                node_step = 0.8 if self.segment is None else float(self.segment)
+                B_samples = _solve_qf_multipoint(
+                    M_at, D, ds_result.tlist, node_step=node_step, rtol=self.rtol, atol=self.atol
+                )
+                if self.project:
+                    B_samples = np.array([symplectic_project(B) for B in B_samples], dtype=float)
+            else:
+                B_samples = _solve_qf_lie(M_at, D, ds_result.tlist, rtol=self.rtol, atol=self.atol)
 
         return QuasiFloquetResult(
             context=self.context,
