@@ -41,7 +41,8 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | `algorithm/normal_form`（积分路径） | Rust（`e2m2e-integrators`） | #336/#340 |
 | `algorithm/normal_form`（CR3BP Hamiltonian 数值构造） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/normal_form`（H→QF 标量多项式投影） | Rust（`e2m2e-integrators`） | — |
-| `algorithm/normal_form`（中心流形化简） | Rust（`e2m2e-integrators`；多项式核内嵌） | #466 |
+| `algorithm/normal_form`（数值多项式核） | Rust（`e2m2e-integrators`） | #464 |
+| `algorithm/normal_form`（中心流形化简） | Rust（`e2m2e-integrators`） | #466 |
 | `algorithm/manifold/manifolds.py`（种子生成与批量传播） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #448 |
 
 ### 迁移中
@@ -49,7 +50,6 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | 模块 | 数值内核 | 工作 issue |
 |---|---|---|
 | `algorithm/solver/MultipleShooting` 类（transfer/hohmann） | Python | 待单独迁移 |
-| `algorithm/normal_form`（数值多项式核，独立入口） | Python（#466 中心流形路径已内嵌等价核） | #464 |
 | `algorithm/normal_form`（复值积分 + QF↔CM Lie 流） | Python（实值积分已 Rust） | #465 |
 
 ### 有意留 Python
@@ -200,11 +200,19 @@ ms 级）；三角点无该输入语义，保留 sympy 符号路径。
 `project_hamiltonian_to_qf` 走 `project_hamiltonian_qf_py`（multinomial
 数值展开）；星历时间序列系数回退 sympy。
 
+**`algorithm/normal_form`（数值多项式核）。** `poly_poisson` /
+`poly_simplify` / `polylist_simplify` 及核内幂次工具（`keys_by_order` /
+`trim_degree`）走 `e2m2e-integrators` 的 `poly_*_py` 绑定；完整支持标量与
+一维时间序列、实/复系数。Python 侧为薄封装，默认 `backend='rust'`，
+`backend='python'` 仅作显式等价性对照（不静默回退）。sympy 符号系数路径
+仍留 Python。工作项：#464。
+
 **`algorithm/normal_form`（中心流形化简）。** `CenterManifoldReducer.reduce`
 默认走 `center_manifold_reduce_py`：两步 Lie 同调（invariant / center）、
 实/复两套频域 W、MAD 抑制、`list_deriv`、全阶 Poisson 链与虚/实基底变换
-完整在 Rust；多项式核在中心流形路径内嵌。`backend="python"` 仅显式对照，
-禁止静默降级（ADR 0020）。工作项：#466。
+完整在 Rust；路径内嵌 Poisson 链所用多项式运算，并与 #464 包级 `poly_*`
+并存。`backend="python"` 仅显式对照，禁止静默降级（ADR 0020）。工作项：
+#466。
 
 **`algorithm/manifold/manifolds.py`（种子生成与批量传播）。** 单值矩阵特征
 分解、STM 转运、±ε 种子与批量弧传播调度在 `e2m2e-forces` 的 `manifold`
@@ -219,11 +227,6 @@ ADR 0011 明示的过渡状态，每个条目有独立工作项。`MultipleShoot
 
 **`algorithm/solver/MultipleShooting` 类。** transfer/hohmann 使用的多重
 打靶类仍是泛型 Python 实现，后续需单独评估和迁移。
-
-**`algorithm/normal_form`（数值多项式核，独立入口）。** 包级
-`poly_poisson` / `polylist_simplify` 仍为 Python（符号路径与其它调用方
-共用）；#466 中心流形路径内嵌了等价复值时间序列核，独立原子入口仍见
-#464（#449 拆包 P1）。
 
 **`algorithm/normal_form`（复值积分 + QF↔CM Lie 流）。** `qf_to_cm` /
 `cm_to_qf` 仍走 scipy 复值 `solve_ivp`（#336 例外）；完整下沉须先具备
@@ -280,9 +283,9 @@ numpy 纯函数实现，ADR 0017 边界固化的 thin-wrapper / numpy 对照基�
 - **符号构造不是数值热路径。** sympy Legendre / 星历 `build_hamiltonian`
   属 CAS；共线点 CR3BP 数值构造已 Rust。无对等「下沉收益」。
 - **NAFF** 是外部可执行文件封装，不进 Rust crate。
-- **pipeline / catalog 编排** 是串联与结果组装；中心流形化简已下沉
-  （#466），其余数值段由 #464/#465 下沉后自然变薄，不单独迁编排层。
-- 剩余数值主链见迁移中 #464/#465，**完整实现、禁止简化**；
+- **pipeline / catalog 编排** 是串联与结果组装；多项式核与中心流形化简
+  已下沉（#464/#466），其余数值段由 #465 下沉后自然变薄，不单独迁编排层。
+- 剩余数值主链见迁移中 #465，**完整实现、禁止简化**；
   quasi-Floquet 全矩阵法与 MS Newton 壳后置未派发。正确性不以 qiao
   为 oracle（#426）。
 
@@ -320,8 +323,8 @@ Rust，见上。
   保证全文 grep 可枚举。
 - **粒度**：登记粒度到文件/路径。同一模块可拆多条（如 `algorithm/design`：
   打靶/传播路径已下沉、编排有意留 Python；`algorithm/normal_form`：积分/
-  CR3BP Hamiltonian/H→QF/中心流形已下沉，独立多项式核/QF↔CM 迁移中
-  #464/#465，符号与 NAFF/编排有意留 Python），以速查表路径为准。
+  CR3BP Hamiltonian/H→QF/多项式核/中心流形已下沉，QF↔CM 迁移中
+  #465，符号与 NAFF/编排有意留 Python），以速查表路径为准。
 - **迁移中条目**：issue 关闭（下沉完成或改判）时，把条目移到对应状态节，
   保留 issue 编号作为历史指针。
 - **有意留 Python 条目**：必须带理由，理由应引用 ADR 或文档决策，不写
