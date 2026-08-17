@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     build_cr3bp_hamiltonian_py: Any
     center_manifold_reduce_py: Any
     check_collision_py: Any
+    cm_to_qf_py: Any
     collinear_center_modes_py: Any
     compute_distance_series_py: Any
     compute_min_distance_py: Any
@@ -57,6 +58,7 @@ if TYPE_CHECKING:
     porkchop_grid_py: Any
     porkchop_grid_states_py: Any
     project_hamiltonian_qf_py: Any
+    qf_to_cm_py: Any
     qlaw_propagate_py: Any
     trim_degree_py: Any
     qlaw_segment_direction_py: Any
@@ -115,6 +117,7 @@ _RUST_SYMBOLS = (
     "build_cr3bp_hamiltonian_py",
     "center_manifold_reduce_py",
     "check_collision_py",
+    "cm_to_qf_py",
     "collinear_center_modes_py",
     "compute_distance_series_py",
     "compute_min_distance_py",
@@ -152,6 +155,7 @@ _RUST_SYMBOLS = (
     "porkchop_grid_py",
     "porkchop_grid_states_py",
     "project_hamiltonian_qf_py",
+    "qf_to_cm_py",
     "qlaw_propagate_py",
     "qlaw_segment_direction_py",
     "trim_degree_py",
@@ -325,6 +329,7 @@ __all__ = [
     "build_cr3bp_hamiltonian_py",
     "center_manifold_reduce_py",
     "check_collision_py",
+    "cm_to_qf_py",
     "collinear_center_modes_py",
     "CowellResult",
     "cowell_step",
@@ -371,6 +376,7 @@ __all__ = [
     "porkchop_grid_py",
     "porkchop_grid_states_py",
     "project_hamiltonian_qf_py",
+    "qf_to_cm_py",
     "qlaw_propagate_py",
     "qlaw_segment_direction_py",
     "trim_degree_py",

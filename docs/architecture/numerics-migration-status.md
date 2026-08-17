@@ -42,6 +42,7 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | `algorithm/normal_form`（CR3BP Hamiltonian 数值构造） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/normal_form`（H→QF 标量多项式投影） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/normal_form`（数值多项式核） | Rust（`e2m2e-integrators`） | #464 |
+| `algorithm/normal_form`（复值积分 + QF↔CM Lie 流） | Rust（`e2m2e-integrators`，12 实维分裂） | #465 |
 | `algorithm/normal_form`（中心流形化简） | Rust（`e2m2e-integrators`） | #466 |
 | `algorithm/manifold/manifolds.py`（种子生成与批量传播） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #448 |
 
@@ -50,7 +51,6 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | 模块 | 数值内核 | 工作 issue |
 |---|---|---|
 | `algorithm/solver/MultipleShooting` 类（transfer/hohmann） | Python | 待单独迁移 |
-| `algorithm/normal_form`（复值积分 + QF↔CM Lie 流） | Python（实值积分已 Rust） | #465 |
 
 ### 有意留 Python
 
@@ -189,8 +189,8 @@ Rust（`solve_ivp_events`）。
 传播走 Rust（`propagate_compiled_stm_py`）。
 
 **`algorithm/normal_form`（积分路径）。** 传播积分走 Rust（`solve_ivp_rust`，
-见 #336/#340）。QF↔CM 复值 Lie 流仍保留 `scipy.integrate.solve_ivp`（Rust
-`solve_ivp_py` 仅支持实值，#336 明示例外）。
+见 #336/#340）。QF↔CM 高阶 Lie 流走 `qf_to_cm_py` / `cm_to_qf_py`（#465，
+12 实维分裂复积分）；`backend="python"` 仅作显式对照。
 
 **`algorithm/normal_form`（CR3BP Hamiltonian 数值构造）。** 共线点
 `build_cr3bp_hamiltonian` 走 `build_cr3bp_hamiltonian_py`（JM `c_n` 形式，
@@ -206,6 +206,10 @@ ms 级）；三角点无该输入语义，保留 sympy 符号路径。
 一维时间序列、实/复系数。Python 侧为薄封装，默认 `backend='rust'`，
 `backend='python'` 仅作显式等价性对照（不静默回退）。sympy 符号系数路径
 仍留 Python。工作项：#464。
+
+**`algorithm/normal_form`（复值积分 + QF↔CM Lie 流）。** `qf_to_cm` /
+`cm_to_qf` 默认走 `qf_to_cm_py` / `cm_to_qf_py`（12 实维分裂 + DOP853，
+完整实↔复基底与全阶 Lie）；`backend="python"` 仅作显式对照。工作项：#465。
 
 **`algorithm/normal_form`（中心流形化简）。** `CenterManifoldReducer.reduce`
 默认走 `center_manifold_reduce_py`：两步 Lie 同调（invariant / center）、
@@ -227,11 +231,6 @@ ADR 0011 明示的过渡状态，每个条目有独立工作项。`MultipleShoot
 
 **`algorithm/solver/MultipleShooting` 类。** transfer/hohmann 使用的多重
 打靶类仍是泛型 Python 实现，后续需单独评估和迁移。
-
-**`algorithm/normal_form`（复值积分 + QF↔CM Lie 流）。** `qf_to_cm` /
-`cm_to_qf` 仍走 scipy 复值 `solve_ivp`（#336 例外）；完整下沉须先具备
-复值（或 12 实维等价）积分能力，再迁全阶 Lie 流与实↔复基底。工作项：
-#465（#449 拆包 P3）。
 
 后置未派发（#449 评估）：quasi-Floquet 全矩阵法（P5）、多重打靶 Newton
 壳（P6）；独立 FFT 产品化（P2）——#466 已内嵌特解所需 FFT，可不单开。
@@ -283,11 +282,10 @@ numpy 纯函数实现，ADR 0017 边界固化的 thin-wrapper / numpy 对照基�
 - **符号构造不是数值热路径。** sympy Legendre / 星历 `build_hamiltonian`
   属 CAS；共线点 CR3BP 数值构造已 Rust。无对等「下沉收益」。
 - **NAFF** 是外部可执行文件封装，不进 Rust crate。
-- **pipeline / catalog 编排** 是串联与结果组装；多项式核与中心流形化简
-  已下沉（#464/#466），其余数值段由 #465 下沉后自然变薄，不单独迁编排层。
-- 剩余数值主链见迁移中 #465，**完整实现、禁止简化**；
-  quasi-Floquet 全矩阵法与 MS Newton 壳后置未派发。正确性不以 qiao
-  为 oracle（#426）。
+- **pipeline / catalog 编排** 是串联与结果组装；多项式核、QF↔CM 与
+  中心流形化简已下沉（#464/#465/#466），不单独迁编排层。
+- 数值主链三项均已下沉；quasi-Floquet 全矩阵法与 MS Newton 壳后置
+  未派发。正确性不以 qiao 为 oracle（#426）。
 
 **`algorithm/design/frozen_orbit.py`（ELFO 辅助）。** 理由：经典根数↔笛卡尔
 转换是解析公式，漂移统计是编排；传播已 Rust（查询已下沉 Rust 实例）。
@@ -323,8 +321,8 @@ Rust，见上。
   保证全文 grep 可枚举。
 - **粒度**：登记粒度到文件/路径。同一模块可拆多条（如 `algorithm/design`：
   打靶/传播路径已下沉、编排有意留 Python；`algorithm/normal_form`：积分/
-  CR3BP Hamiltonian/H→QF/多项式核/中心流形已下沉，QF↔CM 迁移中
-  #465，符号与 NAFF/编排有意留 Python），以速查表路径为准。
+  CR3BP Hamiltonian/H→QF/多项式核/QF↔CM/中心流形已下沉，符号与
+  NAFF/编排有意留 Python），以速查表路径为准。
 - **迁移中条目**：issue 关闭（下沉完成或改判）时，把条目移到对应状态节，
   保留 issue 编号作为历史指针。
 - **有意留 Python 条目**：必须带理由，理由应引用 ADR 或文档决策，不写
