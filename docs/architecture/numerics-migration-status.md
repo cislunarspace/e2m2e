@@ -39,13 +39,13 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | `algorithm/proximity/relative_dynamics.py`（传播） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/station_keeping/monte_carlo.py`（传播） | Rust（`e2m2e-integrators`） | — |
 | `algorithm/normal_form`（积分路径） | Rust（`e2m2e-integrators`） | — |
+| `algorithm/manifold/manifolds.py`（种子生成与批量传播） | Rust（`e2m2e-forces` + `e2m2e-integrators`） | #448 |
 
 ### 迁移中
 
 | 模块 | 数值内核 | 工作 issue |
 |---|---|---|
 | `algorithm/solver/MultipleShooting` 类（transfer/hohmann） | Python | 待单独迁移 |
-| `algorithm/manifold/manifolds.py` | Python | #448 |
 | `algorithm/normal_form`（FFT/多项式/化简、多重打靶 Newton） | Python（积分已 Rust） | #449 |
 
 ### 有意留 Python
@@ -187,6 +187,12 @@ Rust（`solve_ivp_events`）。
 见 #336/#340）；FFT/多项式/化简、多重打靶 Newton 迭代仍是 Python，见
 迁移中 #449。
 
+**`algorithm/manifold/manifolds.py`（种子生成与批量传播）。** 单值矩阵特征
+分解、STM 转运、±ε 种子与批量弧传播调度在 `e2m2e-forces` 的 `manifold`
+模块，经 `manifold_seeds_py` / `manifold_propagate_py` 暴露。Python 只做
+参数校验、`ManifoldTube`/`Orbit` 组装与可选的事后截面截断；不保留 Python
+数值回退。工作项：#448。
+
 ## 迁移中
 
 ADR 0011 明示的过渡状态，每个条目有独立工作项。`MultipleShooting` 是支持多种
@@ -194,10 +200,6 @@ ADR 0011 明示的过渡状态，每个条目有独立工作项。`MultipleShoot
 
 **`algorithm/solver/MultipleShooting` 类。** transfer/hohmann 使用的多重
 打靶类仍是泛型 Python 实现，后续需单独评估和迁移。
-
-**`algorithm/manifold/manifolds.py`。** 单值矩阵特征分解、STM 转运、种子
-生成纯 Python（numpy）。ADR 0026 后续工作第三条点名的过渡状态之一。
-工作项：#448。
 
 **`algorithm/normal_form`（FFT/多项式/化简、多重打靶 Newton）。** 频率提取、
 Legendre 系数、多项式环、Hamiltonian 化简、`multiple_shooting.py` 的块三对角
