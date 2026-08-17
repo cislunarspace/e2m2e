@@ -24,6 +24,7 @@ pub mod multiple_shooting;
 pub mod normal_form;
 pub mod nsga2;
 pub mod planar_pal;
+pub mod qf_cm;
 #[cfg(feature = "spice")]
 pub mod segmented_shooting;
 
@@ -362,6 +363,8 @@ const fn parse_abi_version(s: &str) -> u32 {
 ///   种子、延拓、筛选与结构化终止收进单次 Rust 调用。
 /// - **v16** （#448）：新增 ``manifold_seeds_py`` 与 ``manifold_propagate_py``，
 ///   将不变流形种子生成与批量传播调度下沉 Rust。
+/// - **v17** （#465）：新增 ``qf_to_cm_py`` 与 ``cm_to_qf_py``，将 QF↔CM
+///   高阶 Lie 流（12 实维分裂复积分）下沉 Rust，关闭 #336 复值积分例外。
 ///
 /// 「1→3 跳号」实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -4020,6 +4023,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
         normal_form::build_cr3bp_hamiltonian_py,
         m
     )?)?;
+    m.add_function(wrap_pyfunction!(qf_cm::qf_to_cm_py, m)?)?;
+    m.add_function(wrap_pyfunction!(qf_cm::cm_to_qf_py, m)?)?;
     m.add_function(wrap_pyfunction!(rk_step, m)?)?;
     m.add_function(wrap_pyfunction!(solve_ivp_py, m)?)?;
     m.add_function(wrap_pyfunction!(solve_ivp_events_py, m)?)?;
