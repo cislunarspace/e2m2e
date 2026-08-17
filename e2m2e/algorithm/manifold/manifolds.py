@@ -113,8 +113,7 @@ class InvariantManifold:
         self.epsilon = float(epsilon)
         self.dynamics = CR3BP_Dynamics(system)
 
-        # 最近一次 seeds 缓存（供 propagate 默认相位点数）
-        self._cached_seeds: np.ndarray | None = None
+        # 最近一次 seeds 的相位点数（供 propagate 默认 n_points）
         self._cached_n_points: int | None = None
 
     def seeds(self, n_points: int) -> np.ndarray:
@@ -154,7 +153,6 @@ class InvariantManifold:
         seeds = np.asarray(raw["seeds"], dtype=float)
         if seeds.shape != (n_points, 6):
             raise RuntimeError(f"Rust 种子形状异常: {seeds.shape}，期望 ({n_points}, 6)")
-        self._cached_seeds = seeds
         self._cached_n_points = n_points
         return seeds
 
