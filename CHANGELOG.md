@@ -2,8 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+- **中心流形化简完整下沉 Rust**（#466）：`CenterManifoldReducer` 两步 Lie 同调（invariant / center）、实值与复值+MAD 两套频域 W 求解器、`list_deriv`、全阶 Poisson 链与虚/实基底变换进入 `e2m2e-integrators`（`center_manifold_reduce_py`，ABI v17）；中心流形路径内嵌等价多项式核。默认 `backend="rust"`，`backend="python"` 仅显式等价性对照，禁止静默降级。
+
 ### Changed
-- **normal_form 迁移状态按 #449 拆包更新**：已下沉（积分、共线点 CR3BP Hamiltonian、H→QF 标量投影）登记补全；数值主链拆为完整实现工作项 #464（多项式核）、#465（复值积分+QF↔CM）、#466（中心流形化简）；符号 Legendre/星历 H、NAFF、pipeline 编排有意留 Python；P5/P6 后置未派发。更新 `docs/architecture/numerics-migration-status.md`。
+- **normal_form 迁移状态按 #449 拆包更新**：已下沉（积分、共线点 CR3BP Hamiltonian、H→QF 标量投影、中心流形化简）登记补全；剩余数值主链为 #464（独立多项式核入口）、#465（复值积分+QF↔CM）；符号 Legendre/星历 H、NAFF、pipeline 编排有意留 Python；P5/P6 后置未派发。更新 `docs/architecture/numerics-migration-status.md`。
 
 ## [5.7.1] - 2026-08-17
 

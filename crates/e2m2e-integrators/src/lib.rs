@@ -9,6 +9,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use pyo3::types::{PyDict, PyList};
 
+pub mod center_manifold;
 #[cfg(feature = "spice")]
 pub mod differential_correction;
 pub mod family;
@@ -362,6 +363,8 @@ const fn parse_abi_version(s: &str) -> u32 {
 ///   种子、延拓、筛选与结构化终止收进单次 Rust 调用。
 /// - **v16** （#448）：新增 ``manifold_seeds_py`` 与 ``manifold_propagate_py``，
 ///   将不变流形种子生成与批量传播调度下沉 Rust。
+/// - **v17** （#466）：新增 ``center_manifold_reduce_py``，将中心流形两步
+///   Lie 同调化简（频域 W、Poisson 链、虚/实基底变换）完整下沉 Rust。
 ///
 /// 「1→3 跳号」实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -4018,6 +4021,10 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(normal_form::project_hamiltonian_qf_py, m)?)?;
     m.add_function(wrap_pyfunction!(
         normal_form::build_cr3bp_hamiltonian_py,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        center_manifold::center_manifold_reduce_py,
         m
     )?)?;
     m.add_function(wrap_pyfunction!(rk_step, m)?)?;

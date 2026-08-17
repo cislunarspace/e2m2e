@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     batch_j2000_to_synodic_py: Any
     batch_synodic_to_j2000_py: Any
     build_cr3bp_hamiltonian_py: Any
+    center_manifold_reduce_py: Any
     check_collision_py: Any
     collinear_center_modes_py: Any
     compute_distance_series_py: Any
@@ -107,6 +108,7 @@ _RUST_SYMBOLS = (
     "batch_j2000_to_synodic_py",
     "batch_synodic_to_j2000_py",
     "build_cr3bp_hamiltonian_py",
+    "center_manifold_reduce_py",
     "check_collision_py",
     "collinear_center_modes_py",
     "compute_distance_series_py",
@@ -311,6 +313,7 @@ __all__ = [
     "batch_j2000_to_synodic_py",
     "batch_synodic_to_j2000_py",
     "build_cr3bp_hamiltonian_py",
+    "center_manifold_reduce_py",
     "check_collision_py",
     "collinear_center_modes_py",
     "CowellResult",
