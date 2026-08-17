@@ -9,6 +9,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use pyo3::types::{PyDict, PyList};
 
+pub mod center_manifold;
 #[cfg(feature = "spice")]
 pub mod differential_correction;
 pub mod family;
@@ -24,6 +25,7 @@ pub mod multiple_shooting;
 pub mod normal_form;
 pub mod nsga2;
 pub mod planar_pal;
+pub mod qf_cm;
 #[cfg(feature = "spice")]
 pub mod segmented_shooting;
 
@@ -360,6 +362,15 @@ const fn parse_abi_version(s: &str) -> u32 {
 ///   Lissajous 中心模态轨迹和族几何度量下沉 Rust。
 /// - **v15** （#428）：新增 ``generate_cr3bp_family_py``，将七类轨道族的
 ///   种子、延拓、筛选与结构化终止收进单次 Rust 调用。
+/// - **v16** （#448）：新增 ``manifold_seeds_py`` 与 ``manifold_propagate_py``，
+///   将不变流形种子生成与批量传播调度下沉 Rust。
+/// - **v17** （#464）：新增 ``poly_poisson_py`` / ``poly_simplify_py`` /
+///   ``polylist_simplify_py`` / ``keys_by_order_py`` / ``trim_degree_py``，
+///   将 normal_form 数值多项式核完整下沉 Rust。
+/// - **v18** （#465）：新增 ``qf_to_cm_py`` 与 ``cm_to_qf_py``，将 QF↔CM
+///   高阶 Lie 流（12 实维分裂复积分）下沉 Rust，关闭 #336 复值积分例外。
+/// - **v19** （#466）：新增 ``center_manifold_reduce_py``，将中心流形两步
+///   Lie 同调化简（频域 W、Poisson 链、虚/实基底变换）完整下沉 Rust。
 ///
 /// 「1→3 跳号」实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
@@ -3434,6 +3445,165 @@ fn wsb_search_py(
     ))
 }
 
+/// Python 接口：不变流形种子生成。
+///
+/// 相位扫掠（STM）、单值矩阵双曲实特征选取、转运归一化与 ±ε 扰动均在 Rust
+/// 完成；全程 ``py.allow_threads``，无 Python 数值回退。
+#[pyfunction]
+#[pyo3(signature = (mu, initial_state, period, kind, branch_sign, epsilon, n_points, rtol, atol, max_step=None))]
+#[allow(clippy::too_many_arguments)]
+fn manifold_seeds_py(
+    mu: f64,
+    initial_state: Vec<f64>,
+    period: f64,
+    kind: &str,
+    branch_sign: f64,
+    epsilon: f64,
+    n_points: usize,
+    rtol: f64,
+    atol: f64,
+    max_step: Option<f64>,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    if initial_state.len() != 6 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "initial_state 须含 6 个分量，得到 {}",
+            initial_state.len()
+        )));
+    }
+    let kind = e2m2e_forces::manifold::ManifoldKind::parse(kind)
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    let mut state0 = [0.0_f64; 6];
+    state0.copy_from_slice(&initial_state);
+
+    let result = py
+        .allow_threads(|| {
+            e2m2e_forces::manifold::generate_manifold_seeds(
+                mu,
+                &state0,
+                period,
+                kind,
+                branch_sign,
+                epsilon,
+                n_points,
+                rtol,
+                atol,
+                max_step,
+            )
+        })
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+
+    let seeds: Vec<Vec<f64>> = result.seeds.iter().map(|s| s.to_vec()).collect();
+    let phase_states: Vec<Vec<f64>> = result.phase_states.iter().map(|s| s.to_vec()).collect();
+    let dict = PyDict::new(py);
+    dict.set_item("seeds", seeds)?;
+    dict.set_item("phase_states", phase_states)?;
+    dict.set_item("eigvec0", result.eigvec0.to_vec())?;
+    Ok(dict.into())
+}
+
+/// Python 接口：不变流形批量弧传播。
+///
+/// 输入展平种子 ``n*6``；`kind` 决定积分方向；单弧失败跳过。`n_workers>1`
+/// 或环境变量 ``E2M2E_MANIFOLD_PARALLEL!=0`` 时走 Rayon。
+#[pyfunction]
+#[pyo3(signature = (mu, seeds, kind, t_span, sample_dt, rtol, atol, max_step=None, *, n_workers=None, parallel=None))]
+#[allow(clippy::too_many_arguments)]
+fn manifold_propagate_py(
+    mu: f64,
+    seeds: Vec<f64>,
+    kind: &str,
+    t_span: f64,
+    sample_dt: f64,
+    rtol: f64,
+    atol: f64,
+    max_step: Option<f64>,
+    n_workers: Option<usize>,
+    parallel: Option<bool>,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    if !seeds.len().is_multiple_of(6) {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "seeds 展平长度必须是 6 的倍数",
+        ));
+    }
+    if sample_dt <= 0.0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "sample_dt 必须为正，当前为 {sample_dt}"
+        )));
+    }
+    let duration = t_span.abs();
+    if duration <= 0.0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "t_span 必须非零，当前为 {t_span}"
+        )));
+    }
+    let kind = e2m2e_forces::manifold::ManifoldKind::parse(kind)
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    let t_final = match kind {
+        e2m2e_forces::manifold::ManifoldKind::Stable => -duration,
+        e2m2e_forces::manifold::ManifoldKind::Unstable => duration,
+    };
+
+    let n = seeds.len() / 6;
+    let mut seed_arr = Vec::with_capacity(n);
+    for i in 0..n {
+        let mut s = [0.0_f64; 6];
+        s.copy_from_slice(&seeds[i * 6..i * 6 + 6]);
+        seed_arr.push(s);
+    }
+
+    let use_parallel = parallel.unwrap_or_else(|| {
+        if n_workers.map(|n| n > 1).unwrap_or(false) {
+            true
+        } else {
+            std::env::var("E2M2E_MANIFOLD_PARALLEL").is_ok_and(|v| v != "0")
+        }
+    });
+    let pool = match n_workers {
+        Some(n) if use_parallel => Some(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(n.max(1))
+                .build()
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?,
+        ),
+        _ => None,
+    };
+
+    let result = py.allow_threads(move || {
+        let work = || {
+            if use_parallel {
+                e2m2e_forces::manifold::propagate_manifold_arcs_parallel(
+                    mu, &seed_arr, t_final, sample_dt, rtol, atol, max_step,
+                )
+            } else {
+                e2m2e_forces::manifold::propagate_manifold_arcs_serial(
+                    mu, &seed_arr, t_final, sample_dt, rtol, atol, max_step,
+                )
+            }
+        };
+        if let Some(pool) = pool.as_ref() {
+            pool.install(work)
+        } else {
+            work()
+        }
+    });
+
+    let arcs_list = PyList::empty(py);
+    for arc in &result.arcs {
+        let states: Vec<Vec<f64>> = arc.states.iter().map(|s| s.to_vec()).collect();
+        let d = PyDict::new(py);
+        d.set_item("times", &arc.times)?;
+        d.set_item("states", states)?;
+        arcs_list.append(d)?;
+    }
+    let dict = PyDict::new(py);
+    dict.set_item("arcs", arcs_list)?;
+    dict.set_item("seed_indices", result.seed_indices)?;
+    dict.set_item("n_failures", result.n_failures)?;
+    Ok(dict.into())
+}
+
 /// Python 接口：低能转移流形截面态配对。
 ///
 /// Python 侧先解析庞加莱截面并收集穿越态，本函数只接收展平 POD 状态，完成
@@ -3859,6 +4029,17 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
         normal_form::build_cr3bp_hamiltonian_py,
         m
     )?)?;
+    m.add_function(wrap_pyfunction!(
+        center_manifold::center_manifold_reduce_py,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(normal_form::poly_poisson_py, m)?)?;
+    m.add_function(wrap_pyfunction!(normal_form::poly_simplify_py, m)?)?;
+    m.add_function(wrap_pyfunction!(normal_form::polylist_simplify_py, m)?)?;
+    m.add_function(wrap_pyfunction!(normal_form::keys_by_order_py, m)?)?;
+    m.add_function(wrap_pyfunction!(normal_form::trim_degree_py, m)?)?;
+    m.add_function(wrap_pyfunction!(qf_cm::qf_to_cm_py, m)?)?;
+    m.add_function(wrap_pyfunction!(qf_cm::cm_to_qf_py, m)?)?;
     m.add_function(wrap_pyfunction!(rk_step, m)?)?;
     m.add_function(wrap_pyfunction!(solve_ivp_py, m)?)?;
     m.add_function(wrap_pyfunction!(solve_ivp_events_py, m)?)?;
@@ -3905,6 +4086,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(pal_newton_step_py, m)?)?;
     m.add_function(wrap_pyfunction!(wsb_search_py, m)?)?;
     m.add_function(wrap_pyfunction!(low_energy_patch_py, m)?)?;
+    m.add_function(wrap_pyfunction!(manifold_seeds_py, m)?)?;
+    m.add_function(wrap_pyfunction!(manifold_propagate_py, m)?)?;
     m.add_function(wrap_pyfunction!(transfer_grid_search_serial_py, m)?)?;
     m.add_function(wrap_pyfunction!(transfer_grid_search_py, m)?)?;
     m.add_class::<WsbCandidate>()?;

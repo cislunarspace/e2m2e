@@ -22,7 +22,9 @@ if TYPE_CHECKING:
     batch_j2000_to_synodic_py: Any
     batch_synodic_to_j2000_py: Any
     build_cr3bp_hamiltonian_py: Any
+    center_manifold_reduce_py: Any
     check_collision_py: Any
+    cm_to_qf_py: Any
     collinear_center_modes_py: Any
     compute_distance_series_py: Any
     compute_min_distance_py: Any
@@ -33,12 +35,15 @@ if TYPE_CHECKING:
     enable_ephem_cache: Any
     ephem_ffi_call_count: Any
     hello_integrators: Any
+    keys_by_order_py: Any
     lambert_batch_py: Any
     lambert_izzo_py: Any
     low_energy_patch_py: Any
     lowthrust_collocation_defects_py: Any
     lowthrust_shooting_evaluate_py: Any
     lissajous_bounded_trajectory_py: Any
+    manifold_propagate_py: Any
+    manifold_seeds_py: Any
     nsga2_environmental_selection_py: Any
     nsga2_sort_py: Any
     nsga2_tournament_selection_py: Any
@@ -47,10 +52,15 @@ if TYPE_CHECKING:
     pal_f_df_tangent_py: Any
     pal_newton_step_py: Any
     pole_tide: Any
+    poly_poisson_py: Any
+    poly_simplify_py: Any
+    polylist_simplify_py: Any
     porkchop_grid_py: Any
     porkchop_grid_states_py: Any
     project_hamiltonian_qf_py: Any
+    qf_to_cm_py: Any
     qlaw_propagate_py: Any
+    trim_degree_py: Any
     qlaw_segment_direction_py: Any
     propagate_bcr4bp_py: Any
     propagate_bcr4bp_stm_py: Any
@@ -105,7 +115,9 @@ _RUST_SYMBOLS = (
     "batch_j2000_to_synodic_py",
     "batch_synodic_to_j2000_py",
     "build_cr3bp_hamiltonian_py",
+    "center_manifold_reduce_py",
     "check_collision_py",
+    "cm_to_qf_py",
     "collinear_center_modes_py",
     "compute_distance_series_py",
     "compute_min_distance_py",
@@ -118,12 +130,15 @@ _RUST_SYMBOLS = (
     "ephem_ffi_call_count",
     "hello_integrators",
     "indirect_term_acceleration",
+    "keys_by_order_py",
     "lambert_batch_py",
     "lambert_izzo_py",
     "low_energy_patch_py",
     "lowthrust_collocation_defects_py",
     "lowthrust_shooting_evaluate_py",
     "lissajous_bounded_trajectory_py",
+    "manifold_propagate_py",
+    "manifold_seeds_py",
     "multiple_shooting_correct_py",
     "nsga2_environmental_selection_py",
     "nsga2_sort_py",
@@ -134,11 +149,16 @@ _RUST_SYMBOLS = (
     "pal_newton_step_py",
     "planar_full_period_pal_py",
     "pole_tide",
+    "poly_poisson_py",
+    "poly_simplify_py",
+    "polylist_simplify_py",
     "porkchop_grid_py",
     "porkchop_grid_states_py",
     "project_hamiltonian_qf_py",
+    "qf_to_cm_py",
     "qlaw_propagate_py",
     "qlaw_segment_direction_py",
+    "trim_degree_py",
     "propagate_bcr4bp_py",
     "propagate_bcr4bp_stm_py",
     "propagate_compiled",
@@ -307,7 +327,9 @@ __all__ = [
     "batch_j2000_to_synodic_py",
     "batch_synodic_to_j2000_py",
     "build_cr3bp_hamiltonian_py",
+    "center_manifold_reduce_py",
     "check_collision_py",
+    "cm_to_qf_py",
     "collinear_center_modes_py",
     "CowellResult",
     "cowell_step",
@@ -326,12 +348,15 @@ __all__ = [
     "indirect_term_acceleration",
     "initialize_abm_history",
     "initialize_cowell_history",
+    "keys_by_order_py",
     "lambert_batch_py",
     "lambert_izzo_py",
     "low_energy_patch_rust",
     "lowthrust_collocation_defects_py",
     "lowthrust_shooting_evaluate_py",
     "lissajous_bounded_trajectory_py",
+    "manifold_propagate_py",
+    "manifold_seeds_py",
     "MultistepMethod",
     "MultistepResult",
     "multistep_step",
@@ -345,11 +370,16 @@ __all__ = [
     "pal_newton_step_py",
     "planar_full_period_pal_py",
     "pole_tide",
+    "poly_poisson_py",
+    "poly_simplify_py",
+    "polylist_simplify_py",
     "porkchop_grid_py",
     "porkchop_grid_states_py",
     "project_hamiltonian_qf_py",
+    "qf_to_cm_py",
     "qlaw_propagate_py",
     "qlaw_segment_direction_py",
+    "trim_degree_py",
     "propagate_compiled",
     "propagate_compiled_lowthrust",
     "propagate_compiled_lowthrust_sensitivity",
