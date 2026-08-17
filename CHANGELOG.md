@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- **NRHO 星历修正默认路径不收敛**（#463）：拼接点采样对 NRHO 改为「删近月点附近节点」（与 Halo 近月点加密解耦），固定容差下 segmented 路径在 GUI 默认量级（L2 南、近月高 5000 km、约 1 个月）与更贴月短弧（2000 km）上收敛；文档去掉「NRHO 星历修正暂不可用」。对照矩阵脚本 ``scripts/nrho_ephemeris_correction_matrix.py`` 保留为开发期反馈回路。
+
 ## [5.7.1] - 2026-08-17
 
 ### Added
