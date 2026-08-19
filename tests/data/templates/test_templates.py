@@ -87,7 +87,6 @@ class TestEnums:
         assert OrbitFamilyType.NRHO.value == "nrho"
 
 
-
 class TestForceConfigSchema:
     def test_schema_shape(self):
         assert force_config.CONFIG_VERSION == 1
