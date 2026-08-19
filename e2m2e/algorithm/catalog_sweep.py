@@ -25,8 +25,10 @@ from .results import FamilyGenerationResult
 
 __all__ = ["FamilySweepPoint", "SweepPointResult", "run_family_sweep"]
 
-#: orbit_type → 族生成入口。与 Facade.orbit_family_generation 的分派共用
-#: 同一份入口表（kwargs 形式）；LISSAJOUS 不进扫描（振幅为面内×面外二维）。
+#: orbit_type → 族生成入口（kwargs 调用形式）。
+#: Facade.orbit_family_generation 另有位置参数形式的分派（既有调用契约，
+#: 测试断言精确位置参数）；两处分派新增族时需同步。LISSAJOUS 不进扫描
+#: （振幅为面内×面外二维）。
 _ENTRIES = {
     "HALO": design_halo_family,
     "NRHO": design_nrho_family,

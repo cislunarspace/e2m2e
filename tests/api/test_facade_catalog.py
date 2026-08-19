@@ -442,6 +442,14 @@ class TestCatalogErrors:
         with pytest.raises(OrbitError, match="CATALOG_READ_FAILED"):
             facade.catalog_query()
 
+    def test_path_traversal_record_id_is_record_not_found(self):
+        """record_id 拼路径前的形态校验：路径穿越一律 RECORD_NOT_FOUND。"""
+        facade = Facade()
+        with pytest.raises(OrbitError, match="RECORD_NOT_FOUND"):
+            facade.catalog_get(record_id="../../etc/passwd")
+        with pytest.raises(OrbitError, match="RECORD_NOT_FOUND"):
+            facade.catalog_delete(record_id="../../etc/passwd")
+
 
 class TestToolInventory:
     def test_catalog_methods_are_in_derived_inventory(self):

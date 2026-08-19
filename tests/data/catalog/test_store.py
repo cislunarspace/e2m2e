@@ -52,6 +52,23 @@ class TestRoundTrip:
         with pytest.raises(RecordNotFoundError):
             store.get("no-such-record")
 
+    @pytest.mark.parametrize("bad_id", ["../../etc/passwd", "../x", "a/b", "..", ".hidden"])
+    def test_path_traversal_record_id_is_rejected(self, store, bad_id):
+        """record_id 直接拼文件路径：非法形态一律按记录不存在拒绝。"""
+        with pytest.raises(RecordNotFoundError):
+            store.get_meta(bad_id)
+        with pytest.raises(RecordNotFoundError):
+            store.delete(bad_id)
+        with pytest.raises(RecordNotFoundError):
+            store.tag(bad_id, ["t"])
+
+    def test_missing_npz_with_array_pointer_raises(self, store):
+        """元数据声称有数组段而 NPZ 缺失：记录损坏，抛错而非返回半成品。"""
+        record_id = store.put(*make_record())
+        (store.records_dir / f"{record_id}.npz").unlink()
+        with pytest.raises(CatalogError, match="数组段文件缺失"):
+            store.get(record_id)
+
 
 class TestSegments:
     def test_design_record_keeps_both_segments(self, store):
@@ -149,6 +166,24 @@ class TestFamilyGranularity:
         family_id = store.put(*make_record(with_ephemeris=False, members=members))
         with pytest.raises(RecordNotFoundError):
             store.promote_member(family_id, 5)
+
+    def test_promoted_member_inherits_family_status(self, store):
+        """软失败族的成员提升后不粉饰：状态三元组继承族记录。"""
+        members = [{"index": 0, "period": 3.0, "jacobi": 3.1, "parameters": {}}]
+        family_id = store.put(
+            *make_record(
+                with_ephemeris=False,
+                source_tool="orbit_family_generation",
+                members=members,
+                status="stagnated",
+                cause="stagnation_detected",
+                message="PAL 步长降至下限",
+            )
+        )
+        promoted = store.promote_member(family_id, 0)
+        assert promoted.meta["status"] == "stagnated"
+        assert promoted.meta["cause"] == "stagnation_detected"
+        assert promoted.meta["message"] == "PAL 步长降至下限"
 
 
 class TestQuery:

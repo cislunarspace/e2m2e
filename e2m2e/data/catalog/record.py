@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -29,6 +30,7 @@ __all__ = [
     "CatalogFilter",
     "CatalogRecord",
     "new_record_id",
+    "validate_record_id",
     "validate_meta",
     "member_array_key",
     "geometric_amplitude_km",
@@ -46,6 +48,18 @@ class CatalogError(E2M2EError):
 
 class RecordNotFoundError(CatalogError, KeyError):
     """按 record_id（或族成员序号）查找的记录不存在。"""
+
+
+#: record_id 合法形态：字母数字开头，只含字母数字、点、下划线、连字符，
+#: 不含路径分隔符与 ``..``（record_id 直接拼文件路径，必须防路径穿越）。
+_RECORD_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def validate_record_id(record_id: str) -> str:
+    """校验 record_id 是安全的文件名；非法形态按记录不存在处理。"""
+    if not _RECORD_ID_RE.match(record_id) or ".." in record_id:
+        raise RecordNotFoundError(f"记录不存在：{record_id!r}")
+    return record_id
 
 
 #: 记录 schema 版本号，自 1 起（ADR 0031 决策 1）；不兼容读取其他版本。

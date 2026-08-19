@@ -26,6 +26,7 @@ import numpy as np
 from .index import CatalogIndex
 from .record import (
     SCHEMA_VERSION,
+    CatalogError,
     CatalogFilter,
     CatalogRecord,
     RecordNotFoundError,
@@ -37,6 +38,7 @@ from .record import (
     new_record_id,
     point_interval,
     validate_meta,
+    validate_record_id,
 )
 
 __all__ = ["CatalogStore"]
@@ -67,6 +69,10 @@ class CatalogStore:
         meta = dict(meta)
         meta.setdefault("schema_version", SCHEMA_VERSION)
         meta.setdefault("record_id", new_record_id())
+        try:
+            validate_record_id(meta["record_id"])
+        except RecordNotFoundError as exc:
+            raise CatalogError(f"非法 record_id：{meta['record_id']!r}") from exc
         meta.setdefault("created_at", datetime.now(timezone.utc).isoformat())
         meta["arrays"] = {
             key: {"shape": list(value.shape), "dtype": str(value.dtype)}
@@ -92,18 +98,24 @@ class CatalogStore:
     # ---- 读取 ----
 
     def get(self, record_id: str) -> CatalogRecord:
-        """按 record_id 取完整记录（含数组段）。"""
+        """按 record_id 取完整记录（含数组段）。
+
+        元数据声称有数组段而 NPZ 缺失时抛 :class:`CatalogError`（记录
+        损坏），不静默返回半成品。
+        """
         meta = self.get_meta(record_id)
         npz_path = self.records_dir / f"{record_id}.npz"
         arrays: dict[str, np.ndarray] = {}
         if npz_path.exists():
             with np.load(npz_path) as bundle:
                 arrays = {key: bundle[key] for key in bundle.files}
+        elif meta["arrays"]:
+            raise CatalogError(f"记录 {record_id} 的数组段文件缺失：{npz_path.name}")
         return CatalogRecord(meta=meta, arrays=arrays)
 
     def get_meta(self, record_id: str) -> dict[str, Any]:
         """按 record_id 取记录元数据（不读数组）。"""
-        json_path = self.records_dir / f"{record_id}.json"
+        json_path = self.records_dir / f"{validate_record_id(record_id)}.json"
         if not json_path.exists():
             raise RecordNotFoundError(f"记录不存在：{record_id}")
         return meta_from_json(json_path.read_text(encoding="utf-8"))
@@ -116,7 +128,7 @@ class CatalogStore:
 
     def delete(self, record_id: str) -> None:
         """删除记录文件与索引条目。"""
-        json_path = self.records_dir / f"{record_id}.json"
+        json_path = self.records_dir / f"{validate_record_id(record_id)}.json"
         if not json_path.exists():
             raise RecordNotFoundError(f"记录不存在：{record_id}")
         json_path.unlink()
@@ -153,8 +165,13 @@ class CatalogStore:
                 f"族记录 {record_id} 没有成员 {member_index}（共 {len(members)} 个）"
             )
         member = members[member_index]
-        states = family.arrays[member_array_key(member_index, "states")]
-        times = family.arrays[member_array_key(member_index, "times")]
+        try:
+            states = family.arrays[member_array_key(member_index, "states")]
+            times = family.arrays[member_array_key(member_index, "times")]
+        except KeyError as exc:
+            raise CatalogError(
+                f"族记录 {record_id} 缺少成员 {member_index} 的数组段：{exc}"
+            ) from exc
 
         char_length = family.meta["scalars"].get("char_length_km")
         jacobi = member.get("jacobi")
@@ -171,9 +188,10 @@ class CatalogStore:
             "source_tool": "catalog_promote",
             "source_record_id": record_id,
             "classification": classification,
-            "status": "converged",
-            "cause": "none",
-            "message": "族成员提升为独立记录",
+            # 状态三元组继承族记录：成员的来历（含软失败的族）不粉饰。
+            "status": family.meta["status"],
+            "cause": family.meta["cause"],
+            "message": family.meta["message"],
             "scalars": {
                 "member_count": 1,
                 "member_index": member_index,
