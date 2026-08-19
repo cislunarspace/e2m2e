@@ -37,6 +37,8 @@
 
 不设单值"动力学模型"字段：双段并存下一条记录天然跨模型，过滤语义由段存在性布尔组合表达。结果状态沿用 ADR 0024 三元组（status/cause/message）。原始请求模型以 JSON 快照随记录保存（`request`），可追溯、可复算；任务标量（历元、时长、mu、迭代次数等）随结果段保存。分类字段由算法层填，不做事后推断——打靶与延拓时族类型、平动点、能量都是已知量。
 
+实施补充（2026-08-19）：记录构建器（`api/catalog_ingest.py`）实际落在接口层 Facade 接缝——请求快照依赖 api 请求模型，依赖方向（ADR 0012）不允许算法层持有它们；"生成时填写"指计算完成时同步填写，区别于事后从文件名/路径推断，决策意图不变。另：各族"参数振幅"定义不一（Halo 的 z0、SPO 的径向距离、NRHO 不直接用振幅），分类字段 `amplitude` 统一为**几何主振幅**（CR3BP 段位置三分量半极差最大值 × 特征长度，km），生成时从已知几何度量；请求里的参数振幅保留在 `request` 快照。
+
 ### 3. 谱系在生成时写入
 
 `source_record_id`（可空）由算法层在产出结果时写入：轨道保持产物指向被控轨道，提升的族成员指向所属族。谱系不再依赖调用方内存。
@@ -88,7 +90,7 @@ Facade 的产物型计算方法（design_orbit、orbit_family_generation、contr
 
 - `data/catalog/`：记录类型、存储引擎（写入/读取/索引重建）、SQLite 索引。
 - `algorithm/`：catalog_sweep 参数扫描编排。
-- `api/`：Facade catalog 方法与 Pydantic 模型；CLI、MCP 自动派生。
+- `api/`：Facade catalog 方法与 Pydantic 模型、记录构建器（`catalog_ingest.py`，见决策 2 实施补充）；CLI、MCP 自动派生。
 
 ### 变更
 
