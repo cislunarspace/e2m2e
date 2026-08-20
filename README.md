@@ -44,7 +44,7 @@ irm get.scoop.sh | iex
 scoop install make
 ```
 
-安装完成后重开 PowerShell，回到仓库目录执行上方的 `make setup` 和 `make dev`。若已安装 Scoop，只需执行 `scoop install make`。
+安装完成后重开 PowerShell，回到仓库目录执行 `make dev`（唯一入口：同步依赖 + 拉取数据 + 构建安装，见上方）。若已安装 Scoop，只需执行 `scoop install make`。
 
 ### SPICE 内核
 

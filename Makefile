@@ -5,7 +5,13 @@
 # 切勿裸跑 `uv sync`：e2m2e 在 uv.lock 中是 editable 包，uv sync 会当场以 maturin
 # 构建扩展（需要 CSPICE_DIR），且与 make dev 形成重复构建（issue #478）。
 
-PYTHON := python3
+# Windows 官方 Python 只装 python.exe（无 python3 命令），Linux 惯例为 python3。
+# 均可用命令行 `make PYTHON=...` 覆盖。
+ifeq ($(OS),Windows_NT)
+PYTHON ?= python
+else
+PYTHON ?= python3
+endif
 # --no-sync：uv run 默认先同步环境（触发 editable 构建），与 maturin develop 重复。
 # 依赖由 make dev 显式同步，此处一律跳过（与 CI 的 uv run --no-sync 模式一致）。
 UV     := uv run --no-sync
