@@ -31,9 +31,7 @@ uv add e2m2e
 ```bash
 git clone https://github.com/cislunarspace/e2m2e.git
 cd e2m2e
-uv sync
-make setup   # 拉取 CSPICE 编译包 + SPICE 内核（cspice-v1 / kernels-v1 release，首次必跑）
-make dev     # maturin develop 构建并安装 Rust 扩展（spice 默认开启）
+make dev     # 唯一入口：同步依赖 + 拉取 CSPICE 编译包与 SPICE 内核 + 构建安装 Rust 扩展（spice 默认开启）
 ```
 
 #### Windows 安装 make
@@ -166,7 +164,7 @@ make check    # cargo fmt/clippy + ruff
   author = {ouyangjiahong},
   email = {ouyangjiahong22@nudt.edu.cn},
   url = {https://github.com/cislunarspace/e2m2e},
-  version = {5.7.3},
+  version = {5.8.0},
   year = {2026},
 }
 ```

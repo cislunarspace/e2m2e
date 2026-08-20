@@ -1,7 +1,14 @@
 # e2m2e 开发入口（唯一）。
+#
+# 源码开发只需 `make dev`：同步 Python 依赖（--no-install-project，不构建扩展）、
+# 拉取 CSPICE 编译包与 SPICE 内核（幂等）、maturin develop 构建安装 Rust 扩展。
+# 切勿裸跑 `uv sync`：e2m2e 在 uv.lock 中是 editable 包，uv sync 会当场以 maturin
+# 构建扩展（需要 CSPICE_DIR），且与 make dev 形成重复构建（issue #478）。
 
 PYTHON := python3
-UV     := uv run
+# --no-sync：uv run 默认先同步环境（触发 editable 构建），与 maturin develop 重复。
+# 依赖由 make dev 显式同步，此处一律跳过（与 CI 的 uv run --no-sync 模式一致）。
+UV     := uv run --no-sync
 PYTEST_WORKERS ?= auto
 PYTEST_DIST ?= loadscope
 
@@ -38,10 +45,12 @@ kernels:  ## 下载 SPICE 内核
 
 setup: cspice kernels  ## 首次拉取：CSPICE 编译包 + SPICE 内核（kernels/）
 
-dev: cspice  ## 构建并安装开发版扩展（maturin develop，debug 构建）
+dev: setup  ## 唯一开发入口：同步依赖 + 拉数据 + 构建安装 Rust 扩展（debug）
+	uv sync --group dev --no-install-project
 	$(UV) maturin develop
 
-dev-release:  ## 同 dev，以 --release 构建（性能基准 / 长期预报用）
+dev-release: setup  ## 同 dev，以 --release 构建（性能基准 / 长期预报用）
+	uv sync --group dev --no-install-project
 	$(UV) maturin develop --release
 
 test: test-rust test-python  ## 全量测试（Rust 工作区 + Python）

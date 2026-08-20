@@ -172,7 +172,9 @@ Rust 实现；共线点求根、线性中心模态、Lissajous 非线性中心�
 以及近月距、
 L4/L5 径向振幅与面外振幅扫描也在同一模块内执行。Python 不逐成员调用
 数值原子，不保留数值回退，只负责请求校验、领域分派和 `OrbitFamily` 重包。
-工作项：#428。
+工作项：#428。catalog_sweep 的能量维度（#476）经
+`generate_cr3bp_family_windows_py` 批量入口：同一（族、平动点）的延拓
+trace 只走一次，Jacobi 窗口筛选留在 Rust 单次调用内（与振幅窗口同层）。
 
 **`algorithm/design`（打靶/传播路径）。** 分段修正、多重打靶、段传播、
 时间转换走 Rust（`segmented_shooting_correct_py`、
@@ -242,7 +244,7 @@ ADR 0011 明示的过渡状态，每个条目有独立工作项。`MultipleShoot
 
 **`algorithm/transfer/nlp_core.py`、`nlp_scipy.py`、`nlp_copt.py`、
 `transfer_optimization.py`（NLP 优化与编排）。** 理由：SLSQP/COPT 串行迭代是
-Python 强项（`architecture-design-discussion.md` 共识，ADR 0017 边界固化）；
+Python 强项（早期架构讨论共识，ADR 0017 边界固化）；
 `transfer_optimization.py` 是"搜索-优化"两步法优化阶段的高层编排（构造优化器、
 计算目标/约束），属 NLP 范畴。这是默认求解器所在，不是迁移目标。
 

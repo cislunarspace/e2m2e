@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Axial 星历修正固定时刻打靶**（#485）：`AXIAL` 加入 `_FIXED_TIME_ORBIT_TYPES`。Axial 从 Lyapunov 族 1:1 共振分岔（Gómez Type B）产生，分岔邻域面内/面外周期相等，自由时间打靶的时间平移与面外相位平移近似简并，雅可比列病态，LM 停滞（STAGNATION_DETECTED；GUI 默认参数 L2/5000 km 下 15 次迭代后位置残差卡 1.5e-01 km，与 #366 的 Lissajous/L4/L5 同型）。固定时刻后约 10 s 收敛到容差内，two_level 与 segmented 两路径同时生效。新增 GUI 默认量级端到端回归（`test_axial_ephemeris_correction.py`）。建议下游固定到含本修复的版本。
+
+### Added
+- **catalog_sweep 参数空间补全：能量网格与 Lissajous 二维网格**（#476）：扫描主参数维度增至三选一（同传结构化报错）——既有振幅/近月点高度网格之外，新增 `jacobi_windows` 能量（Jacobi）窗口网格与 `amplitude_ins_km` × `amplitude_outs_km` LISSAJOUS 面内×面外二维振幅网格。能量窗口经新增 Rust 入口 `generate_cr3bp_family_windows_py`（ABI v20）实现：同一（族、平动点）只走一次延拓 trace，各窗口分别筛选成员（窗口边界包含），记录 jacobi 包络落在窗口内，窗口零成员时该点无记录、结局逐点可查；LISSAJOUS 二维网格逐点采样入库（相位取请求默认值），不再被扫描排除。
+
+### Changed
+- **源码开发入口统一为 `make dev`**（#478）：一条命令完成依赖同步（`uv sync --group dev --no-install-project`，不再构建 editable 扩展）+ CSPICE 编译包/SPICE 内核拉取（幂等）+ `maturin develop`。此前 `uv sync` → `make setup` → `make dev` 三步顺序自相矛盾（裸 `uv sync` 缺 `CSPICE_DIR` 必败）且一次 `make dev` 实际触发三次 cargo 构建；现 Makefile 内所有 `uv run` 带 `--no-sync`，全过程仅一次 debug 构建。文档不再把 `uv sync` 列为源码开发步骤，并新增裸 `uv sync` 报错的故障排除说明。pip 安装路径（build backend、wheel/sdist、release 工作流）零改动。
+
+## [5.8.0] - 2026-08-19
+
+### Added
+- **轨道库 catalog**（#475，ADR 0031）：`design_orbit` / `orbit_family_generation` / `control_orbit` 成功产出后自动入库（Config 可关闭）。记录 = JSON 元数据 + NPZ 数组段（`schema_version` 自 1 起），双段并存（CR3BP 段 + 星历段，各自可空），带多维分类（族、平动点、Jacobi、主振幅、段存在性）、状态三元组、请求快照与谱系指针；`catalog.db` SQLite 只做派生索引，删掉可扫描重建。Facade 新增 `catalog_query`（多维组合过滤，摘要列表）/ `catalog_get`（完整记录，未知 id 抛 `RECORD_NOT_FOUND`）/ `catalog_delete` / `catalog_tag`（标注随 JSON 走）/ `catalog_promote`（族成员提升为独立记录并指向所属族）/ `catalog_export`（子集打包，可直接作为库打开）/ `catalog_sweep`（参数空间扫描，复用统一 Rust 族生成，部分点失败保留已产记录），CLI/MCP 按纯派生自动获得。`control_orbit` 新增 `input_record_id` 输入源：取库中记录星历作标称轨道，站保产物自动以 `source_record_id` 指向它；三个产物响应新增 `record_id` 字段。
+
 ## [5.7.3] - 2026-08-17
 
 ### Fixed
@@ -19,7 +33,7 @@
 - **normal_form 迁移状态按 #449 拆包更新**：已下沉（积分、共线点 CR3BP Hamiltonian、H→QF 标量投影、数值多项式核、QF↔CM、中心流形化简）登记补全；符号 Legendre/星历 H、NAFF、pipeline 编排有意留 Python；P5/P6 后置未派发。更新 `docs/architecture/numerics-migration-status.md`。
 
 ### Fixed
-- **NRHO 星历修正默认路径不收敛**（#463）：拼接点采样对 NRHO 改为「删近月点附近节点」（与 Halo 近月点加密解耦），固定容差下 segmented 路径在 GUI 默认量级（L2 南、近月高 5000 km、约 1 个月）与更贴月短弧（2000 km）上收敛；文档去掉「NRHO 星历修正暂不可用」。对照矩阵脚本 ``scripts/nrho_ephemeris_correction_matrix.py`` 保留为开发期反馈回路。
+- **NRHO 星历修正默认路径不收敛**（#463）：拼接点采样对 NRHO 改为「删近月点附近节点」（与 Halo 近月点加密解耦），固定容差下 segmented 路径在 GUI 默认量级（L2 南、近月高 5000 km、约 1 个月）与更贴月短弧（2000 km）上收敛；文档去掉「NRHO 星历修正暂不可用」。
 
 ### Docs
 - **forces 的 Python 层位置裁决**（#429，ADR 0030）：`algorithm/forces` 留在 algorithm 层作配置/编排面，数值在 `e2m2e-forces`；不新建 Python 数值目录、不搬家。

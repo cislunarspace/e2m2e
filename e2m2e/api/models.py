@@ -7,6 +7,7 @@ api/ 边界，算法层用 numpy/dataclass。每个 Facade 方法一个 Request/
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -37,6 +38,22 @@ __all__ = [
     "SpacetimeTransformResponse",
     "FamilyGenerationRequest",
     "FamilyGenerationResponse",
+    "CatalogQueryRequest",
+    "CatalogRecordSummary",
+    "CatalogQueryResponse",
+    "CatalogGetRequest",
+    "CatalogRecordResponse",
+    "CatalogDeleteRequest",
+    "CatalogDeleteResponse",
+    "CatalogTagRequest",
+    "CatalogTagResponse",
+    "CatalogPromoteRequest",
+    "CatalogPromoteResponse",
+    "CatalogExportRequest",
+    "CatalogExportResponse",
+    "CatalogSweepRequest",
+    "CatalogSweepPointOutcome",
+    "CatalogSweepResponse",
 ]
 
 
@@ -372,6 +389,10 @@ class FamilyGenerationResponse(_ApiModel, OrbitFamily):
     metadata: dict[str, Any] = Field(default_factory=dict)
     requested_members: int
     generated_members: int
+    record_id: str | None = Field(
+        default=None,
+        description="产物自动入库的记录 id（ADR 0031）；库关闭或无成员产出时为 None",
+    )
 
     def __iter__(self):
         """按 OrbitFamily 兼容语义迭代轨道成员。"""
@@ -427,6 +448,10 @@ class DesignOrbitResponse(ResultResponse):
     secular_aop_rate_deg_per_year: float | None = Field(
         default=None, description="ω 线性拟合年漂移率（仅 ELFO）"
     )
+    record_id: str | None = Field(
+        default=None,
+        description="产物自动入库的记录 id（ADR 0031）；库关闭或无产物时为 None",
+    )
 
 
 class ControlOrbitRequest(_ApiModel):
@@ -434,9 +459,20 @@ class ControlOrbitRequest(_ApiModel):
 
     字段与算法层业务参数一一对应；运行时参数（spice/kernel_dir/n_workers/
     seed）由 Facade 注入，不进模型。默认值、单位与算法层签名一致。
+
+    输入源二选一（ADR 0031）：``input_ephemeris`` 直接给星历，或
+    ``input_record_id`` 引用库中记录（取其星历段，站保产物记录自动以
+    ``source_record_id`` 指向该记录，谱系跨进程不断）。
     """
 
-    input_ephemeris: Any = Field(description="标称轨道星历路径或 EphemerisTable")
+    input_ephemeris: Any = Field(
+        default=None, description="标称轨道星历路径或 EphemerisTable；与 input_record_id 二选一"
+    )
+    input_record_id: str | None = Field(
+        default=None,
+        min_length=1,
+        description="库中记录 id：取其星历段作为标称轨道；站保产物自动指向该记录",
+    )
     # 控制策略
     control_mode: int = Field(
         default=1,
@@ -557,6 +593,13 @@ class ControlOrbitRequest(_ApiModel):
         description="CR3BP 质量比 μ（透传到响应，画地月/L 点标注用）；算法层不产 mu",
     )
 
+    @model_validator(mode="after")
+    def _validate_input_source(self) -> ControlOrbitRequest:
+        """输入源二选一：裸星历或库记录引用。"""
+        if (self.input_ephemeris is None) == (self.input_record_id is None):
+            raise ValueError("input_ephemeris 与 input_record_id 必须且只能提供一个")
+        return self
+
 
 class ControlOrbitResponse(ResultResponse):
     """轨道保持输出。
@@ -576,6 +619,10 @@ class ControlOrbitResponse(ResultResponse):
     mu: float | None = Field(
         default=None,
         description="CR3BP 质量比 μ（请求透传，画地月/L 点标注用）",
+    )
+    record_id: str | None = Field(
+        default=None,
+        description="产物自动入库的记录 id（ADR 0031）；库关闭或无产物时为 None",
     )
 
 
@@ -1006,3 +1053,327 @@ class FamilyGenerationRequest(_ApiModel):
                     f"当前 {self.min_amplitude_km} >= {self.max_amplitude_km}"
                 )
         return self
+
+
+# ---------------------------------------------------------------------------
+# 轨道库 catalog（ADR 0031）：查询/读取/删除/标注/提升/导出/批量生成。
+# 分类六维度可组合过滤；区间维度（jacobi/amplitude）与记录的 [min, max]
+# 包络做相交匹配。
+# ---------------------------------------------------------------------------
+
+
+class CatalogQueryRequest(_ApiModel):
+    """轨道库多维查询过滤；各维度可独立组合（逻辑与）。"""
+
+    orbit_family: str | None = Field(
+        default=None,
+        description="轨道族（dro/halo/nrho/lissajous/dpo/axial/spo/lpo/horseshoe/elfo 等）",
+    )
+    libration_point: int | None = Field(default=None, ge=1, le=5, description="平动点编号 1–5")
+    jacobi_min: float | None = Field(default=None, description="Jacobi 常数区间下界")
+    jacobi_max: float | None = Field(default=None, description="Jacobi 常数区间上界")
+    amplitude_min_km: float | None = Field(default=None, ge=0.0, description="主振幅区间下界（km）")
+    amplitude_max_km: float | None = Field(default=None, ge=0.0, description="主振幅区间上界（km）")
+    has_cr3bp: bool | None = Field(default=None, description="是否含 CR3BP 段")
+    has_ephemeris: bool | None = Field(default=None, description="是否含星历段")
+    status: ConvergenceState | None = Field(
+        default=None, description="按结果状态筛（如筛掉软失败产物）"
+    )
+    tags: list[str] | None = Field(default=None, description="按标签筛，命中任一即匹配")
+
+    @model_validator(mode="after")
+    def _validate_ranges(self) -> CatalogQueryRequest:
+        if (
+            self.jacobi_min is not None
+            and self.jacobi_max is not None
+            and self.jacobi_min > self.jacobi_max
+        ):
+            raise ValueError(
+                f"jacobi_min 不得大于 jacobi_max：{self.jacobi_min} > {self.jacobi_max}"
+            )
+        if (
+            self.amplitude_min_km is not None
+            and self.amplitude_max_km is not None
+            and self.amplitude_min_km > self.amplitude_max_km
+        ):
+            raise ValueError(
+                f"amplitude_min_km 不得大于 amplitude_max_km："
+                f"{self.amplitude_min_km} > {self.amplitude_max_km}"
+            )
+        return self
+
+
+class CatalogRecordSummary(_ApiModel):
+    """记录摘要：浏览大量记录时轻量，不含数组段与请求快照。"""
+
+    record_id: str
+    created_at: str
+    source_tool: str
+    source_record_id: str | None
+    orbit_family: str | None
+    libration_point: int | None
+    jacobi: list[float] | None = Field(
+        description="记录 Jacobi 包络 [min, max]；无 CR3BP 段为 None"
+    )
+    amplitude: list[float] | None = Field(
+        description="主振幅包络 [min, max]（km）；无 CR3BP 段为 None"
+    )
+    has_cr3bp: bool
+    has_ephemeris: bool
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
+    member_count: int = Field(description="族成员数；单轨道记录为 1，纯星历记录为 0")
+    tags: list[str]
+    note: str
+
+
+class CatalogQueryResponse(ResultResponse):
+    """catalog_query 输出。"""
+
+    records: list[CatalogRecordSummary]
+
+
+class CatalogGetRequest(_ApiModel):
+    """按 record_id 取完整记录。"""
+
+    record_id: str = Field(min_length=1)
+
+
+class CatalogRecordResponse(CatalogRecordSummary):
+    """完整记录：元数据全文 + 数组段（numpy 值，键含 ``/`` 段前缀）。"""
+
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+
+    scalars: dict[str, Any] = Field(description="任务标量（历元、时长、mu、迭代次数等）")
+    request: dict[str, Any] = Field(description="原始请求快照")
+    members: list[dict[str, Any]] = Field(description="族成员参数表；非族记录为空")
+    arrays: dict[str, Any] = Field(
+        description="数组段：cr3bp/ 与 eph/ 前缀的 numpy 数组（含族成员 cr3bp/members/）"
+    )
+
+    def to_ephemeris_table(self) -> Any | None:
+        """把星历段重建为 ``EphemerisTable``（供接续计算）；无星历段返回 None。"""
+        from e2m2e.data.catalog import ephemeris_from_arrays
+
+        if not self.has_ephemeris:
+            return None
+        return ephemeris_from_arrays(self.arrays)
+
+    def to_orbit(self) -> Any | None:
+        """把单轨道 CR3BP 段重建为 ``Orbit``；族记录与纯星历记录返回 None。"""
+        import numpy as np
+
+        from e2m2e.data.types.orbit import Orbit
+
+        states = self.arrays.get("cr3bp/states")
+        times = self.arrays.get("cr3bp/times")
+        if states is None or times is None:
+            return None
+        return Orbit(states=np.asarray(states), times=np.asarray(times))
+
+
+class CatalogDeleteRequest(_ApiModel):
+    """按 record_id 删除记录。"""
+
+    record_id: str = Field(min_length=1)
+
+
+class CatalogDeleteResponse(ResultResponse):
+    """catalog_delete 输出。"""
+
+    record_id: str
+    deleted: bool
+
+
+class CatalogTagRequest(_ApiModel):
+    """写教学标注（随 JSON 记录走）；``tags`` 整体替换，``note=None`` 保留原注释。"""
+
+    record_id: str = Field(min_length=1)
+    tags: list[str] = Field(default_factory=list, description="标签列表（整体替换）")
+    note: str | None = Field(default=None, description="自由文本注释；None 保留原注释")
+
+
+class CatalogTagResponse(ResultResponse):
+    """catalog_tag 输出：更新后的记录摘要。"""
+
+    record: CatalogRecordSummary
+
+
+class CatalogPromoteRequest(_ApiModel):
+    """把族成员提升为独立记录（``source_record_id`` 指向所属族）。"""
+
+    record_id: str = Field(min_length=1, description="族记录 id")
+    member_index: int = Field(ge=0, description="族内成员序号（自 0 起）")
+
+
+class CatalogPromoteResponse(ResultResponse):
+    """catalog_promote 输出：提升出的独立记录。"""
+
+    record: CatalogRecordResponse
+
+
+class CatalogExportRequest(CatalogQueryRequest):
+    """子集打包导出：过滤条件同 catalog_query，外加目标路径。"""
+
+    dest: str = Field(
+        min_length=1,
+        description="目标路径；以 .zip 结尾产出 zip 包，否则产出目录（records/ + manifest.json）",
+    )
+
+
+class CatalogExportResponse(ResultResponse):
+    """catalog_export 输出。"""
+
+    dest: str
+    record_ids: list[str]
+    exported_count: int
+
+
+#: catalog_sweep 各族可作主参数维度的请求字段（条件取值域的单一来源，
+#: ADR 0014 决策 8）：LISSAJOUS 只走二维振幅网格（能量窗口不适用），
+#: 其余族一维振幅/近月点维度与能量窗口二选一。
+_SWEEP_GRID_DIMENSIONS: Mapping[str, frozenset[str]] = MappingProxyType(
+    {
+        "HALO": frozenset({"max_amplitudes_km", "jacobi_windows"}),
+        "NRHO": frozenset({"perilune_heights_max_km", "jacobi_windows"}),
+        "AXIAL": frozenset({"max_amplitudes_km", "jacobi_windows"}),
+        "LISSAJOUS": frozenset({"amplitude_ins_km", "amplitude_outs_km"}),
+        "SPO": frozenset({"max_amplitudes_km", "jacobi_windows"}),
+        "LPO": frozenset({"max_amplitudes_km", "jacobi_windows"}),
+        "HORSESHOE": frozenset({"max_amplitudes_km", "jacobi_windows"}),
+    }
+)
+
+
+class CatalogSweepRequest(_ApiModel):
+    """参数空间扫描批量生成并入库（编排复用 ADR 0029 的 Rust 族生成）。
+
+    扫描网格 = 族 × 平动点 × 主参数维度。主参数维度三选一（同传报错）：
+
+    - 一维主参数：HALO/AXIAL/SPO/LPO/HORSESHOE 扫 ``max_amplitudes_km``，
+      NRHO 扫 ``perilune_heights_max_km``；
+    - 能量（Jacobi）窗口：``jacobi_windows``——同一（族、平动点）只走
+      一次延拓 trace（族延拓范围取各族默认），各窗口成员分别成记录，
+      记录 jacobi 包络落在窗口内；窗口零成员时该点无记录、结局可查；
+    - LISSAJOUS 二维振幅网格：``amplitude_ins_km`` × ``amplitude_outs_km``
+      笛卡尔积逐点采样（相位取请求默认值）；能量窗口不适用于 LISSAJOUS
+      （其族生成是参数采样而非延拓 trace）。
+
+    部分参数点失败时已产出的记录保留（ADR 0020 软失败语义）。
+    """
+
+    orbit_types: list[str] = Field(
+        min_length=1, description="族集合：HALO/NRHO/AXIAL/LISSAJOUS/SPO/LPO/HORSESHOE"
+    )
+    libration_points: list[int] | None = Field(
+        default=None, description="平动点集合；缺省按各族默认（共线 L2、三角 L4）"
+    )
+    max_amplitudes_km: list[float] | None = Field(
+        default=None,
+        description="族振幅上限网格（km）；HALO/AXIAL 带符号区分北/南（上/下）族；"
+        "SPO/LPO/HORSESHOE 的下限取各族默认",
+    )
+    perilune_heights_max_km: list[float] | None = Field(
+        default=None, description="近月点高度上限网格（km），仅 NRHO 用"
+    )
+    jacobi_windows: list[list[float]] | None = Field(
+        default=None,
+        min_length=1,
+        description="能量（Jacobi）窗口网格 [[min, max], ...]，边界包含；"
+        "与 max_amplitudes_km/perilune_heights_max_km 互斥；LISSAJOUS 不适用",
+    )
+    amplitude_ins_km: list[float] | None = Field(
+        default=None,
+        min_length=1,
+        description="LISSAJOUS 面内振幅网格（km）；须与 amplitude_outs_km 同给，与其他网格维度互斥",
+    )
+    amplitude_outs_km: list[float] | None = Field(
+        default=None,
+        min_length=1,
+        description="LISSAJOUS 面外振幅网格（km）；须与 amplitude_ins_km 同给",
+    )
+    n_orbits: int = Field(default=20, ge=1, description="每点族成员数量上限")
+
+    @classmethod
+    def supported_grid_dimensions(cls, orbit_type: str) -> tuple[str, ...]:
+        """返回该族可作为扫描主参数维度的请求字段（条件取值域公开）。
+
+        GUI/CLI/MCP 不得解析错误文本或维护本地副本（ADR 0014 决策 8）；
+        Facade 的网格展开与校验共用本接口。LISSAJOUS 的两个振幅字段是
+        同一维度（须同给）；其余族的 ``jacobi_windows`` 与一维振幅字段
+        互斥，由请求级校验器拒绝同传。
+        """
+        if not isinstance(orbit_type, str):
+            raise ValueError(f"orbit_type 必须为字符串，当前 {orbit_type!r}")
+        try:
+            return tuple(sorted(_SWEEP_GRID_DIMENSIONS[orbit_type.upper()]))
+        except KeyError as exc:
+            raise ValueError(f"不支持的 orbit_type: {orbit_type!r}") from exc
+
+    @model_validator(mode="after")
+    def _validate_grid_dimensions(self) -> CatalogSweepRequest:
+        """主参数维度互斥与能量窗口取值域（ADR 0014 决策 8 同源规则）。"""
+        amplitude_grid = (
+            self.max_amplitudes_km is not None or self.perilune_heights_max_km is not None
+        )
+        lissajous_grid = self.amplitude_ins_km is not None or self.amplitude_outs_km is not None
+        given = [
+            name
+            for name, present in (
+                ("max_amplitudes_km/perilune_heights_max_km", amplitude_grid),
+                ("jacobi_windows", self.jacobi_windows is not None),
+                ("amplitude_ins_km/amplitude_outs_km", lissajous_grid),
+            )
+            if present
+        ]
+        if len(given) > 1:
+            raise ValueError(f"扫描主参数维度互斥：{' 与 '.join(given)} 同传；一次调用只选一个维度")
+        if (self.amplitude_ins_km is None) != (self.amplitude_outs_km is None):
+            raise ValueError(
+                "LISSAJOUS 二维振幅网格须同时给出 amplitude_ins_km 与 amplitude_outs_km"
+            )
+        for window in self.jacobi_windows or ():
+            valid_length = len(window) == 2
+            finite = all(math.isfinite(value) for value in window)
+            if not valid_length or not finite or not window[0] < window[1]:
+                raise ValueError(
+                    f"jacobi_windows 每项须为有限数对 [min, max] 且 min < max，当前 {window!r}"
+                )
+        return self
+
+
+class CatalogSweepPointOutcome(_ApiModel):
+    """扫描单参数点的结局：成功（含软失败）保留 record_id，硬失败保留原因。"""
+
+    orbit_type: str
+    libration_point: int
+    parameter_km: float | None = Field(
+        default=None,
+        description="网格点主参数值（振幅或近月点高度上限，km）；能量窗口与二维振幅点为 None",
+    )
+    jacobi_window: list[float] | None = Field(
+        default=None, description="能量窗口点的 [min, max] Jacobi 窗口"
+    )
+    amplitudes_km: list[float] | None = Field(
+        default=None, description="LISSAJOUS 二维网格点的 [面内, 面外] 振幅（km）"
+    )
+    status: ConvergenceState
+    cause: FailureCause
+    message: str
+    record_id: str | None
+    generated_members: int
+
+
+class CatalogSweepResponse(ResultResponse):
+    """catalog_sweep 输出。
+
+    ``succeeded`` 为产出记录的参数点数（含软失败但有成员产出的点）；
+    ``failed`` 为硬失败（无产出）参数点数；软失败且零成员的点两者都
+    不计，其结局见 ``points`` 逐点状态。
+    """
+
+    points: list[CatalogSweepPointOutcome]
+    record_ids: list[str]
+    succeeded: int
+    failed: int
