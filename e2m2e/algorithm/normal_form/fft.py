@@ -137,7 +137,11 @@ def detect_naff(
         tmp_root = Path(tmp).resolve()
 
         def _confined(name: str) -> Path:
-            """临时文件路径解析后必须仍在 tmp 内（防路径穿越）。"""
+            """临时文件路径解析后必须仍在 tmp 内（防路径穿越）。
+
+            name 为本函数内写死的字面量，校验对当前调用恒真；保留它是
+            安全门禁对该写入口的显式约束，改动文件名时校验随之生效。
+            """
             path = (tmp_root / name).resolve()
             if not path.is_relative_to(tmp_root):
                 raise ValueError(f"临时文件路径越界: {name}")
