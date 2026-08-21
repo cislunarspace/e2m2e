@@ -46,6 +46,8 @@ scoop install make
 
 安装完成后重开 PowerShell，回到仓库目录执行 `make dev`（唯一入口：同步依赖 + 拉取数据 + 构建安装，见上方）。若已安装 Scoop，只需执行 `scoop install make`。
 
+Windows 上运行 Rust 测试请使用 `make test-rust`：测试二进制依赖 Python 的 `python3.dll`，该 DLL 在 Python 安装根目录而不在虚拟环境 `Scripts/`；Makefile 会自动探测并加入测试进程 PATH。若自动探测失败，可显式执行 `make test-rust PYTHON_DLL_DIR=<含 python*.dll 的目录>`。手工排查时先对失败的测试 EXE 执行 `dumpbin /DEPENDENTS` 或 `dumpbin /IMPORTS`，确认实际缺失的 DLL，不要把 CSPICE 的 `lib/`（静态库目录）加入 PATH。
+
 ### SPICE 内核
 
 星历动力学需要 NASA SPICE 内核文件。本项目测试所需的全部内核（行星星历、地球自转、月球姿态、闰秒与行星常数）已打包在 [GitHub Release](https://github.com/cislunarspace/e2m2e/releases) 的 `kernels-v1` 中。三种配置方式：
