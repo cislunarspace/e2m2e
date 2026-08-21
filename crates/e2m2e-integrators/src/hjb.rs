@@ -313,6 +313,10 @@ fn build_result_dict<'py>(
 /// （C 序，形状 (len(times), ×shape)）、``axes`` 各维节点坐标、
 /// ``steps`` 实际积分步数。快照按时间近似等距抽样，数量有上界，
 /// 高维网格不会返回完整时间序列。
+///
+/// 值函数产物落盘时，调用方须按 ADR 0033 决策 3 补足元数据：动力学
+/// 标识与参数表、状态维顺序、无量纲化口径、``times`` 语义
+/// （ephemeris_planar 为求解器秒，ET = et0 + times）、历元映射参数。
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 pub fn solve_hjb_py<'py>(

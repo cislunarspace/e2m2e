@@ -34,5 +34,3 @@ e2m2e-spice = { path = "../e2m2e-spice", optional = true }
 # （非 feature 门控）。关闭默认 spice feature，避免测试引入 CSPICE 构建依赖；
 # ephemeris feature 开启时与正常依赖的 spice feature 合并（cargo feature 可加）。
 e2m2e-forces = { path = "../e2m2e-forces", default-features = false }
-# 真实内核路径的 CFL 诊断示例（examples/diag_ephem.rs）需要 furnsh 与 EphemCache::build。
-cspice = { workspace = true }

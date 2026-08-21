@@ -543,8 +543,9 @@ impl Hamiltonian for EphemerisPlanar {
         let fs = self.frame(t);
         let ax: Vec<Vec<f64>> = (0..self.dim()).map(|d| grid.axis(d).to_vec()).collect();
         // 位置维：∂H/∂p_r = v，精确取速度轴坐标。速度维：|无控加速度| +
-        // 推力项（推力取节点质量的 T/m，比质量轴上界更紧且仍是包络）。
-        // 质量维：∂H/∂p_m 在 δ*=1 时为常值 −T/(Isp·g0)。
+        // 推力项——T/m 取节点质量而非质量轴区间上界（逐点包络更紧，
+        // 正确性与保守性不减）。质量维：∂H/∂p_m 在 δ*=1 时为常值
+        // −T/(Isp·g0)，包络取其绝对值。
         match dim {
             0 => ArrayD::from_shape_fn(grid.shape(), |idx| ax[2][idx[2]].abs()),
             1 => ArrayD::from_shape_fn(grid.shape(), |idx| ax[3][idx[3]].abs()),
