@@ -101,7 +101,7 @@ class TestLevelFromThrottle:
 class TestSequenceFromControls:
     def test_uniform_burn_merges_into_single_arc(self) -> None:
         controls = _controls([0.55] * 8)
-        seq = sequence_from_controls(0.0, 8 * DT, controls, min_duration_s=3600.0)
+        seq = sequence_from_controls(np.linspace(0.0, 8 * DT, 9), controls, min_duration_s=3600.0)
         assert len(seq.arcs) == 1
         assert seq.arcs[0].throttle == 0.6
         assert seq.total_duration_s == pytest.approx(8 * DT)
@@ -109,7 +109,7 @@ class TestSequenceFromControls:
     def test_dense_segments_do_not_raise_and_respect_min_arc(self) -> None:
         # 档位交替、段长远小于最短弧：旧实现直接报错，新实现必须合并
         controls = _controls([0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1])
-        seq = sequence_from_controls(0.0, 8 * DT, controls, min_duration_s=3600.0)
+        seq = sequence_from_controls(np.linspace(0.0, 8 * DT, 9), controls, min_duration_s=3600.0)
         seq.validate(min_duration_s=min(3600.0, 8 * DT))
         burn = [a for a in seq.arcs if a.throttle > 0.0]
         assert burn, "合并后应保留点火弧"
@@ -117,7 +117,7 @@ class TestSequenceFromControls:
 
     def test_mixed_profile_produces_contiguous_arcs(self) -> None:
         controls = _controls([0.95, 0.9, 0.1, 0.05, 0.6, 0.62])
-        seq = sequence_from_controls(100.0, 100.0 + 6 * DT, controls, min_duration_s=DT)
+        seq = sequence_from_controls(100.0 + np.arange(7) * DT, controls, min_duration_s=DT)
         seq.validate(min_duration_s=DT)
         throttles = [a.throttle for a in seq.arcs]
         assert throttles == [1.0, 0.0, 0.6]
@@ -127,20 +127,40 @@ class TestSequenceFromControls:
     def test_custom_levels_used_in_mapping(self) -> None:
         controls = _controls([0.48] * 4)
         seq = sequence_from_controls(
-            0.0, 4 * DT, controls, levels=(0.0, 0.5, 1.0), min_duration_s=DT
+            np.linspace(0.0, 4 * DT, 5), controls, levels=(0.0, 0.5, 1.0), min_duration_s=DT
         )
         assert all(a.throttle == 0.5 for a in seq.arcs)
 
     def test_burn_directions_are_unit_vectors(self) -> None:
         controls = np.array([[0.9, 0.3, -0.2]] * 4)
-        seq = sequence_from_controls(0.0, 4 * DT, controls, min_duration_s=DT)
+        seq = sequence_from_controls(np.linspace(0.0, 4 * DT, 5), controls, min_duration_s=DT)
         for arc in seq.arcs:
             if arc.throttle > 0.0:
                 assert np.linalg.norm(arc.direction) == pytest.approx(1.0, abs=1e-12)
 
     def test_rejects_bad_control_shape(self) -> None:
         with pytest.raises(ValueError, match="controls"):
-            sequence_from_controls(0.0, 10.0, np.zeros((0, 3)), min_duration_s=1.0)
+            sequence_from_controls(np.array([0.0]), np.zeros((0, 3)), min_duration_s=1.0)
+
+    def test_nonuniform_time_nodes(self) -> None:
+        # 非均匀段边界：档位相同的相邻段合并，时间窗保持
+        times = np.array([0.0, 100.0, 500.0, 900.0, 2000.0])
+        controls = _controls([0.9, 0.9, 0.1, 0.6])
+        seq = sequence_from_controls(times, controls, min_duration_s=50.0)
+        seq.validate(min_duration_s=50.0, levels=DEFAULT_THRUST_LEVELS)
+        assert [a.throttle for a in seq.arcs] == [1.0, 0.0, 0.6]
+        assert seq.arcs[0].t_end == 500.0
+        assert seq.total_duration_s == pytest.approx(2000.0)
+
+    def test_times_length_mismatch_raises(self) -> None:
+        with pytest.raises(ValueError, match="times"):
+            sequence_from_controls(np.array([0.0, 1.0, 2.0]), _controls([0.5]), min_duration_s=0.1)
+
+    def test_validate_rejects_off_level_throttle(self) -> None:
+        arc = ThrustArc(0.0, 4000.0, 0.55, np.array([1.0, 0.0, 0.0]))
+        arc.validate(min_duration_s=3600.0)  # 不传 levels 不查档位
+        with pytest.raises(ValueError, match="档位"):
+            arc.validate(min_duration_s=3600.0, levels=DEFAULT_THRUST_LEVELS)
 
 
 class TestControlsRoundTrip:
@@ -149,14 +169,14 @@ class TestControlsRoundTrip:
     def test_roundtrip_preserves_snapped_throttle(self) -> None:
         controls = _controls([0.95, 0.9, 0.1, 0.6])
         n = controls.shape[0]
-        seq = sequence_from_controls(0.0, n * DT, controls, min_duration_s=DT)
+        seq = sequence_from_controls(np.linspace(0.0, n * DT, n + 1), controls, min_duration_s=DT)
         expanded = controls_from_sequence(seq, n)
         assert expanded.shape == (n, 3)
         np.testing.assert_allclose(expanded[:, 0], [1.0, 1.0, 0.0, 0.6], atol=1e-12)
 
     def test_expanded_directions_match_angles(self) -> None:
         controls = _controls([0.9, 0.9], theta1=0.7)
-        seq = sequence_from_controls(0.0, 2 * DT, controls, min_duration_s=DT)
+        seq = sequence_from_controls(np.linspace(0.0, 2 * DT, 3), controls, min_duration_s=DT)
         expanded = controls_from_sequence(seq, 2)
         for row in expanded:
             direction = direction_from_angles(row[1], row[2])
@@ -222,19 +242,28 @@ class TestEndToEndMapping:
 
         # 已知连续控制（0.55 油门沿迹）传播得目标；求解器以此收敛出连续油门解
         known_y = np.tile(np.array([0.55, np.pi / 2, 0.0]), n_segments)
+        probe = LowThrustShooting(
+            system,
+            [GravityField("EARTH", degree=0, order=0)],
+            engine,
+            init,
+            initial_mass=1000.0,
+            target_state=init.copy(),  # 占位，本实例只用于传播
+            t0=et0,
+            tf=et0 + duration,
+        )
+        _, known_states = probe._propagate_chain(known_y)
+
         shooter = LowThrustShooting(
             system,
             [GravityField("EARTH", degree=0, order=0)],
             engine,
             init,
             initial_mass=1000.0,
-            target_state=init.copy(),  # 占位，先传播拿目标
+            target_state=known_states[-1][:6].copy(),
             t0=et0,
             tf=et0 + duration,
         )
-        _, known_states = shooter._propagate_chain(known_y)
-        shooter._target_state = known_states[-1][:6].copy()
-
         solution = shooter.solve(n_segments, x0=known_y.copy(), maxiter=30)
         assert solution.status is ConvergenceState.CONVERGED, solution.message
 
@@ -243,7 +272,9 @@ class TestEndToEndMapping:
             [[seg.throttle, *angles_from_direction(seg.direction)] for seg in solution.segments]
         )
         dt = duration / n_segments
-        sequence = sequence_from_controls(et0, et0 + duration, controls, min_duration_s=2 * dt)
+        sequence = sequence_from_controls(
+            np.linspace(et0, et0 + duration, n_segments + 1), controls, min_duration_s=2 * dt
+        )
         sequence.validate(min_duration_s=2 * dt)
 
         y_discrete = controls_from_sequence(sequence, n_segments).reshape(-1)
@@ -251,6 +282,8 @@ class TestEndToEndMapping:
 
         pos_residual = float(np.linalg.norm(discrete_states[-1][:3] - solution.states[-1][:3]))
         vel_residual = float(np.linalg.norm(discrete_states[-1][3:6] - solution.states[-1][3:6]))
-        # L1 门槛（384 km / 1 m/s 量级，issue #499 验收口径）
-        assert pos_residual < 384.0, f"位置残差 {pos_residual:.1f} km 超门槛"
-        assert vel_residual < 1.0, f"速度残差 {vel_residual:.3f} m/s 超门槛"
+        # L1 量级门槛（384 km / 1 m/s，issue #499 验收口径）是任务级上界；
+        # 本算例实测残差约 0.35 km / 0.0004 m/s，阈值按实测十余倍收紧防回归
+        print(f"\n终端残差: {pos_residual:.2f} km, {vel_residual:.4f} m/s")
+        assert pos_residual < 5.0, f"位置残差 {pos_residual:.1f} km 超收紧阈值（L1 口径 384 km）"
+        assert vel_residual < 0.005, f"速度残差 {vel_residual:.4f} m/s 超收紧阈值（L1 口径 1 m/s）"

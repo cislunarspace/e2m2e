@@ -17,7 +17,9 @@ from e2m2e.algorithm.levelset import (
 pytestmark = [pytest.mark.theory]
 
 
-def _grid(bounds: tuple[tuple[float, float], ...], shape: tuple[int, ...]) -> tuple[np.ndarray, ...]:
+def _grid(
+    bounds: tuple[tuple[float, float], ...], shape: tuple[int, ...]
+) -> tuple[np.ndarray, ...]:
     return tuple(np.linspace(lo, hi, n) for (lo, hi), n in zip(bounds, shape, strict=True))
 
 
@@ -54,7 +56,9 @@ class TestPolynomialExactness:
 
         state = np.array([0.31, -0.42, 0.53, -0.64])
         x, y, z, w = state
-        expected_gradient = np.array([3 * x**2 + w, -4.0 * y * z, -2.0 * y**2 + 1.5 * z**2, 2 * w + x])
+        expected_gradient = np.array(
+            [3 * x**2 + w, -4.0 * y * z, -2.0 * y**2 + 1.5 * z**2, 2 * w + x]
+        )
 
         _, gradient = value_function_gradient(axes, values, times, state, time=1.0)
         np.testing.assert_allclose(gradient, expected_gradient, atol=1e-10)
@@ -95,9 +99,7 @@ class TestSmoothFunctionAccuracy:
 
             # 对照组：geo-nrho 现状——np.gradient 中心差分 + 多重线性插值
             node_grads = np.gradient(values[0], *spacing, edge_order=2)
-            central = np.array(
-                [_multilinear(axes, g, state) for g in node_grads]
-            )
+            central = np.array([_multilinear(axes, g, state) for g in node_grads])
             errors_central.append(float(np.linalg.norm(central - exact)))
 
         assert np.median(errors_spline) < np.median(errors_central) / 10.0
@@ -142,7 +144,9 @@ class TestTimeInterpolation:
         values = (axes[0] ** 2)[None, :]
         times = np.array([3.0])
 
-        value, gradient = value_function_gradient(axes, values, times, np.array([0.25]), time=-100.0)
+        value, gradient = value_function_gradient(
+            axes, values, times, np.array([0.25]), time=-100.0
+        )
         assert value == pytest.approx(0.0625, abs=1e-12)
         np.testing.assert_allclose(gradient, [0.5], atol=1e-10)
 
@@ -181,9 +185,7 @@ class TestInputValidation:
     def test_non_increasing_axis_raises(self) -> None:
         axes = (np.array([0.0, 0.5, 0.4, 1.0]),)
         with pytest.raises(ValueError, match="严格递增"):
-            value_function_gradient(
-                axes, np.zeros((1, 4)), np.array([0.0]), np.array([0.2]), 0.0
-            )
+            value_function_gradient(axes, np.zeros((1, 4)), np.array([0.0]), np.array([0.2]), 0.0)
 
     def test_error_is_value_error_compatible(self) -> None:
         axes = _grid(((-1.0, 1.0),), (8,))

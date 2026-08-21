@@ -78,13 +78,15 @@ class ThrustArc:
     def is_burn(self) -> bool:
         return self.throttle > 0.0
 
-    def validate(self, *, min_duration_s: float) -> None:
+    def validate(self, *, min_duration_s: float, levels: tuple[float, ...] | None = None) -> None:
         if not np.isfinite(self.t_start) or not np.isfinite(self.t_end):
             raise ValueError("弧时间必须有限")
         if self.t_end <= self.t_start:
             raise ValueError("弧结束时间必须晚于起始时间")
         if self.duration_s < min_duration_s - _TIME_TOL_S:
             raise ValueError(f"弧长 {self.duration_s:.3f}s 低于最短弧 {min_duration_s:.3f}s")
+        if levels is not None and self.throttle not in levels:
+            raise ValueError(f"油门 {self.throttle!r} 不在档位集合 {levels!r} 内")
         direction = np.asarray(self.direction, dtype=float)
         if direction.shape != (3,) or not np.all(np.isfinite(direction)):
             raise ValueError("弧方向必须为有限三维向量")
@@ -98,11 +100,11 @@ class ThrustArcSequence:
 
     arcs: tuple[ThrustArc, ...]
 
-    def validate(self, *, min_duration_s: float) -> None:
+    def validate(self, *, min_duration_s: float, levels: tuple[float, ...] | None = None) -> None:
         if not self.arcs:
             raise ValueError("弧段序列不能为空")
         for index, arc in enumerate(self.arcs):
-            arc.validate(min_duration_s=min_duration_s)
+            arc.validate(min_duration_s=min_duration_s, levels=levels)
             if index and abs(self.arcs[index - 1].t_end - arc.t_start) > _TIME_TOL_S:
                 raise ValueError(f"弧 {index - 1} 与弧 {index} 不连续")
 
@@ -156,14 +158,13 @@ def angles_from_direction(direction: npt.ArrayLike) -> tuple[float, float]:
 
 
 def sequence_from_controls(
-    t0: float,
-    tf: float,
+    times: npt.ArrayLike,
     controls: npt.ArrayLike,
     *,
     levels: tuple[float, ...] = DEFAULT_THRUST_LEVELS,
     min_duration_s: float,
 ) -> ThrustArcSequence:
-    """将均匀分段的 ``(throttle, θ₁, θ₂)`` 控制序列映射为离散弧段序列。
+    """将分段 ``(throttle, θ₁, θ₂)`` 控制序列映射为离散弧段序列。
 
     流程：逐段取最近档位 → 同档相邻段合并为弧 → 贪心合并短弧直到所有弧
     满足最短弧约束。短弧并入档位更近的邻居（等距取时长更长者，再等距取
@@ -173,38 +174,43 @@ def sequence_from_controls(
     整个时间窗短于最短弧时，单弧序列豁免最短弧约束（无可合并对象）。
 
     Args:
-        t0: 时间窗起点（s）。
-        tf: 时间窗终点（s），须大于 ``t0``。
-        controls: 控制数组，形状 ``(N, 3)``，每行 ``(throttle, θ₁, θ₂)``，
-            对应 ``N`` 个均分 ``[t0, tf]`` 的段——即配点/打靶求解器的
-            节点控制口径。
+        times: 段边界时刻（s），形状 ``(N+1,)``，严格递增；第 k 段覆盖
+            ``[times[k], times[k+1]]``。均匀分段（打靶/配点求解器的节点
+            口径）传 ``np.linspace(t0, tf, N+1)`` 即可，非均匀时间节点
+            同样接受。
+        controls: 控制数组，形状 ``(N, 3)``，每行 ``(throttle, θ₁, θ₂)``。
         levels: 档位集合（油门比，含 0.0），默认 0/60/100%。
         min_duration_s: 最短弧时长（s）。
 
     Returns:
-        :class:`ThrustArcSequence`，连续覆盖 ``[t0, tf]``。
+        :class:`ThrustArcSequence`，连续覆盖 ``[times[0], times[-1]]``。
     """
     controls_np = np.asarray(controls, dtype=float)
     if controls_np.ndim != 2 or controls_np.shape[1] != 3 or controls_np.shape[0] == 0:
         raise ValueError("controls 形状须为 (N, 3) 且 N > 0")
     if not np.all(np.isfinite(controls_np)):
         raise ValueError("controls 含非有限值")
-    if not np.isfinite(t0) or not np.isfinite(tf) or tf <= t0:
-        raise ValueError("tf 必须大于有限的 t0")
+    times_np = np.asarray(times, dtype=float).reshape(-1)
+    if times_np.size != controls_np.shape[0] + 1:
+        raise ValueError(
+            f"times 长度须为段数+1（{controls_np.shape[0] + 1}），当前 {times_np.size}"
+        )
+    if not np.all(np.isfinite(times_np)) or not np.all(np.diff(times_np) > 0):
+        raise ValueError("times 须有限且严格递增")
     if not np.isfinite(min_duration_s) or min_duration_s <= 0:
         raise ValueError("min_duration_s 必须为正")
     _check_levels(levels)
 
-    n = controls_np.shape[0]
-    dt = (tf - t0) / n
     snapped = [level_from_throttle(row[0], levels) for row in controls_np]
     directions = [direction_from_angles(row[1], row[2]) for row in controls_np]
 
-    arcs = _runs_to_arcs(t0, dt, snapped, directions)
+    arcs = _runs_to_arcs(times_np, snapped, directions)
     arcs = _merge_short_arcs(arcs, levels, min_duration_s)
 
     sequence = ThrustArcSequence(tuple(arcs))
-    sequence.validate(min_duration_s=min(min_duration_s, tf - t0))
+    sequence.validate(
+        min_duration_s=min(min_duration_s, float(times_np[-1] - times_np[0])), levels=levels
+    )
     return sequence
 
 
@@ -246,8 +252,7 @@ def _check_levels(levels: tuple[float, ...]) -> None:
 
 
 def _runs_to_arcs(
-    t0: float,
-    dt: float,
+    times: npt.NDArray[np.floating],
     snapped: list[float],
     directions: list[npt.NDArray[np.floating]],
 ) -> list[ThrustArc]:
@@ -257,7 +262,14 @@ def _runs_to_arcs(
     for k in range(1, len(snapped) + 1):
         if k == len(snapped) or snapped[k] != snapped[start]:
             arcs.append(
-                _fuse(t0 + start * dt, t0 + k * dt, snapped[start], directions[start:k], None)
+                _fuse(
+                    float(times[start]),
+                    float(times[k]),
+                    snapped[start],
+                    directions[start:k],
+                    np.diff(times[start : k + 1]),
+                    None,
+                )
             )
             start = k
     return arcs
@@ -268,10 +280,13 @@ def _fuse(
     t_end: float,
     throttle: float,
     directions: list[npt.NDArray[np.floating]],
+    weights: npt.ArrayLike,
     fallback: npt.NDArray[np.floating] | None,
 ) -> ThrustArc:
-    """构造弧：方向为各段方向（等时长）平均后归一化；对冲近零时退回 fallback。"""
-    mean = np.mean(directions, axis=0)
+    """构造弧：方向为各段方向按时长加权平均后归一化；对冲近零时退回 fallback。"""
+    w = np.asarray(weights, dtype=float)
+    w = w / w.sum()
+    mean = np.tensordot(w, np.asarray(directions, dtype=float), axes=(0, 0))
     norm = float(np.linalg.norm(mean))
     if norm < 1e-12:
         if fallback is None or throttle == 0.0:
@@ -317,10 +332,11 @@ def _merge_pair(a: ThrustArc, b: ThrustArc, levels: tuple[float, ...]) -> Thrust
     weighted_throttle = (a.throttle * a.duration_s + b.throttle * b.duration_s) / total
     throttle = level_from_throttle(weighted_throttle, levels)
     longer = a if a.duration_s >= b.duration_s else b
-    w1, w2 = a.duration_s / total, b.duration_s / total
-    merged_direction = w1 * a.direction + w2 * b.direction
-    norm = float(np.linalg.norm(merged_direction))
-    direction = (
-        merged_direction / norm if norm >= 1e-12 else np.asarray(longer.direction, dtype=float)
+    return _fuse(
+        left.t_start,
+        right.t_end,
+        throttle,
+        [a.direction, b.direction],
+        [a.duration_s, b.duration_s],
+        np.asarray(longer.direction, dtype=float),
     )
-    return ThrustArc(left.t_start, right.t_end, throttle, direction)
