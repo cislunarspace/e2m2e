@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **轨道族生成支持 DRO（远距逆行轨道族）**（#502）：`orbit_family_generation` 新增 `orbit_type="DRO"`（Rust 族生成 ABI v21）。DRO 是月心族不绑定平动点：请求不含 `libration_point`（显式携带即拒绝，跨族字段口径与其余七族一致），字段为 `min_amplitude_km`/`max_amplitude_km`（距月心距离 min/max 均值，默认 2000~60000，包络 1737~110000 km，与单轨 DRO 一致）与 `n_orbits`。算法层新增 `design_dro_family`：Rust 单次调用从标准种子做 x0 自然参数延拓（修正失败步长减半），按窗口与种子振幅（约 90,786 km）的相对位置自动选向、跨种子窗口双向行走，一次延拓覆盖振幅区间并按振幅升序返回成员，不以 Facade 循环调单轨 `design_dro` 凑数。
+
 ## [5.8.1] - 2026-08-20
 
 ### Fixed
