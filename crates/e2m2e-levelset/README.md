@@ -65,12 +65,12 @@ ToolboxLS 的内核是一个函数句柄协议网，`schemeData` 弱类型结构
 ## 实现与验证状态
 
 四个阶段全部实现完毕，验证不依赖 MATLAB 基准数据，改用解析解与
-收敛阶两类自足门控（`tests/` 下四个集成测试，共 22 项断言全过）：
+收敛阶两类自足门控（22 项测试用例全过：单测 10 + 集成测试 12）：
 
 | 阶段 | 内容 | 验证门控（实测） |
 |---|---|---|
 | 1 | 鬼单元 ×5、一阶迎风、`ode_cfl1` | 周期回卷/常值/斜率/外推逐位断言；平流圆质心误差 < 0.02、面积比偏差 < 5%（81² 网格） |
-| 2 | ENO2/ENO3/WENO5、GLF/LLF/LLLF、`termLaxFriedrichs`、`ode_cfl2/3` | sin 场导数收敛阶实测 1.00/2.00/3.00/5.00；Burgers 方程 t=0.5 与 Hopf–Lax 精确解 L∞ 误差 < 0.02（ENO2+GLF，N=401）且加密网格收敛 |
+| 2 | ENO2/ENO3/WENO5、GLF/LLF/LLLF、`termLaxFriedrichs`、`ode_cfl2/3` | sin 场导数收敛阶断言门限 0.8/1.8/2.5/4.0（实测 1.00/2.00/3.00/5.00，见 `derivative.rs` 单测）；Burgers 方程 t=0.5 与 Hopf–Lax 精确解 L∞ 误差 < 0.02（ENO2+GLF，N=401）且加密网格收敛 |
 | 3 | `ReinitTerm`（含 Russo-Smereka 亚网格修正）、`signed_distance_iterative`、全部形状与集合运算 | 0.3 倍距离函数重初始化回真距离：最大误差 < 2.5 dx、平均 < 0.5 dx（81²）；Zalesak 圆盘缺口拓扑保持 |
 | 4 | `RestrictUpdateTerm`、`PostTimestepTtrRecorder`、`TerminalEvent`、双积分器 TTR | 可达集边界与解析解错分 < 2%（101²）；TTR 最大误差 < 0.45 且分辨率 51→101 明显下降；收敛事件提前终止 |
 
