@@ -1,0 +1,76 @@
+# ADR 0032：HJB 小推力工具链——crate 归属、值函数产品契约与在线查询接口
+
+**状态**：已采纳
+**日期**：2026-08-21
+**关联 Issue**：#497、#498、#499
+**关联**：ADR 0011（五层架构）、ADR 0012（依赖方向）、ADR 0013（按定义验证）、ADR 0031（catalog 记录格式）；geo-nrho `docs/hjb-dependency-architecture.md`（下游依赖架构）
+
+## 背景
+
+geo-nrho 项目按 Bellman 最优性原理走两级 HJB 路线：离线用 e2m2e-levelset 在结构网格上解 HJ 方程得值函数，在线由值函数梯度生成闭环控制。下游依赖架构文档（geo-nrho `docs/hjb-dependency-architecture.md` §2.3）已列出四项建议上游化的能力，对应 issue #497（CR3BP 会合系 Hamiltonian）、#498（星历力模型 Hamiltonian）、#499（值函数梯度接口与离散工况映射）。
+
+开工前有三条缝不定，后续深化会返工：
+
+1. **crate 归属**。e2m2e-levelset 自我声明为"纯数学 crate：无 SPICE、无 pyo3"。星历 Hamiltonian 需要 e2m2e-forces 的编译力模型与 e2m2e-spice 的星历缓存，它住哪、要不要新建 crate，是一条新的依赖边决策，按 ADR 0012 的规矩应先批准再实现。
+2. **值函数产品契约**。梯度查询接口放在 Python 层意味着接口与求解器解耦，契约随之转移到数据格式上：双积分器产物是无量纲时间、会合系坐标，星历产物将是 ET 秒、可能换参考系、可能加质量维。格式语义不定，每种 Hamiltonian 就会长出一个读取特例。geo-nrho 已有 `ProductMeta` 雏形（`produced_by`/`frame`/`units`/`maturity`），但与 ADR 0031 的键名体系不一致。
+3. **时间维度地位**。双积分器是自治系统，geo-nrho 现状取最近时间快照尚能凑合；星历模型非定常，时间不插值就是错的。接口设计须把这一点提前固化。
+
+## 决策
+
+### 1. levelset 保持纯数学叶子；动力学适配器住在拥有该动力学的 crate
+
+e2m2e-levelset 只依赖 ndarray，继续只含 `Advection` 这类数学示例。动力学经 `Hamiltonian` trait 注入，适配器不新建 crate：
+
+- #497 的 CR3BP 会合系 Hamiltonian：CR3BP 动力学本身在 e2m2e-forces 的 cr3bp 模块，适配器同住 e2m2e-forces。
+- #498 的星历力模型 Hamiltonian：住 e2m2e-forces，构造时注入 `CompiledForce` 与星历缓存时间范围，求解阶段纯查表、不碰 CSPICE、不进 Python 回调。
+
+由此新增一条依赖边 `e2m2e-forces → e2m2e-levelset`，无环（levelset 是叶子），不设 feature 门控（levelset 无外部库、无构建成本）。本条收窄 #497 正文"在 e2m2e-levelset 或新 crate 中实现"的表述，#497 开工时以其更新后的正文为准。
+
+### 2. Python 暴露只经 e2m2e-integrators，绑定层不含领域逻辑
+
+levelset 求解函数（如 `solve_planar_lowthrust_hjb_py`）经 e2m2e-integrators 按既有 ABI 戳流程统一暴露，输入扁平数组与形状，输出时间序列与值函数网格。绑定层只做数组搬运与错误转换，Hamiltonian 组装、控制极小化等领域逻辑一律在 forces/levelset 内完成并可在 Rust 侧测试。
+
+### 3. 值函数产品契约对齐 ADR 0031
+
+值函数产品 = JSON 元数据 + NPZ 数组段，复用 catalog 记录体系而非另起格式：
+
+- `schema_version` 自 1 起，不兼容跨版本读取；必备键沿用 ADR 0031 的 `_META_REQUIRED_KEYS` 体系（`source_tool`、状态三元组、`request` 快照、`source_record_id` 等）。
+- 数值口径显式进元数据：状态维顺序、各维物理含义、无量纲化口径（特征长度/时间/质量或"无"）、`times` 语义（ET 秒或会合系无量纲时间）。口径不同的产品靠元数据字段区分，不靠读取方猜测——与 ADR 0031 用段存在性区分动力学模型同一精神。
+- 值函数产品作为 catalog 新记录类型入库，`source_record_id` 指向作为终端约束的目标轨道记录。入库动作属求解端（#497/#498）；消费端（#499 的梯度接口）只要求能读该格式的 npz，不依赖 catalog 存在。
+- geo-nrho `ProductMeta` 是下游原型，其 `frame`/`units`/`force_model` 字段语义被本契约吸收；geo-nrho 迁移时键名向 ADR 0031 对齐（`produced_by` → `source_tool` 等），属 geo-nrho 侧工作。
+
+### 4. 梯度查询接口放 Python 算法层，时间插值必选
+
+值函数在消费者手中本就是 numpy 数组，在线查询频率低（当前为控制周期级），无 Rust 化必要：
+
+- 落点：Python 算法层（`e2m2e/algorithm/`），纯 numpy/SciPy 实现，遵循 ADR 0012 依赖方向。
+- 维度无关：接口只吃 `axes`/`values`/`times` 与查询点，不假设状态维数或物理含义。
+- 空间插值用张量积样条（如 `RegularGridInterpolator` 三次），梯度为**插值函数的解析导数**；禁止"网格上中心差分再插值"的路线（geo-nrho `_grid_gradient` 现状），后者正是本 issue 要消除的误差来源。
+- 时间插值必选，至少线性；自治系统只是它退化仍正确的特例。
+- 性能不是本接口的目标。若未来闭环仿真把查询打成瓶颈，平移 Rust 是独立决策，不影响本契约。
+
+### 5. 离散工况映射：数据模型搬迁，常数参数化，算法含最短弧约束
+
+- `ThrustLevel`（0/60/100%）、`ThrustArc`、`ThrustArcSequence` 从 geo-nrho `thrust_arcs.py` 原样迁入 e2m2e Python 低推力层，与 `LowThrustCollocation` 共享工况定义；geo-nrho 侧删除本地副本改为导入。
+- 任务级常数参数化：`MIN_ARC_DURATION_S`（geo-nrho 现值 3600s）、`MAX_THRUST_N`、`ISP_S` 改为构造参数，不留模块级常量。
+- 映射算法必须处理最短弧约束（合并/切分），不是 geo-nrho 现有的逐段最近档位——后者在配点段密于最短弧时直接报错，不可用。
+- 验收在 e2m2e 内自包含：CR3BP 连续油门解（`LowThrustShooting`/`LowThrustCollocation` 生成）→ 映射 → 重传播 → 终端残差满足 L1 门槛（384 km / 1 m/s 量级）。不依赖 geo-nrho 算例，遵循 ADR 0013 与 `.out-of-scope/` 确立的"验证不依赖外部研究代码"原则。
+
+## 理由
+
+1. **不新建 crate**：星历适配器的重活（批量加速度、星历查表、帧旋转）全在 forces/spice 里，适配器本身是薄胶水；为它付一整套 crate 仪式（workspace 接线、README、许可证、CI 矩阵）不值。同类适配器真出现第二个再抽，重复比错误的抽象便宜。绑定层（integrators）混领域逻辑则破坏其薄 FFI 定位，排除。
+2. **契约对齐 0031 而非另起格式**：catalog 已解决同一个问题（多模型产物、口径歧义、谱系），且白得谱系机制——`source_record_id` 指向终端约束轨道，正是"边界条件不可变"难题在记录层的缓解：换目标轨道等于换谱系指针重解，产品间关系可追溯。
+3. **梯度接口放 Python**：消费者、数据形态、查询频率三者都在 Python 侧，Rust 化的收益不成立；把接口做维度无关、时间必选，星历化时无需返工。
+4. **数据模型原样搬迁**：契约已被 geo-nrho 验证过，重设计一套只会制造两个等价但不同的概念。
+
+## 结果
+
+**新增**：`e2m2e-forces → e2m2e-levelset` 依赖边（#497 开工时建立）；catalog 值函数记录类型（#497/#498）；Python 梯度查询接口与离散工况映射模块（#499）。
+
+**变更**：#497 正文的实现落点表述被决策 1 收窄；geo-nrho 的 `thrust_arcs.py` 在 #499 落地后删除本地副本，`ProductMeta` 键名后续向 ADR 0031 对齐（均为 geo-nrho 侧动作）。
+
+**不变**：e2m2e-levelset 内核与其纯数学定位；e2m2e-integrators 薄绑定定位；现有 catalog 记录格式（值函数记录是新增类型，不改既有 schema）。
+
+**代价**：forces 的公开 API 将引用 levelset 类型（`Grid`、`Hamiltonian`），其消费者传递可见 levelset；catalog 需为值函数记录增加段约定与校验。
+
+**范围外**：研究层面的三个难题（自适应网格、误差定量演化、边界条件可变的重解策略）不由本篇解决；本篇只保证工程架构不挡它们的路。
