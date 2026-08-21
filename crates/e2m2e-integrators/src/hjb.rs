@@ -317,8 +317,26 @@ pub fn solve_hjb_py<'py>(
     cfl: f64,
     max_step: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
+    // 期望维数由动力学标识决定，不是入口级常量：五维含质量等后续
+    // 动力学加入时只动自己的分支（ADR 0032 决策 3 的通用入口定位）。
+    let expected_dim = match dynamics {
+        "planar_double_integrator" | "cr3bp_synodic" => 4,
+        other => {
+            return Err(PyValueError::new_err(format!(
+                "未知动力学标识 {other}（支持：planar_double_integrator、cr3bp_synodic）"
+            )));
+        }
+    };
     validate_grid_args(
-        &terminal, &minimum, &maximum, &shape, t0, tf, cfl, max_step, 4,
+        &terminal,
+        &minimum,
+        &maximum,
+        &shape,
+        t0,
+        tf,
+        cfl,
+        max_step,
+        expected_dim,
     )?;
     let grid =
         Grid::new(&minimum, &maximum, &shape).with_boundary_all(BoundaryCondition::Extrapolate);
@@ -354,9 +372,7 @@ pub fn solve_hjb_py<'py>(
             py.allow_threads(|| solve_hjb(grid.clone(), terminal_arr, t0, tf, ham, cfl, max_step))
         }
         other => {
-            return Err(PyValueError::new_err(format!(
-                "未知动力学标识 {other}（支持：planar_double_integrator、cr3bp_synodic）"
-            )));
+            unreachable!("动力学标识已在入口校验：{other}")
         }
     };
     // 参数校验先于构造完成，上面的 ::new 不会 panic。

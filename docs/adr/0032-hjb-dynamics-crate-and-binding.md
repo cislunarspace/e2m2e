@@ -31,3 +31,7 @@ e2m2e-levelset 完成 ToolboxLS 移植后只带示例 Hamiltonian（常速平流
 - 变更：e2m2e-integrators 增加通用 HJB 求解绑定，ABI 戳递增。
 - 不变：e2m2e-levelset 的模块结构与许可条款；ADR 0012、0016 的规则。
 - 代价：通用绑定的参数表在 FFI 边界弱类型，键名拼错只能运行期发现，靠绑定层校验与明确报错缓解；新 crate 增加一份脚手架维护成本。
+
+## 修订（2026-08-21，#497 实现评审）
+
+结果节补充分发后果：e2m2e-integrators 自 #497 起依赖 e2m2e-levelset，发布的 wheel 自此包含 ACM 非商业许可代码。按 e2m2e-levelset README 许可节的要求，后续发布说明须注明此许可差异，商业使用需联系 ToolboxLS 原作者。

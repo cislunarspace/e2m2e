@@ -167,6 +167,34 @@ mod tests {
         }
     }
 
+    /// 共线平动点 L1/L2/L3：在 y = 0 轴上一分法求 ∂Ω/∂x = 0 的根
+    /// （括号区间取 μ = 0.01215 下文献位置的邻域），该点无控加速度为零。
+    /// y = 0 时 ay 自动为零，只需验证 ax。
+    #[test]
+    fn collinear_libration_points_are_equilibria() {
+        let h = ham();
+        let brackets = [(0.5, 0.95), (1.0, 1.2), (-1.1, -0.9)];
+        for (lo, hi) in brackets {
+            let f = |x: f64| h.vector_field([x, 0.0, 0.0, 0.0])[2];
+            let (mut a, mut b) = (lo, hi);
+            assert!(f(a) * f(b) < 0.0, "括号 [{a}, {b}] 内应有变号");
+            for _ in 0..80 {
+                let mid = 0.5 * (a + b);
+                if f(a) * f(mid) <= 0.0 {
+                    b = mid;
+                } else {
+                    a = mid;
+                }
+            }
+            let x = 0.5 * (a + b);
+            let field = h.vector_field([x, 0.0, 0.0, 0.0]);
+            assert!(
+                field.iter().all(|v| v.abs() < 1e-9),
+                "共线点应为平衡点：x = {x}，f = {field:?}"
+            );
+        }
+    }
+
     /// 控制项的开关结构：p_v = 0 时不推力（贡献 0），
     /// a·‖p_v‖ > w 时满推力（贡献 w − a·‖p_v‖）。
     #[test]
