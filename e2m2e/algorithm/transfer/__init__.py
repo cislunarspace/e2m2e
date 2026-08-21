@@ -64,6 +64,13 @@ from .qlaw import qlaw_guess, rv_to_keplerian
 from .solution_database import SolutionDatabase
 from .terminal import OrbitTerminal, StateTerminal, TerminalCondition
 from .three_body_lambert import ThreeBodyLambert
+from .thrust_arcs import (
+    DEFAULT_THRUST_LEVELS,
+    ThrustArc,
+    ThrustArcSequence,
+    controls_from_sequence,
+    sequence_from_controls,
+)
 from .transfer import Transfer
 from .transfer_optimization import (
     DROTRONLPOptimizer,
@@ -119,6 +126,11 @@ __all__ = [
     "LowThrustShooting",
     "LowThrustShootingSolution",
     "LowThrustCollocation",
+    "ThrustArc",
+    "ThrustArcSequence",
+    "DEFAULT_THRUST_LEVELS",
+    "sequence_from_controls",
+    "controls_from_sequence",
     "qlaw_guess",
     "rv_to_keplerian",
     "TliParams",
