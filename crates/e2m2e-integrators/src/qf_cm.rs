@@ -488,8 +488,8 @@ mod tests {
         let d = d_matrix();
         let inv = d_inv_matrix();
         // inv · D ≈ I
-        #[allow(clippy::needless_range_loop)] // j 同时用于索引与 i==j 判别，迭代器化反而绕
         for (i, inv_row) in inv.iter().enumerate() {
+            #[allow(clippy::needless_range_loop)] // j 同时用于索引与 i==j 判别，迭代器化反而绕
             for j in 0..6 {
                 let mut acc = C64::ZERO;
                 for k in 0..6 {
