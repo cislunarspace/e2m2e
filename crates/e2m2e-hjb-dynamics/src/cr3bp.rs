@@ -63,7 +63,7 @@ impl Cr3bpSynodic {
         let r2 = r2sq.sqrt().max(MIN_DISTANCE);
         let inv_r1_3 = 1.0 / (r1 * r1 * r1);
         let inv_r2_3 = 1.0 / (r2 * r2 * r2);
-        let ax = 2.0 * vy + x - (1.0 - mu) * (x + mu) * inv_r1_3 - mu * (x - 1.0 + mu) * inv_r2_3;
+        let ax = 2.0 * vy + x - (1.0 - mu) * x1 * inv_r1_3 - mu * x2 * inv_r2_3;
         let ay = -2.0 * vx + y - (1.0 - mu) * y * inv_r1_3 - mu * y * inv_r2_3;
         [vx, vy, ax, ay]
     }
