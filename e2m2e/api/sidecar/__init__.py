@@ -38,7 +38,11 @@ def _line(payload: Any) -> bytes:
 
 
 def _progress_line(job_id: Any, percent: float, message: str) -> bytes:
-    """进度行：可丢弃的信封 JSON 行（ADR 0035 决策 3）。"""
+    """进度行：可丢弃的信封 JSON 行（ADR 0035 决策 3）。
+
+    当前进度行只有任务开始事件（percent=0）：真进度需要算法层回调
+    通道，Facade 尚未提供；待消费端（tod）需要时再接，不在本层虚构。
+    """
     return _line(
         {
             "status": "progress",
@@ -97,11 +101,14 @@ def handle_request(facade: Facade, request: Any) -> list[bytes]:
         ]
     job_id = request.get("job_id")
     arguments = request.get("arguments") or {}
-    chunks = [_progress_line(job_id, 0.0, f"开始 {tool}")]
+    started = _progress_line(job_id, 0.0, f"开始 {tool}")
+    chunks = [started]
 
     if tool in _BINARY_TOOLS:
         if dtype is None:
-            # 响应含 Orbit 对象不可 JSON 化（MCP 传输层同此限制），必须走帧。
+            # 协议约定（非参数校验）：响应含 Orbit 对象不可 JSON 化（MCP
+            # 传输层同此限制），该工具必须走帧，缺省 dtype 视为协议用法
+            # 错误，借用 INVALID_PARAMS 错误码。
             return [
                 _line(
                     envelope.error_envelope(
@@ -112,14 +119,11 @@ def handle_request(facade: Facade, request: Any) -> list[bytes]:
             ]
         result, err = envelope.dispatch_tool(spec.method, arguments)
         if err is not None:
-            return [chunks[0], _line(err)]
+            return [started, _line(err)]
         try:
             data, frames = _family_binary_payload(result, dtype)
         except FrameError as exc:
-            return [
-                chunks[0],
-                _line(envelope.error_envelope("INTERNAL_ERROR", f"帧编码失败：{exc}")),
-            ]
+            return [started, _line(envelope.error_envelope("INTERNAL_ERROR", f"帧编码失败：{exc}"))]
         response = envelope.ok_envelope(data)
         response["binary_frames"] = len(frames)
         return [*chunks, _line(response), *frames]
