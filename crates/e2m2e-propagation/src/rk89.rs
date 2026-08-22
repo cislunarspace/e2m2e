@@ -281,13 +281,9 @@ mod tests {
     #[test]
     fn ee_consistency() {
         // b - b_star must equal GMAT's ee literal (verifies b_star = cj - ee).
-        for i in 0..RK89_TABLE.stages {
-            let diff = RK89_TABLE.b[i] - RK89_TABLE.b_star[i];
-            assert!(
-                (diff - GMAT_EE[i]).abs() < 1e-12,
-                "b[{i}] - b_star[{i}] = {diff} != ee {}",
-                GMAT_EE[i]
-            );
+        for ((&b, &b_star), ee) in RK89_TABLE.b.iter().zip(RK89_TABLE.b_star).zip(GMAT_EE) {
+            let diff = b - b_star;
+            assert!((diff - ee).abs() < 1e-12, "b - b_star = {diff} != ee {ee}");
         }
     }
 
@@ -303,7 +299,7 @@ mod tests {
 
         let (y1, error) = explicit_rk_step(&RK89_TABLE, 0.0, &y0, h, f, None).unwrap();
 
-        let y_exact = vec![h.cos(), -h.sin()];
+        let y_exact = [h.cos(), -h.sin()];
         let num_err = y1
             .iter()
             .zip(y_exact.iter())
