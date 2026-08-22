@@ -410,8 +410,10 @@ fn step_system(
 
 fn jacobi_constant(mu: f64, state: &[f64; 6]) -> f64 {
     let (x, y, z, vx, vy, vz) = (state[0], state[1], state[2], state[3], state[4], state[5]);
-    let r1 = ((x + mu).powi(2) + y * y + z * z).sqrt().max(1e-10);
-    let r2 = ((x - 1.0 + mu).powi(2) + y * y + z * z).sqrt().max(1e-10);
+    let x1 = x + mu;
+    let x2 = x - 1.0 + mu;
+    let r1 = (x1 * x1 + y * y + z * z).sqrt().max(1e-10);
+    let r2 = (x2 * x2 + y * y + z * z).sqrt().max(1e-10);
     x * x + y * y + 2.0 * (1.0 - mu) / r1 + 2.0 * mu / r2 - (vx * vx + vy * vy + vz * vz)
 }
 
@@ -809,15 +811,13 @@ mod tests {
         let stm = result.stms.last().unwrap();
         let flow = cr3bp_eom(MU, &final_state);
 
-        for row in 0..4 {
-            let component = PLANAR[row];
+        for (row, &component) in PLANAR.iter().enumerate() {
             assert!(
                 (evaluation.closure[row] - (final_state[component] - state_from_q(&q)[component]))
                     .abs()
                     < 1e-12
             );
-            for col in 0..4 {
-                let variable = PLANAR[col];
+            for (col, &variable) in PLANAR.iter().enumerate() {
                 let expected = (stm[component * 6 + variable] - f64::from(component == variable))
                     * SCALES[col];
                 assert!((evaluation.jacobian[(row, col)] - expected).abs() < 1e-8);
