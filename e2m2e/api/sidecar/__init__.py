@@ -60,6 +60,8 @@ def _catalog_binary_payload(result: Any, dtype: str) -> tuple[dict[str, Any], li
 
     帧序 = JSON 行 ``data.arrays`` 中 None 占位键的顺序；每帧是对应键的
     数组。非数组值原样留 JSON。元数据、标量段、成员参数表不受影响。
+    #525 落地 period/mu 标量补齐后，本函数与族生成的帧抽取共用字段
+    抽取逻辑（当前各自独立，待第二个消费点出现再收拢）。
     """
     frames = []
     arrays: dict[str, Any] = {}

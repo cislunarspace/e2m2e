@@ -19,6 +19,8 @@ from e2m2e.api.facade import Facade, mcp_exposed  # noqa: E402
 from e2m2e.api.mcp import envelope  # noqa: E402
 from e2m2e.api.models import (  # noqa: E402
     CatalogGetRequest,
+    CatalogQueryRequest,
+    CatalogQueryResponse,
     CatalogRecordResponse,
     FamilyGenerationRequest,
     FamilyGenerationResponse,
@@ -51,6 +53,15 @@ def facade(tmp_path, monkeypatch) -> Facade:
                 family_type="halo",
                 requested_members=2,
                 generated_members=2,
+            )
+
+        @mcp_exposed(request_model=CatalogQueryRequest)
+        def catalog_query(self, **params) -> CatalogQueryResponse:
+            return CatalogQueryResponse(
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="查询完成：0 条记录",
+                records=[],
             )
 
         @mcp_exposed(request_model=CatalogGetRequest)
@@ -257,8 +268,6 @@ def test_run_loop_survives_envelope_serialization_failure(facade):
 
 def test_invoke_tool_serialization_failure_translated():
     """issue #526：结果含不可 JSON 化对象时兑成 INTERNAL_ERROR 信封，不炸传输层。"""
-    import numpy as np
-
     from e2m2e.api.models import CatalogRecordResponse
     from e2m2e.data.templates import ConvergenceState, FailureCause
 
@@ -296,3 +305,14 @@ def test_invoke_tool_serialization_failure_translated():
     assert env["error"]["code"] == "INTERNAL_ERROR"
     assert "序列化" in env["error"]["message"]
     assert "Traceback" not in env["error"]["message"]
+
+
+def test_catalog_query_unchanged_by_binary_mapping(facade):
+    """issue #526 验收：不进帧映射的工具走原信封化路径，无帧、无 binary_frames。"""
+    chunks = handle_request(facade, {"tool": "catalog_query", "arguments": {}})
+    lines = [json.loads(c) for c in chunks]
+    assert len(lines) == 2  # 进度行 + 响应行，无帧
+    assert lines[0]["status"] == "progress"
+    assert lines[1]["status"] == "ok"
+    assert "binary_frames" not in lines[1]
+    assert lines[1]["data"]["message"] == "查询完成：0 条记录"
