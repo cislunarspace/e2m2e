@@ -350,7 +350,11 @@ def transfer_orbit(
     Args:
         transfer_type: "HMN"（直接）/ "LGA"（月球引力辅助）/ "WSB"（太阳引力辅助）/
             "low_thrust"（小推力）。
-        target_ephemeris: 目标轨道星历（FR1 产物）。
+        target_ephemeris: 目标轨道星历（FR1 产物）。坐标系契约按转移类型
+            区分（#516）：LGA/WSB 要求会合旋转系（synodic）物理单位
+            （km, km/s）状态，编排器直接无量纲化，不做惯性系→旋转系转换，
+            惯性星历须先经 ``j2000_to_synodic`` 转换；HMN/low_thrust 按地心
+            惯性系 km/km/s 状态解释（与 construct_departure_state 出发态同系）。
         tli_params: 地球停泊轨道参数（TLI 高度/倾角/航迹角）。
         tof_range: 飞行时间范围（天）。
         target_orbit_radius_km: 目标轨道半径 (km)，HMN 转移必需。
@@ -421,6 +425,11 @@ def transfer_orbit(
 
 def _extract_target_state(target_ephemeris: Any) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """从 target_ephemeris 提取目标位置和速度。
+
+    本函数只做格式提取，不解释坐标系；坐标系契约在调用方（#516）：
+    LGA/WSB 要求会合旋转系（synodic）物理单位，惯性星历须先经
+    ``spacetime_transform`` 的 ``j2000_to_synodic`` 转换；HMN/low_thrust
+    按地心惯性系 km/km/s 状态解释。
 
     支持三种输入格式：
 
@@ -495,8 +504,11 @@ def _transfer_orbit_lga(
     )
 
     params = search_params if search_params is not None else LgaSearchParams()
+    vu_km_s = system.characteristic_velocity
+    if vu_km_s is None or vu_km_s <= 0.0:
+        raise ValueError("system.characteristic_velocity must be set")
 
-    n_searched = params.n_departure_phase * params.n_tof
+    n_searched = params.n_departure_phase * params.n_tof * params.n_out_of_plane
     n_feasible = len(candidates)
 
     if not candidates:
@@ -557,8 +569,8 @@ def _transfer_orbit_lga(
         perilune_alt_km=refined.perilune_alt_km,
         perilune_vel_km_s=perilune_vel,
         perilune_state=perilune_phys,
-        dv_departure_km_s=refined.dv_departure,
-        dv_arrival_km_s=refined.dv_arrival,
+        dv_departure_km_s=refined.dv_departure * vu_km_s,
+        dv_arrival_km_s=refined.dv_arrival * vu_km_s,
         jacobi_departure=refined.jacobi_departure,
         jacobi_arrival=refined.jacobi_arrival,
         n_candidates_searched=n_searched,
@@ -571,7 +583,7 @@ def _transfer_orbit_lga(
 
     return TransferDesignResult(
         transfer_type="LGA",
-        delta_v=refined.total_dv,
+        delta_v=refined.total_dv * vu_km_s,
         trajectory=None,
         details=details,
         status=refined.status,
@@ -773,15 +785,18 @@ def _transfer_orbit_low_thrust(
     Args:
         tli_params: 地球停泊轨道参数（TLI 高度/倾角/航迹角）。当 ``departure_state``
             未提供时用于构造出发状态。
-        target_ephemeris: 目标轨道星历。当 ``target_state`` 未提供时用于提取目标状态。
+        target_ephemeris: 目标轨道星历（地心惯性系 km/km/s 状态，#516）。
+            当 ``target_state`` 未提供时用于提取目标状态。
         engine_config: 推进配置（最大推力、比冲）。
         initial_mass: 初始质量 (kg)。
         n_segments: 求解器段数。
         target_oe: Q-law 目标 ``(a_T, e_T, i_T)``。默认从目标状态反推圆轨道。
         solver_method: 求解方法 ``"shooting"`` 或 ``"collocation"``。
         duration_days: 飞行时间 (天)。
-        departure_state: 出发状态 ``[r, v]`` (6,)，km / km/s。优先于 tli_params。
-        target_state: 目标末态 ``[r, v]`` (6,)，km / km/s。优先于 target_ephemeris。
+        departure_state: 出发状态 ``[r, v]`` (6,)，地心惯性系 km / km/s。
+            优先于 tli_params。
+        target_state: 目标末态 ``[r, v]`` (6,)，地心惯性系 km / km/s。
+            优先于 target_ephemeris。
         system: 动力学系统。默认纯二体 ``SimpleNamespace(origin="EARTH")``。
         forces: 非推力力模型列表。默认 ``[PointMassGravity("EARTH", mu=MU_EARTH)]``。
 
