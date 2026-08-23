@@ -9,10 +9,10 @@ e2m2e 是"LLM+Agent"任务规划系统中的**算法工具集基础设施**：�
 | 模块 | 职责 | 关键决策 |
 |---|---|---|
 | 时空系统与常量 | UTC/TDB/TAI/TT 时间尺度、J2000/ITRF93/GCRS 等参考系转换、多套物理常量基准集 | ADR 0010、ADR 0022 |
-| Rust 计算 | 四个 crate（spice / propagation / forces / integrators）：积分、力模型、STM、并行 | ADR 0002、ADR 0016 |
+| Rust 计算 | 四个核心 crate（spice / propagation / forces / integrators），另有 HJB 求解器两 crate（levelset / hjb-dynamics，见 [hjb-subsystem](hjb-subsystem.md)） | ADR 0002、ADR 0016、ADR 0032 |
 | Python 编排 | 构造问题 → 调 Rust 迭代器 → 解释结果；任务级 Facade | ADR 0014、ADR 0029 |
 | CI | 三平台 wheel 矩阵（Linux x64/ARM、Windows）+ CSPICE 编译包分发 | ADR 0009 |
-| 数据管理 | GitHub Release 星历数据、Git 跟踪族种子、本地 catalog | ADR 0031 |
+| 数据管理 | GitHub Release 星历数据、Git 跟踪族种子、随包 CR3BP 基线族数据集、本地 catalog | ADR 0031、ADR 0036 |
 
 分工原则（ADR 0011 五层架构、ADR 0012 依赖方向）：**领域决策留 Python，热循环进 Rust**。Rust 不吃 SPICE 句柄，吃预采样注入的星历缓存表——cspice 内核是全局状态、不可并发，这一约束决定了接缝的位置。
 

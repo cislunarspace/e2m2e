@@ -25,7 +25,7 @@ locale_dirs = ["locale/"]
 # MBSE 参考文档（.md）以 YAML frontmatter 的 title 作为页面标题
 myst_title_to_page_title = True
 
-# ADR、research 与 agents 文档面向开发协作，不进用户文档站点（ADR 索见表 architecture/index.md）
+# ADR、research 与 agents 文档面向开发协作，不进用户文档站点（ADR 索引见 architecture/index.md）
 exclude_patterns = ["_build", "adr", "research", "agents", "Thumbs.db", ".DS_Store"]
 
 # MBSE 参考文档（.md）里的 ```mermaid 围栏交给 sphinxcontrib-mermaid 渲染
