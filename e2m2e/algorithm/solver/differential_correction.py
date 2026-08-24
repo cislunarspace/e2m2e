@@ -88,9 +88,7 @@ class DifferentialCorrection:
         # 可能因积分噪声停滞（由 stagnation_limit 兜底盘整为 MAX_ITERATIONS），
         # 需要更紧闭合时应同步调紧 integration_rtol。
         self.integration_rtol = (
-            integration_rtol
-            if integration_rtol is not None
-            else self.DEFAULT_INTEGRATION_TOLERANCE
+            integration_rtol if integration_rtol is not None else self.DEFAULT_INTEGRATION_TOLERANCE
         )
         self.integration_atol = (
             integration_atol if integration_atol is not None else self.integration_rtol
