@@ -14,9 +14,10 @@ from typing import Any
 import numpy as np
 from pydantic import BaseModel, ValidationError
 
+from e2m2e.data.types.orbit import Orbit
+
 from ..catalog_ingest import _finite_or_none
 from ..models import OrbitError
-from e2m2e.data.types.orbit import Orbit
 
 __all__ = ["Envelope", "ok_envelope", "error_envelope", "invoke_tool", "dispatch_tool"]
 
