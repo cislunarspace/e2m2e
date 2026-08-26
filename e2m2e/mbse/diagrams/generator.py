@@ -60,7 +60,7 @@ class DiagramGenerator:
             lines.append(f"        {comp.description}" if comp.description else "")
             lines.append("    }")
 
-            # ADR 0001 后 protocols 默认为空；仅保留对历史元数据的兼容渲染
+            # ADR 0001 起 protocols 默认为空；仅当组件显式携带 protocols 时才有输出
             for proto in comp.protocols:
                 lines.append(f"    {comp.name} ..|> {proto} : implements")
 

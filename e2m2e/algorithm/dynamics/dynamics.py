@@ -682,8 +682,8 @@ class CR3BP_Dynamics(Dynamics):
         ``"scipy"`` 走 scipy ``solve_ivp``；``"rust"`` 走 Rust
         ``solve_ivp_events`` （事件语义与 scipy 未完全对齐，由调用方显式
         选择并接受差异）。``backend`` 由 :meth:`propagate` 校验（不传报错、
-        不允许 ``auto``）。无 events 时要求 Rust 扩展可用（issue #378：
-        缺失即抛 RustExtensionUnavailableError，不静默降级 scipy）。
+        不允许 ``auto``）。无 events 时要求 Rust 扩展可用（缺失即抛
+        RustExtensionUnavailableError，不静默降级 scipy）。
         """
         if events is not None:
             if backend == "scipy":
@@ -794,7 +794,7 @@ class CR3BP_Dynamics(Dynamics):
         time = np.array(result["time"])
 
         # 防御性校验：Rust 侧任何提前退出都必须在这里暴露，不允许把截断
-        # 结果当完整轨迹返回（issue #246，照抄 ephemeris_dynamics.py）。
+        # 结果当完整轨迹返回（照抄 ephemeris_dynamics.py）。
         if len(time) != len(t_eval_list):
             raise RuntimeError(
                 f"Rust STM propagation returned {len(time)} of {len(t_eval_list)} "
@@ -823,8 +823,7 @@ class CR3BP_Dynamics(Dynamics):
 
         events 时按显式 ``backend`` 选择事件积分路径（ADR 0020 决策 4），
         语义同 :meth:`_propagate_with_stm`。无 events 时要求 Rust 扩展可用
-        （issue #378：缺失即抛 RustExtensionUnavailableError，不静默降级
-        scipy）。
+        （缺失即抛 RustExtensionUnavailableError，不静默降级 scipy）。
         """
         if events is not None:
             if backend == "scipy":
@@ -847,7 +846,8 @@ class CR3BP_Dynamics(Dynamics):
 
         # 直接调用传播接口时，步长塌缩是确定性传播失败，必须按
         # PropagationFailure 上抛。搜索/优化调用方在自己的语境中把异常翻译为
-        # 结构化 status，传播器不再用空 states 伪装失败结果（ADR 0020 决策 1、2）。
+        # 结构化 status；传播器始终上抛异常，不返回空 states 伪装的完整轨迹
+        # （ADR 0020 决策 1、2）。
         result = propagate_cr3bp_py(
             mu=mu,
             t_span=(float(t_span[0]), float(t_span[1])),

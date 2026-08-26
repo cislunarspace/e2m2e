@@ -214,7 +214,7 @@ def _ephemeris_to_dict(ephemeris: EphemerisTable | None) -> dict[str, Any] | Non
 
 
 def _design_result_to_response(result: OrbitDesignResult) -> DesignOrbitResponse:
-    """把 ``OrbitDesignResult`` 翻译为 ``DesignOrbitResponse`` （含几何字段，#312）。
+    """把 ``OrbitDesignResult`` 翻译为 ``DesignOrbitResponse``（含几何字段）。
 
     纯翻译、无副作用、不依赖 SPICE。ELFO 场景下 ``cr3bp_orbit`` /
     ``correction`` 为 None，对应字段输出默认值（mu=None、states/times 空、
@@ -257,7 +257,7 @@ def _design_result_to_response(result: OrbitDesignResult) -> DesignOrbitResponse
 def _control_result_to_response(
     result: ControlOrbitResult, *, mu: float | None
 ) -> ControlOrbitResponse:
-    """把 ``ControlOrbitResult`` 翻译为 ``ControlOrbitResponse`` （含几何字段，#312）。
+    """把 ``ControlOrbitResult`` 翻译为 ``ControlOrbitResponse``（含几何字段）。
 
     ``controlled_ephemeris`` 来自最后一次蒙特卡洛样本（全失败时 None）；
     ``mu`` 由请求透传——算法层不产 mu，design→control 链式时由调用方注入。
@@ -933,8 +933,8 @@ class Facade:
     def orbit_family_generation(self, **params) -> FamilyGenerationResponse:
         """轨道族生成（二档）。
 
-        Pydantic 模型校验（#411）→ 按 orbit_type 分派到算法层族生成入
-        口（#428、#502）→ 结构化错误。八族均已实现，成功返回统一容器
+        Pydantic 模型校验 → 按 orbit_type 分派到算法层族生成入口 →
+        结构化错误。八族均已实现，成功返回统一容器
         ``FamilyGenerationResponse``（兼容 ``OrbitFamily`` 读取接口）；
         Lissajous 是拟周期参数采样，族上显式标注
         ``periodicity=quasi-periodic``。软失败使用同一响应保留部分族。
@@ -1066,8 +1066,8 @@ class Facade:
         """稳定性分析（二档）：薄封装 algorithm/stability。
 
         需要带 period/system 绑定的 Orbit 对象入参，无法经 JSON 信封表达
-        （空参 schema 注册后 Agent 必然调用失败）；按 issue #510 决策不
-        注册，待记录引用式入参（如 input_record_id）落地后放开。
+        （空参 schema 注册后 Agent 必然调用失败），故不注册 MCP 工具；
+        待记录引用式入参（如 input_record_id）落地后放开。
         """
         from e2m2e.algorithm.stability import StabilityAnalysis
 
