@@ -93,7 +93,8 @@ print(result.initial_state)
 
 **积分器与动力学**
 
-- Rust 积分器内核：单步 RK（PD45 / PD78 / RK89）、Adams 多步、Störmer–Cowell 二阶积分；状态转移矩阵（STM）传播；事件检测（terminal / direction 语义）。
+- Rust 积分器内核：单步 RK（PD45 / PD78 / RK89）、Adams 多步、Störmer–Cowell 二阶积分、IAS15（15 阶 Gauss-Radau 预测-校正 + 补偿求和，长弧高精度）；状态转移矩阵（STM）传播；事件检测（terminal / direction 语义）。
+- 变分方程：状态对初值的 STM，以及对力模型参数（Cr / Cd）的一阶敏感列，供测定轨与协方差传播。
 - 动力学模型：CR3BP（快速设计）、星历 N 体（SPICE，精确外推）、含太阳解析摄动的 BCR4BP，以及三者之间的转换。
 - 高精度力模型：点质量与第三体引力、球谐重力场（含固体潮）、ECOM 9 系数光压、大气阻力、太阳光压、连续推力，传播精度与 GMAT、DFH 对齐到亚百米级。
 

@@ -81,3 +81,4 @@
 | 0029 | 轨道族生成采用统一 Rust 深模块 | 已采纳（已实施） |
 | 0030 | algorithm/forces 留在 algorithm 层——Python 配置/编排面，数值在 crates | 已采纳 |
 | 0031 | 轨道库 catalog——记录格式、存储布局与查询接口 | 已采纳 |
+| 0032 | 纳入 ASSIST 两项算法（IAS15 积分器、参数敏感变分方程），MERCURIUS 不纳入 | 已采纳 |

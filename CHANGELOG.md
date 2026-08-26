@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **IAS15 积分器与参数敏感变分方程**（ADR 0032）：纳入 ASSIST（Holman et al. 2023）两项算法。IAS15（15 阶 Gauss-Radau 预测-校正 + 补偿求和）按论文公开算法自行实现（REBOUND/ASSIST 为 GPL，未引用其代码），长弧段舍入按 Brouwer 律 n^1/2 积累，近距交会自缩步长；经 `ForceModel.propagate(integrator="ias15")` 使用，支持 `with_stm`。STM 增广系统新增力模型参数敏感列（`sens_params=["srp_cr", "drag_cd"]`，需 `with_stm=True`），即 ASSIST 式一阶变分方程对 Cr/Cd 的偏导，供测定轨与协方差传播使用。新增 Rust 绑定 `propagate_compiled_ias15_py`，`propagate_compiled_stm_py` 追加可选 `sens_params`（ABI v22）。星历力模型下 IAS15 有效精度受星历采样光滑度限制（约 1e-11 相对量级），引擎内置噪声地板检测，到达地板时抬升有效容差继续而非死循环拒步。MERCURIUS（Rein et al. 2019）混合辛积分器经评估与本仓问题域不匹配，不纳入（理由见 ADR 0032）。
+
 ## [5.8.1] - 2026-08-20
 
 ### Fixed

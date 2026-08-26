@@ -66,6 +66,7 @@ if TYPE_CHECKING:
     propagate_bcr4bp_py: Any
     propagate_bcr4bp_stm_py: Any
     propagate_compiled: Any
+    propagate_compiled_ias15_py: Any
     propagate_compiled_lowthrust: Any
     propagate_compiled_lowthrust_sensitivity: Any
     propagate_compiled_stm_py: Any
@@ -164,6 +165,7 @@ _RUST_SYMBOLS = (
     "propagate_bcr4bp_py",
     "propagate_bcr4bp_stm_py",
     "propagate_compiled",
+    "propagate_compiled_ias15_py",
     "propagate_compiled_lowthrust",
     "propagate_compiled_lowthrust_sensitivity",
     "propagate_compiled_stm_py",
@@ -384,6 +386,7 @@ __all__ = [
     "qlaw_segment_direction_py",
     "trim_degree_py",
     "propagate_compiled",
+    "propagate_compiled_ias15_py",
     "propagate_compiled_lowthrust",
     "propagate_compiled_lowthrust_sensitivity",
     "propagate_compiled_stm_py",
