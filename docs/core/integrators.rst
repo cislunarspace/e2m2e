@@ -1,7 +1,7 @@
 积分器族选择与配置
 ========================
 
-e2m2e 的积分器分三族：自适应单步 Runge-Kutta（RK）、固定步长多步 Adams、固定步长二阶 Cowell，分别对应一阶化方程 :math:`\dot{y}=f(t,y)`、一阶化方程 :math:`\dot{y}=f(t,y)` 和双积分方程 :math:`\ddot{x}=a(t,x)`。Rust 侧是一个 workspace，含四个 crate：``e2m2e-propagation``（纯数学积分器：Butcher 表、RK/ABM/Cowell、solve_ivp）、``e2m2e-forces``（N 体与 STM 变分方程、编译型力模型）、``e2m2e-spice``（CSPICE FFI，spice feature 构建时内嵌 CSPICE）与 ``e2m2e-integrators``（PyO3 绑定，maturin 唯一打包目标，生成 ``e2m2e._integrators`` 扩展）。Python 层仅做类型转换与初始化辅助。
+e2m2e 的积分器分三族：自适应单步 Runge-Kutta（RK）、固定步长多步 Adams、固定步长二阶 Cowell，分别对应一阶化方程 :math:`\dot{y}=f(t,y)`、一阶化方程 :math:`\dot{y}=f(t,y)` 和双积分方程 :math:`\ddot{x}=a(t,x)`。Rust 侧是一个 workspace，含六个 crate：``e2m2e-propagation``（纯数学积分器：Butcher 表、RK/ABM/Cowell、solve_ivp）、``e2m2e-forces``（N 体与 STM 变分方程、编译型力模型）、``e2m2e-spice``（CSPICE FFI，spice feature 构建时内嵌 CSPICE）、``e2m2e-integrators``（PyO3 绑定，maturin 唯一打包目标，生成 ``e2m2e._integrators`` 扩展），以及水平集可达性求解器 crate ``e2m2e-levelset``（ToolboxLS 移植）与 HJB 动力学 crate ``e2m2e-hjb-dynamics``。Python 层仅做类型转换与初始化辅助。
 
 
 积分器概览

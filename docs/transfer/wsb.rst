@@ -24,7 +24,10 @@ WSB 转移利用日地系统中的弱稳定边界区域：航天器先飞离月�
 
 1. **弹道网格搜索**：在太阳相位角 × 出发相位角 × 飞行时间三维网格上，
    BCR4BP（含太阳摄动的双圆四体模型）前向传播，筛选近月点高度与
-   :math:`H_2` 满足捕获条件的候选（``ProcessPoolExecutor`` 并行）
+   :math:`H_2` 满足捕获条件的候选。默认 ``backend="rust"``，传播、
+   截面检测与筛选都在 Rust 内由 Rayon 并行完成；Python 实现仅在显式
+   ``backend="python"`` 时作为等价性对照运行（``ProcessPoolExecutor``
+   并行），绝不自动回退
 2. **到达段精化**：对最优候选用 ThreeBodyLambert 打靶，精化月心到达段
 
 使用方法
@@ -45,8 +48,9 @@ WSB 转移利用日地系统中的弱稳定边界区域：航天器先飞离月�
        target_state=target_state,
    )
 
-   print(f"总 Δv: {result.total_dv:.4f} km/s")
-   print(f"飞行时间: {result.time_of_flight:.2f} 天")
+   print(f"状态: {result.status.name}")
+   print(f"总 Δv: {result.delta_v:.4f} km/s")
+   print(f"飞行时间: {result.details.tof_sec / 86400.0:.2f} 天")
 
 应用场景
 --------

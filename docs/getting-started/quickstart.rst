@@ -134,7 +134,10 @@
    from e2m2e.algorithm.transfer import Transfer
 
    transfer = Transfer(dynamics)
-   result = transfer.set_orbit(start=dro_orbit, end=ro_orbit).optimize(
+   # 出发轨道用前文微分修正得到的 seed_dro，到达轨道取延拓族末端成员作初值
+   result = transfer.set_orbit(
+       start=seed_dro, end=cont_result.family.orbits[-1]
+   ).optimize(
        initial_guess={"alpha": 1.0, "transfer_time": 15.0, "t_ins": 5.0},
        alpha_range=(0.5, 2.5),
    )

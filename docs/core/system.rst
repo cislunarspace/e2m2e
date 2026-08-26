@@ -34,7 +34,9 @@ CR3BP 系统
        secondary="Moon",
    )._with_default_scales()
 
-``_with_default_scales()`` 自动设置地月特征尺度（384405 km、27.32 天）。
+``_with_default_scales()`` 对地月分支采用 DE421 自洽基准：距离取
+``Datum.DE421.char_length_km``（384400 km），周期取
+``2π × Datum.DE421.char_time_s``（TU ≈ 375190 s，约 27.28 天）。
 内置 Earth-Moon、Sun-Earth、Sun-Jupiter 三组默认尺度；其他组合抛
 ``ValueError``，需用 ``set_characteristic_scales()`` 显式设置。
 
@@ -115,8 +117,10 @@ BCR4BP 系统
    print(system.sun_position(0.0))        # t=0 时刻太阳位置（无量纲）
    print(system.gravitational_parameter("sun"))   # 太阳无量纲质量 m_s
 
-``earth_moon()`` 的特征尺度与 ``CR3BP_System._with_default_scales`` 的
-地月分支一致（DU = 384405 km，周期 27.32 天），太阳参数取标准值：
+两套系统的地月特征尺度基准不同：``earth_moon()`` 使用常量
+``EARTH_MOON_DISTANCE_KM``（DU = 384405 km），周期取 27.32 天；
+``CR3BP_System._with_default_scales`` 的地月分支使用 DE421 自洽值
+（DU = 384400 km，周期约 27.28 天）。``earth_moon()`` 的太阳参数取标准值：
 
 - m_s = GM_sun / GM_EMB ≈ 328900.56（太阳与地月质心 GM 均取 DE440）
 - a_s = 日地平均距离 / 地月距离 ≈ 389.17（日地距离取 GMAT nominalSun）

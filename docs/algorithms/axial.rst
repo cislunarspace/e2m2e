@@ -33,21 +33,23 @@ Axial 轨道在某些参数范围内可提供不同于 Halo 的覆盖特性，
        collinear_point=2,
        amplitude=20000.0,  # km
        epoch=[2024, 1, 1, 0, 0, 0.0],
-       duration=1.0,  # 年
+       duration=365.25 * 86400.0,  # 一年的弧长（单位：秒）
    )
 
 或使用底层 API：
 
 .. code-block:: python
 
+   from e2m2e.api.models import DesignOrbitRequest
    from e2m2e.algorithm.design import design_orbit
 
-   result = design_orbit(
+   request = DesignOrbitRequest(
        orbit_type="Axial",
        collinear_point=2,
        amplitude=20000.0,
        epoch=[2024, 1, 1, 0, 0, 0.0],
    )
+   result = design_orbit(request)
 
 参考文献
 --------

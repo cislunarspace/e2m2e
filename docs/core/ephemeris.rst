@@ -141,9 +141,9 @@ ET 秒，``dt`` 为网格步长（秒）。
    print(result["states"].shape)  # (n_points, 6)
    print(result["stm"].shape)     # (n_points, 6, 6)
 
-``with_stm=True`` 时，若 Rust 绑定可用，传播走 ``propagate_with_stm_py``
-快速路径，否则回退到 Python 增广积分。行为契约：星历内核缺失或轨迹被截断
-（如 Rust 侧提前退出）时抛 ``RuntimeError``，不会静默返回截断结果。
+``with_stm=True`` 时传播一律走 ``propagate_with_stm_py`` Rust 快速路径：
+Rust 扩展缺失时直接抛错（无 Python 回退）。行为契约：星历内核缺失或轨迹被
+截断（如 Rust 侧提前退出）时抛 ``RuntimeError``，不会静默返回截断结果。
 
 **积分器配置：**
 

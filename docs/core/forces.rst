@@ -291,20 +291,21 @@ name-based 注册机制
        t_eval=t_eval,             # 输出采样点，默认 linspace(t0, tf, 100)
        with_stm=True,             # 同时积分状态转移矩阵
        initial_step=1.0,          # 初始步长，默认从初始状态估算
-       events=[...],              # 终止事件列表，见下
        max_steps=200_000,
        method=RkMethod.PD45,      # RK 方法，默认 PD45
    )
 
-``with_stm=True`` 时把 6 维状态与 6×6 STM 展平拼成 42 维增广状态一起积分：
-各力的解析雅可比 ``compute_jacobian`` 直接叠加，不提供解析雅可比的力由
-``ForceModel`` 用三点中心差分兜底；STM 分量不参与步长误差控制，接受/拒绝
-只看前 6 维物理状态（对齐 GMAT）。返回字典在 ``time``、``states``、
-``terminal_event_index`` 之外多一个 ``stm`` 键，形状 ``(n_points, 6, 6)``。
+``with_stm=True`` 时把 6 维状态与 6×6 STM 组成 42 维增广问题一起积分：
+启用力模型经 ``to_rust_spec`` 序列化后，加速度与解析雅可比都在 Rust 内
+求值；STM 分量不参与步长误差控制，接受/拒绝只看前 6 维物理状态（对齐
+GMAT）。返回字典在 ``time``、``states``、``terminal_event_index`` 之外
+多一个 ``stm`` 键，形状 ``(n_points, 6, 6)``。
 
-``events`` 是终止事件列表，每个事件是 ``f(t, state) -> float`` 的可调用，
-函数值符号变化即在该步停止，``terminal_event_index`` 记录触发的事件下标；
-``with_stm=True`` 时事件函数接收 6 维物理状态（非增广状态）。
+``propagate`` 不支持 ``events``：传非 None 的 events 直接抛
+``NotImplementedError``（事件检测与力求值需在同一 Rust 内循环完成，
+compiled-forces Rust API 尚未提供，且不允许回退 Python RHS）。需要事件
+检测时改用 ``Dynamics.propagate`` 的 events 接口，或对传播结果做事后
+检测（密采样 + Brent 插值）。
 
 带脉冲机动时用 ``propagate_maneuvers(initial_state, t_span, burns)``：按
 ``epoch`` 排序 ``ImpulsiveBurn`` 列表，逐段 coast 传播，在每个 burn epoch
@@ -321,14 +322,18 @@ name-based 注册机制
 Rust 编译快速路径
 ^^^^^^^^^^^^^^^^^
 
-spice feature 启用、无 ``events``、不带 STM，且所有启用力模型的
-``to_rust_spec()`` 都非 ``None`` 时，``propagate`` 自动分流到 Rust
+spice feature 启用、不带 STM 时，``propagate`` 走编译 Rust
 ``propagate_compiled``：力模型一次序列化后整个积分循环在 Rust 内完成，
-消除逐步 Python↔Rust 跨界。任一条件不满足时自动回退 Python 路径，返回格式一致，无需用户干预。
+消除逐步 Python↔Rust 跨界。默认一律走编译 Rust 快速路径，不存在静默回退：
+Rust 扩展不可用抛 ``RustExtensionUnavailableError``，任一启用力模型的
+``to_rust_spec()`` 返回 ``None`` 抛 ``NotImplementedError``
+（ADR 0020 决策 4）。
 
-带 STM 时有对应的 Rust compiled STM 快速路径（``propagate_compiled_stm_py``），
-但 ``SolarRadiationPressure`` 与 ``RelativisticCorrection`` 无解析雅可比，
-含这两个力的 STM 传播不走该路径，回退 Python 增广积分。
+带 STM 时走对应的 compiled STM 快速路径（``propagate_compiled_stm_py``），
+同样要求全部启用力模型可序列化。``SolarRadiationPressure`` 与
+``RelativisticCorrection`` 均已实现 ``to_rust_spec``；当前 STM 路径仍不
+支持 ``RelativisticCorrection`` 与 ``VariableMassFiniteBurn``，含这两个力
+时显式报错，不允许回退 Python 增广积分。
 
 Rust 星历预采样缓存
 ^^^^^^^^^^^^^^^^^^^
@@ -492,7 +497,7 @@ JSON 文件 IO
    from e2m2e.algorithm.forces.force_config import build_force
 
    build_force("UnknownType", {})
-   # ValueError: unknown force type 'UnknownType'; known types: ['DragModel', 'FiniteBurn', 'GravityField', 'IndirectTerm', 'PointMassGravity', 'RelativisticCorrection', 'SolarRadiationPressure', 'ThirdBodyGravity']
+   # ValueError: unknown force type 'UnknownType'; known types: ['DragModel', 'EcomSolarRadiationPressure', 'FiniteBurn', 'GravityField', 'IndirectTerm', 'PointMassGravity', 'RelativisticCorrection', 'SolarRadiationPressure', 'ThirdBodyGravity']
 
 **不可序列化的推力剖面**
 

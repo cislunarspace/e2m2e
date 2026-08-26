@@ -20,7 +20,7 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 
 | 模块 | 数值内核 | 工作 issue |
 |---|---|---|
-| `algorithm/dynamics`（传播） | Rust（`e2m2e-integrators`） | 无 |
+| `algorithm/dynamics`（无事件传播） | Rust（`e2m2e-integrators`） | 无 |
 | `algorithm/forces`（数值） | Rust（`e2m2e-forces`） | 无 |
 | `algorithm/transfer/lambert.py` | Rust（`e2m2e-propagation`） | 无 |
 | `algorithm/transfer/search_parallel.py`（网格搜索） | Rust（`e2m2e-integrators`） | 无 |
@@ -36,7 +36,7 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | `algorithm/transfer/porkchop.py`（网格评估：终端传播 + Lambert + ΔV） | Rust（`e2m2e-forces` + `e2m2e-integrators`；Python 仅问题构造与存档/查询） | #446 |
 | `algorithm/design`（打靶/传播路径） | Rust（`e2m2e-integrators`） | 无 |
 | `algorithm/coordinate/synodic_j2000.py`（批量转换） | Rust（`e2m2e-integrators`） | 无 |
-| `algorithm/proximity/relative_dynamics.py`（传播） | Rust（`e2m2e-integrators`） | 无 |
+| `algorithm/proximity/relative_dynamics.py`（传播积分） | Rust（`e2m2e-integrators`，`solve_ivp_events`）；星历目标的 A(t) 由 Python 雅可比内核提供 | 无 |
 | `algorithm/station_keeping/monte_carlo.py`（传播） | Rust（`e2m2e-integrators`） | 无 |
 | `algorithm/normal_form`（积分路径） | Rust（`e2m2e-integrators`） | #336/#340 |
 | `algorithm/normal_form`（CR3BP Hamiltonian 数值构造） | Rust（`e2m2e-integrators`） | 无 |
@@ -71,6 +71,9 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 | `algorithm/dynamics/potential.py`（伪势能 Hessian） | Python | 无 |
 | `algorithm/propagation.py` | Python（传播已 Rust） | 无 |
 | `algorithm/proximity`（编排） | Python（传播已 Rust） | 无 |
+| `algorithm/proximity/relative_dynamics.py`（星历目标的 A(t) 求值） | Python（复用 `ephemeris_dynamics` 的 numpy 雅可比内核） | 无 |
+| `algorithm/levelset/value_function.py`（值函数网格任意点值/梯度查询） | Python（scipy NdBSpline 张量样条；HJB 求解数值已在 `e2m2e-hjb-dynamics` crate，ADR 0032 决策 4） | 无 |
+| `algorithm/catalog_sweep.py`（参数空间扫描编排） | Python（扫描网格构造与族生成分派；批量数值走 Rust 族生成入口，ADR 0031/ADR 0029） | 无 |
 | `algorithm/nominal_orbit/` | Python（占位） | 无 |
 
 ## 已下沉
@@ -78,10 +81,21 @@ ADR 0011 决策：部分计算功能由 Python 执行，正在逐步迁移至 Ru
 数值内核在 Rust，Python 侧只构造问题、传参过 FFI、解释结果。审计时若看到
 Python 文件里有数值循环，先查它是否只是薄封装。
 
-**`algorithm/dynamics`（传播）。** CR3BP/BCR4BP/星历路径的传播数值在
-`e2m2e-integrators` crate（`propagate_cr3bp_py`、`propagate_bcr4bp_py`、
-`propagate_with_state_py` 等）。无事件时 CR3BP 直接走 Rust 快速路径，
-`dynamics.py` 只做问题构造与结果解释。同包 `potential.py` 的伪势能
+**`algorithm/dynamics`（无事件传播）。** 无事件时 CR3BP/BCR4BP/星历路径的
+传播数值在 `e2m2e-integrators` crate（`propagate_cr3bp_py`、
+`propagate_bcr4bp_py`、`propagate_with_state_py` 等），CR3BP 直接走 Rust
+快速路径，`dynamics.py` 只做问题构造与结果解释。三处边界如实登记：
+
+- **events 事件积分**：Rust 事件路径只在显式 `backend="rust"` 时启用；
+  `backend="scipy"` 与基类事件的右端函数是 Python 运动方程，走 scipy
+  `solve_ivp`（显式后端选择，按 ADR 0020 决策 4 不构成静默回退）。
+- **BCR4BP rust 事件路径**：积分数值在 Rust，右端函数以 Python 回调喂入
+  `solve_ivp_events`，存在跨语言回调开销。
+- **星历 N 体雅可比内核**：加速度与解析雅可比的全套 numpy 实现保留在
+  `ephemeris_dynamics.py`，并被 `proximity/relative_dynamics.py` 生产消费
+  （`compute_jacobian_A(t, state)` 鸭子类型缝）。
+
+同包 `potential.py` 的伪势能
 Hessian 是 numpy 实现（供非传播路径共用），见有意留 Python 节。
 依据 ADR 0002。
 
@@ -314,7 +328,18 @@ Rust，见上。
 编排器），配 `ForceModel` + 调传播 + 输出 `EphemerisTable`；传播数值已 Rust。
 
 **`algorithm/proximity`（编排）。** `phasing.py`、`safety.py`。理由：编排；
-相对动力学传播已 Rust（`relative_dynamics.py`）。
+相对动力学传播已 Rust（`relative_dynamics.py`）。其中星历目标下
+A(t) 的求值复用 `ephemeris_dynamics` 的 numpy 雅可比内核，属有意留 Python。
+
+**`algorithm/levelset/value_function.py`（值函数网格查询）。** 理由：随轨道库
+记录分发的网格数据产品，任意点值/梯度查询用 scipy NdBSpline 张量样条评估，
+单次调用无热路径（ADR 0032 决策 4）；HJB 求解数值本体在
+`e2m2e-hjb-dynamics` crate（ADR 0032/0033），不在本文件。
+
+**`algorithm/catalog_sweep.py`（参数空间扫描编排）。** 理由：振幅/近月点/
+Jacobi 窗口等扫描网格构造、按族分派与记录组装是编排职责；批量数值经
+Rust 族生成入口（`generate_cr3bp_family_windows_py` 等，ADR 0029）完成，
+Python 不保留独立数值路径。
 
 **`algorithm/nominal_orbit/`。** 理由：当前为占位实现（插值器待 FR1 落地，
 包 docstring 明示），无实际数值可下沉。

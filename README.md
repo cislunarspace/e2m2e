@@ -83,7 +83,7 @@ print(result.initial_state)
 
 ## MCP
 
-e2m2e 可作为 [MCP](https://modelcontextprotocol.io/) 服务器把 13 个任务级工具（轨道设计、站保仿真、转移设计、轨道预报、时空转换、轨道族生成、轨道库查询/标注/导出/扫描）暴露给 LLM Agent，stdio 传输，不监听端口。工具清单由 Facade 方法元数据派生，产物自动入库、`record_id` 跨工具链式调用；用法与工具速查见文档「[通过 MCP 使用 e2m2e](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)」。
+e2m2e 可作为 [MCP](https://modelcontextprotocol.io/) 服务器把 13 个任务级工具（轨道设计、站保仿真、转移设计、轨道预报、时空转换、轨道族生成与 7 个轨道库工具）暴露给 LLM Agent，stdio 传输，不监听端口。工具清单由 Facade 方法元数据派生，产物自动入库、`record_id` 跨工具链式调用；用法与工具速查见文档「[通过 MCP 使用 e2m2e](https://cislunarspace.github.io/e2m2e/getting-started/mcp.html)」。
 
 安装 MCP extra（在已有 e2m2e 的环境里）：
 

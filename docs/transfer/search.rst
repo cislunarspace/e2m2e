@@ -80,19 +80,27 @@
 并行搜索
 --------
 
-支持多进程和多线程并行搜索以加速计算。多进程（默认）绕过 GIL，适合 CPU 密集的积分运算；
-多线程保留细粒度 tqdm 进度条，适合需要实时进度的场景。
+并行后端默认恒为 ``rust``：网格搜索整体下沉到 Rust + Rayon 内核，多核
+并行在 Rust 侧完成。``processes`` 与 ``threads`` 两个 Python 后端仅在
+显式指定时使用（等价性对照、测试注入等场景）：``processes`` 用
+``ProcessPoolExecutor`` 多进程绕过 GIL；``threads`` 用线程池，保留细粒度
+tqdm 进度条。Rust 扩展缺失时会直接报错，不会静默改用 Python 后端。
 
 .. code-block:: python
 
-   # 使用所有 CPU 核心（多进程，默认）
+   # 默认：Rust + Rayon 并行（无需显式传参）
    results = searcher.search(
        ...,  # 其他参数同上
-       n_workers=None,
+   )
+
+   # 显式选择 Python 多进程后端
+   results = searcher.search(
+       ...,  # 其他参数同上
+       n_workers=4,
        parallel_backend="processes",
    )
 
-   # 指定线程数（多线程，适合 I/O 或需要实时进度的场景）
+   # 显式选择 Python 多线程后端（需要实时细粒度进度时）
    results = searcher.search(
        ...,  # 其他参数同上
        n_workers=4,

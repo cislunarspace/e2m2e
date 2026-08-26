@@ -80,8 +80,7 @@ Halo 轨道有专用的延拓编排，结合 Richardson 三阶解析近似和延
 步长缩减到下限（``min_step_size``）仍不收敛时，终止该方向的延拓。
 轨道族中只追加收敛的轨道，失败步不会进入结果。
 
-延拓结束后，可通过 ``Continuation`` 实例上的两个属性诊断：
-
-- ``continuation.termination_reason``：终止原因（如步长过小，延拓终止）
-- ``continuation.continuation_stats``：成功/失败步数等统计信息
+延拓结束后，可通过 ``Continuation`` 实例的 ``continuation_stats``
+属性诊断：字典含 ``total_steps``、``successful_steps``、``failed_steps``
+三个键，分别记录总步数与成功/失败步数。
 

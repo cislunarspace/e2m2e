@@ -171,9 +171,8 @@ scipy 语义的事件函数（截面函数只依赖前 6 维，增广传播时�
 插值，见 :doc:`../algorithms/manifolds`）相比，积分中检测不依赖采样密度，
 穿越残差由积分器求精保证。
 
-``ForceModel.propagate(events=...)`` 走 Rust 快速路径：事件检测由
-``e2m2e.integrators.solve_ivp_events``（Rust ``solve_ivp_events_py``
-的薄封装）在积分内循环完成，每个接受步端点评估事件函数，符号变化时
-步内二分求精，末点为求精后的事件点而非触发步终点；返回字典新增
-``t_events``/``y_events``/``n_steps``。求精精度受步内线性插值误差限制，
-需要更紧的事件时刻时减小 ``initial_step``，或调小 ``ForceModel.DEFAULT_MAX_STEP``。
+``ForceModel.propagate`` 不支持 ``events``：传非 None 的 events 直接抛
+``NotImplementedError``（事件检测与力求值需在同一 Rust 内循环完成，
+compiled-forces Rust API 尚未提供，且不允许回退 Python RHS）。需要事件
+检测时改用上文 ``Dynamics.propagate`` 路径，或对传播结果做事后检测
+（密采样 + Brent 插值，见 :doc:`../algorithms/manifolds`）。
