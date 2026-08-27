@@ -115,6 +115,5 @@ def test_drag_rust_path_respects_configured_f107_ap(earth_icrf_system):
     # 5400s 短弧末态差约 1e-2 km（~10 m）。下界 1e-3 km（1 m）留一个数量级余量，
     # 远高于 0，可靠区分是否回归。
     assert diff > 1e-3, (
-        f"Rust 路径改 f107/ap 后末态几乎不变（diff={diff:.3e} km），"
-        "f107/ap 未透传到 density"
+        f"Rust 路径改 f107/ap 后末态几乎不变（diff={diff:.3e} km），f107/ap 未透传到 density"
     )

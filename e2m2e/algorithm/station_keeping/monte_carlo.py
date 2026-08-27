@@ -715,8 +715,7 @@ def _make_law(
             v_c=syn_system.cr3bp_system.characteristic_velocity,
         )
     raise ValueError(
-        f"control_mode 必须为 1/2/3（角动量管理 4-6 暂不支持蒙特卡洛仿真），"
-        f"当前 {control_mode}"
+        f"control_mode 必须为 1/2/3（角动量管理 4-6 暂不支持蒙特卡洛仿真），当前 {control_mode}"
     )
 
 
