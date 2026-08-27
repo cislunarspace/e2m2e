@@ -27,7 +27,9 @@ class ForceEntry:
 
 
 class ForceModel:
-    """Composition of force models driving one propagation via Rust integrators. / 聚合多个 PhysicalModel 并完成传播的动力学容器。
+    """Composition of force models driving one propagation via Rust integrators.
+
+    聚合多个 PhysicalModel 并完成传播的动力学容器。
 
     不继承 ``Dynamics``：``Dynamics`` 是 CR3BP/Ephemeris 的基类，其
     ``propagate()`` 基于 ``scipy.solve_ivp`` 与 STM 模板方法；ForceModel 用

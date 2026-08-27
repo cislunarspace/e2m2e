@@ -6,7 +6,7 @@ title: 需求追溯矩阵 / Requirement Traceability Matrix
 
 [English] Mapping from requirements to code modules and test files. Column headers are bilingual (中文 / English).
 
-[简体中文] 受管产物：由 `scripts/generate_mbse_diagrams.py` 重新生成，请勿手改。
+[简体中文] 受管产物：由 scripts/generate_mbse_diagrams.py 重新生成，请勿手改。
 
 | 需求 ID / Requirement ID | 标题 / Title | 类别 / Category | 优先级 / Priority | 验证方法 / Verification | 关联代码 / Linked code | 关联测试 / Linked tests |
 |---------|------|------|--------|----------|----------|----------|

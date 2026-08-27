@@ -116,7 +116,10 @@ class DiagramGenerator:
     def generate_traceability_matrix(self) -> str:
         """生成需求到代码和测试的 Markdown 追溯矩阵。"""
         lines = [
-            "| 需求 ID / Requirement ID | 标题 / Title | 类别 / Category | 优先级 / Priority | 验证方法 / Verification | 关联代码 / Linked code | 关联测试 / Linked tests |",
+            # 表头中英并列；列宽见下一行分隔行。/ Bilingual header row.
+            "| 需求 ID /"
+            " Requirement ID | 标题 / Title | 类别 / Category | 优先级 / Priority |"
+            " 验证方法 / Verification | 关联代码 / Linked code | 关联测试 / Linked tests |",
             "|---------|------|------|--------|----------|----------|----------|",
         ]
         for requirement in self.requirements:
@@ -264,7 +267,10 @@ class DiagramGenerator:
         en_title = title_en if title_en is not None else _EN_TITLES.get(title, "")
         heading = f"# {title} / {en_title}" if en_title else f"# {title}"
         intro = (
-            f"[English] {intro_en}\n\n[简体中文] 受管产物：由 `scripts/generate_mbse_diagrams.py` 重新生成，请勿手改。\n\n"
+            "[English] "
+            + (intro_en or "")
+            + "\n\n"
+            + "[简体中文] 受管产物：由 scripts/generate_mbse_diagrams.py 重新生成，请勿手改。\n\n"
             if intro_en
             else ""
         )
@@ -297,11 +303,32 @@ class DiagramGenerator:
         """
         generated = []
         layer_titles = {
-            "data": ("BDD：数据层", "BDD: Data Layer", "Block definition diagram of data-layer components: containers, kernels and constants."),
-            "numerical": ("BDD：数值层", "BDD: Numerical Layer", "Block definition diagram of the Rust numerical computation facade."),
-            "algorithm": ("BDD：算法层", "BDD: Algorithm Layer", "Block definition diagram of dynamics, correction and continuation components."),
-            "api": ("BDD：接口层", "BDD: Interface Layer", "Block definition diagram of Facade, CLI and MCP interfaces."),
-            "tools": ("BDD：工具层", "BDD: Tools Layer", "Block definition diagram of auxiliary tools such as logging."),
+            "data": (
+                "BDD：数据层",
+                "BDD: Data Layer",
+                "Block definition diagram of data-layer components:"
+                " containers, kernels and constants.",
+            ),
+            "numerical": (
+                "BDD：数值层",
+                "BDD: Numerical Layer",
+                "Block definition diagram of the Rust numerical computation facade.",
+            ),
+            "algorithm": (
+                "BDD：算法层",
+                "BDD: Algorithm Layer",
+                "Block definition diagram of dynamics, correction and continuation components.",
+            ),
+            "api": (
+                "BDD：接口层",
+                "BDD: Interface Layer",
+                "Block definition diagram of Facade, CLI and MCP interfaces.",
+            ),
+            "tools": (
+                "BDD：工具层",
+                "BDD: Tools Layer",
+                "Block definition diagram of auxiliary tools such as logging.",
+            ),
         }
 
         for layer in ARCHITECTURE_LAYERS:
@@ -322,7 +349,8 @@ class DiagramGenerator:
                 self.generate_requirement_diagram(),
                 requirement_path,
                 "Functional Requirements",
-                "Requirement diagram of the registered functional requirements and their code trace links.",
+                "Requirement diagram of the registered functional"
+                " requirements and their code trace links.",
             )
             generated.append(requirement_path)
 
@@ -332,7 +360,8 @@ class DiagramGenerator:
                 self.generate_traceability_matrix(),
                 matrix_path,
                 "Requirement Traceability Matrix",
-                "Mapping from requirements to code modules and test files. Column headers are bilingual (中文 / English).",
+                "Mapping from requirements to code modules and test files."
+                " Column headers are bilingual (中文 / English).",
             )
             generated.append(matrix_path)
 

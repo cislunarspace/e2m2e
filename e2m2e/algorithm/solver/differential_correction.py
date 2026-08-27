@@ -42,7 +42,9 @@ _HALO_TIME_RECOVERY_SETUPS = {
 
 
 class DifferentialCorrection:
-    """Differential correction: iterative refinement of periodic-orbit initial guesses. / 周期轨道微分修正的问题构造入口。
+    """Differential correction: iterative refinement of periodic-orbit initial guesses.
+
+    周期轨道微分修正的问题构造入口。
 
     对称性配置、自由变量和结果编排保留在 Python；残差、STM 雅可比、Newton
     修正与收敛判定只由 Rust CR3BP 内核执行。

@@ -6,7 +6,7 @@ title: BDD：数据层 / BDD: Data Layer
 
 [English] Block definition diagram of data-layer components: containers, kernels and constants.
 
-[简体中文] 受管产物：由 `scripts/generate_mbse_diagrams.py` 重新生成，请勿手改。
+[简体中文] 受管产物：由 scripts/generate_mbse_diagrams.py 重新生成，请勿手改。
 
 ```mermaid
 classDiagram

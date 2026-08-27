@@ -6,7 +6,7 @@ title: BDD：接口层 / BDD: Interface Layer
 
 [English] Block definition diagram of Facade, CLI and MCP interfaces.
 
-[简体中文] 受管产物：由 `scripts/generate_mbse_diagrams.py` 重新生成，请勿手改。
+[简体中文] 受管产物：由 scripts/generate_mbse_diagrams.py 重新生成，请勿手改。
 
 ```mermaid
 classDiagram

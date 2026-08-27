@@ -1137,7 +1137,9 @@ class Facade:
 
     @mcp_exposed(request_model=CatalogQueryRequest)
     def catalog_query(self, **params) -> CatalogQueryResponse:
-        """Multi-dimensional catalog query returning record summaries. / 多维过滤查询，返回摘要列表（不含数组段与请求快照）。"""
+        """Multi-dimensional catalog query returning record summaries..
+
+        多维过滤查询，返回摘要列表（不含数组段与请求快照）。"""
         try:
             request = CatalogQueryRequest(**params)
         except (ValueError, TypeError) as exc:
@@ -1161,7 +1163,9 @@ class Facade:
 
     @mcp_exposed(request_model=CatalogGetRequest)
     def catalog_get(self, **params) -> CatalogRecordResponse:
-        """Fetch a full record by ``record_id``. / 按 record_id 取完整记录（含数组段）；不存在抛 ``RECORD_NOT_FOUND``。"""
+        """Fetch a full record by ``record_id``..
+
+        按 record_id 取完整记录（含数组段）；不存在抛 ``RECORD_NOT_FOUND``。"""
         try:
             request = CatalogGetRequest(**params)
         except (ValueError, TypeError) as exc:
@@ -1176,7 +1180,9 @@ class Facade:
 
     @mcp_exposed(request_model=CatalogDeleteRequest)
     def catalog_delete(self, **params) -> CatalogDeleteResponse:
-        """Delete a record by ``record_id`` — irreversible. / 按 record_id 删除记录（文件与索引条目）；删除不可撤销。"""
+        """Delete a record by ``record_id`` — irreversible..
+
+        按 record_id 删除记录（文件与索引条目）；删除不可撤销。"""
         try:
             request = CatalogDeleteRequest(**params)
             self._open_catalog().delete(request.record_id)
@@ -1201,7 +1207,9 @@ class Facade:
 
     @mcp_exposed(request_model=CatalogTagRequest)
     def catalog_tag(self, **params) -> CatalogTagResponse:
-        """Write teaching annotations to the JSON record. / 写教学标注入 JSON 记录（随文件走）；tags 整体替换，note=None 保留。"""
+        """Write teaching annotations to the JSON record..
+
+        写教学标注入 JSON 记录（随文件走）；tags 整体替换，note=None 保留。"""
         try:
             request = CatalogTagRequest(**params)
             meta = self._open_catalog().tag(request.record_id, request.tags, request.note)
@@ -1225,7 +1233,9 @@ class Facade:
 
     @mcp_exposed(request_model=CatalogPromoteRequest)
     def catalog_promote(self, **params) -> CatalogPromoteResponse:
-        """Lift a family member into a standalone record. / 把族成员提升为独立记录（source_record_id 指向所属族）。"""
+        """Lift a family member into a standalone record..
+
+        把族成员提升为独立记录（source_record_id 指向所属族）。"""
         try:
             request = CatalogPromoteRequest(**params)
             record = self._open_catalog().promote_member(request.record_id, request.member_index)
@@ -1249,7 +1259,9 @@ class Facade:
 
     @mcp_exposed(request_model=CatalogExportRequest)
     def catalog_export(self, **params) -> CatalogExportResponse:
-        """Package the query result subset for distribution. / 把查询子集打包导出（标注随包）；包可直接作为库打开。"""
+        """Package the query result subset for distribution..
+
+        把查询子集打包导出（标注随包）；包可直接作为库打开。"""
         try:
             request = CatalogExportRequest(**params)
         except (ValueError, TypeError) as exc:
@@ -1274,11 +1286,13 @@ class Facade:
 
     @mcp_exposed(request_model=CatalogSweepRequest)
     def catalog_sweep(self, **params) -> CatalogSweepResponse:
-        """Parameter-space sweep batch-generating into the catalog. / 参数空间扫描批量生成并入库（编排复用 ADR 0029 的 Rust 族生成）。
+        """Parameter-space sweep batch-generating into the catalog.
 
-        网格 = 族 × 平动点 × 主参数维度（一维振幅/近月点高度、能量窗口、
-        LISSAJOUS 二维振幅，三选一）；部分参数点失败时已产出的记录
-        保留，失败原因逐点可查（ADR 0020 软失败语义）。
+        参数空间扫描批量生成并入库（编排复用 ADR 0029 的 Rust 族生成）。
+
+            网格 = 族 × 平动点 × 主参数维度（一维振幅/近月点高度、能量窗口、
+            LISSAJOUS 二维振幅，三选一）；部分参数点失败时已产出的记录
+            保留，失败原因逐点可查（ADR 0020 软失败语义）。
         """
         try:
             request = CatalogSweepRequest(**params)
