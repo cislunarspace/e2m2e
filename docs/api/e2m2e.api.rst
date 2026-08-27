@@ -12,7 +12,7 @@ e2m2e.api.catalog_ingest module
 -------------------------------
 
 产物型 Facade 结果到 catalog 记录的构建纯函数（ADR 0031）。无产物时
-不建记录，返回 ``None``。
+不建记录，返回 ``None`` 。
 
 .. automodule:: e2m2e.api.catalog_ingest
    :members:

@@ -12,7 +12,7 @@ e2m2e.data.catalog package
 
 轨道库 catalog（ADR 0031）：记录文件是事实来源，SQLite 索引是可全量
 重建的派生物。子模块分工：record 定义记录格式与段数组键约定，store
-提供存储引擎 ``CatalogStore``，index 维护派生索引，baseline 负责随包
+提供存储引擎 ``CatalogStore`` ，index 维护派生索引，baseline 负责随包
 基线数据集的首用导入（ADR 0036）。导出面统一由包 __init__ 再输出。
 
 
@@ -40,7 +40,7 @@ e2m2e.data.catalog.index module
 
 基于 SQLite 的派生索引：只存过滤维度与文件指针，记录文件仍是唯一事实
 来源，删除后可由 store 全量重建。表结构为实现细节，不作为外部契约；
-查询入口走 ``CatalogStore``，不直接使用本模块。
+查询入口走 ``CatalogStore`` ，不直接使用本模块。
 
 
 e2m2e.data.catalog.baseline module
