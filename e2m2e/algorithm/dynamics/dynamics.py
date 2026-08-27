@@ -47,7 +47,7 @@ from e2m2e.integrators import (
 
 
 class Dynamics:
-    """通用天体系统动力学基类
+    """Generic propagation of a system's dynamics (template-method base). / 通用天体系统动力学基类
 
     采用 Template Method 模式：基类定义 ``propagate()`` 的算法骨架，
     子类通过钩子方法提供具体的 ODE 函数和步长配置。
@@ -520,7 +520,7 @@ class Dynamics:
 
 
 class CR3BP_Dynamics(Dynamics):
-    """CR3BP动力学方程
+    """CR3BP dynamics (propagation orchestrator). / CR3BP动力学方程
 
     封装了CR3BP的动力学模型，提供状态传播、状态转移矩阵计算、
     Jacobi常数计算等核心功能。支持6维状态向量（位置+速度）和

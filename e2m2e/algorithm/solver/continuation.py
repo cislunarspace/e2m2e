@@ -196,7 +196,7 @@ def _pal_newton_step_python(
 
 
 class Continuation:
-    """轨道族延拓
+    """Orbit-family continuation (natural-parameter and pseudo-arclength). / 轨道族延拓
 
     通过延拓算法生成一族周期轨道，支持自然参数延拓和伪弧长延拓。
 

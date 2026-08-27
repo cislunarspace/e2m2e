@@ -157,7 +157,7 @@ class MultipleShootingResult:
 
 
 class MultipleShooting:
-    """多重打靶法（Multiple Shooting）修正器。
+    """Standard multiple-shooting corrector over patch points. / 多重打靶法（Multiple Shooting）修正器。
 
     将一条轨迹分为 N 个节点、n_seg = N-1 段弧段，对每段独立积分后，
     通过匹配相邻段端点状态来构建残差向量，再利用雅可比矩阵（含 STM）

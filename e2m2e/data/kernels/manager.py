@@ -151,7 +151,7 @@ def _call_rust_or_compat_error(
 
 
 class SPICEManager(EphemerisProvider):
-    """SPICE 内核管理器：SPICE 星历数据提供者实现。
+    """Wrapper around the NASA SPICE toolkit: ephemeris queries, time conversion, kernel management. / SPICE 内核管理器：SPICE 星历数据提供者实现。
 
     统一管理内核加载与天体状态查询：自动加载闰秒内核、提供星历查询接口
     （位置/状态）、时间格式转换（UTC ↔ ET）以及天体引力参数查询。
