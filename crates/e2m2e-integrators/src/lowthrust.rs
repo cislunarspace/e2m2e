@@ -274,6 +274,7 @@ pub fn lowthrust_shooting_evaluate_py(
 /// `levels[i]` 是第 i 条区间的推力百分比，只允许 0、60、100；
 /// `controls` 仍为每个节点的方向角 `(unused_throttle, theta1, theta2)`，
 /// 其中第一列会被忽略，避免把连续油门混入离散弧段模型。
+#[allow(clippy::too_many_arguments)]
 fn discrete_collocation_defects(
     states: &[Vec<f64>],
     controls: &[Vec<f64>],
@@ -368,7 +369,7 @@ pub fn lowthrust_discrete_collocation_defects_py(
             "states/controls/levels lengths must be N+1/N+1/N",
         ));
     }
-    if !(tf > t0) {
+    if tf <= t0 {
         return Err(pyo3::exceptions::PyValueError::new_err("tf must exceed t0"));
     }
     if levels.iter().any(|level| !matches!(level, 0 | 60 | 100)) {
