@@ -523,8 +523,9 @@ class LowThrustCollocation:
         return np.diff(times) - 3600.0
 
     def _fuel_objective_vt(self, z: npt.NDArray[np.floating], n_nodes: int) -> float:
-        """目标：最小化 -m_N。"""
-        return -float(z[7 * n_nodes + 6])
+        """目标：最小化 -m_N（最大化末态质量）。"""
+        states, _controls, _times = self._unpack_vt(z, n_nodes)
+        return -float(states[-1][6])
 
     def _build_solution_vt(
         self,
