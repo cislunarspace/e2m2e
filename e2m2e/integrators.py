@@ -41,7 +41,9 @@ if TYPE_CHECKING:
     lambert_izzo_py: Any
     low_energy_patch_py: Any
     lowthrust_collocation_defects_py: Any
+    lowthrust_discrete_collocation_defects_py: Any
     lowthrust_shooting_evaluate_py: Any
+    lowthrust_variable_time_collocation_defects_py: Any
     lissajous_bounded_trajectory_py: Any
     manifold_propagate_py: Any
     manifold_seeds_py: Any
@@ -138,7 +140,9 @@ _RUST_SYMBOLS = (
     "lambert_izzo_py",
     "low_energy_patch_py",
     "lowthrust_collocation_defects_py",
+    "lowthrust_discrete_collocation_defects_py",
     "lowthrust_shooting_evaluate_py",
+    "lowthrust_variable_time_collocation_defects_py",
     "lissajous_bounded_trajectory_py",
     "manifold_propagate_py",
     "manifold_seeds_py",
@@ -358,7 +362,9 @@ __all__ = [
     "lambert_izzo_py",
     "low_energy_patch_rust",
     "lowthrust_collocation_defects_py",
+    "lowthrust_discrete_collocation_defects_py",
     "lowthrust_shooting_evaluate_py",
+    "lowthrust_variable_time_collocation_defects_py",
     "lissajous_bounded_trajectory_py",
     "manifold_propagate_py",
     "manifold_seeds_py",

@@ -4213,6 +4213,16 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
         lowthrust::lowthrust_collocation_defects_py,
         m
     )?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(
+        lowthrust::lowthrust_discrete_collocation_defects_py,
+        m
+    )?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(
+        lowthrust::lowthrust_variable_time_collocation_defects_py,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(nsga2::nsga2_sort_py, m)?)?;
     m.add_function(wrap_pyfunction!(
         nsga2::nsga2_environmental_selection_py,
