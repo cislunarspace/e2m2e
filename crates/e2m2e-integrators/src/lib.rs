@@ -2173,8 +2173,7 @@ fn propagate_compiled_stm_py(
     state0.copy_from_slice(&initial_state);
 
     let result = propagate_compiled_stm_sens(
-        &forces, observer, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps, method,
-        &sens,
+        &forces, observer, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps, method, &sens,
     )
     .map_err(|e| {
         pyo3::exceptions::PyRuntimeError::new_err(format!("STM propagation failed: {}", e))
@@ -2283,15 +2282,7 @@ fn propagate_compiled_ias15_py(
     let result = py
         .allow_threads(|| {
             propagate_compiled_ias15(
-                &forces,
-                observer,
-                t_span,
-                &t_eval,
-                &state0,
-                tol,
-                max_step,
-                max_steps,
-                with_stm,
+                &forces, observer, t_span, &t_eval, &state0, tol, max_step, max_steps, with_stm,
                 &sens,
             )
         })
