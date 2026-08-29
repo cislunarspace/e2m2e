@@ -393,8 +393,7 @@ class TestThreadSafety:
     def test_concurrent_puts_are_serialized(self, store):
         """并发 put：RLock 串行化索引访问，全部记录可见。"""
         threads = [
-            threading.Thread(target=store.put, args=make_record(tags=[f"t{i}"]))
-            for i in range(8)
+            threading.Thread(target=store.put, args=make_record(tags=[f"t{i}"])) for i in range(8)
         ]
         for thread in threads:
             thread.start()
