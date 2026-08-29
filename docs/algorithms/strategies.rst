@@ -1,41 +1,46 @@
-微分修正策略
-============
+Correction Strategies
+=====================
 
-微分修正策略函数将配置逻辑与迭代求解器分离。每个策略返回一个不可变的
-``CorrectionConfig``，``DifferentialCorrection`` 接收配置后执行牛顿迭代。
+Strategy functions separate configuration logic from the iterative solver. Each
+strategy returns an immutable ``CorrectionConfig`` that
+``DifferentialCorrection`` consumes to run Newton iterations.
 
-策略函数
---------
+Strategy functions
+~~~~~~~~~~~~~~~~~~
 
-e2m2e 提供以下策略函数：
+Available strategies:
 
-**平面策略（2D 对称）：**
+**Planar (2D symmetric):**
 
-- ``symmetric_2d_fixed_x0`` — 固定 x0，调整 y_dot0 和半周期。适用于 Lyapunov、DRO。
-- ``symmetric_2d_fixed_t`` — 固定半周期，调整 x0 和 y_dot0。适用于固定周期轨道。
-- ``symmetric_2d_fixed_y0`` — 固定 y0，调整 x_dot0 和半周期。适用于共振轨道（RO）。
+- ``symmetric_2d_fixed_x0``: fix x0, adjust y_dot0 & half-period. For Lyapunov, DRO.
+- ``symmetric_2d_fixed_t``: fix half-period, adjust x0 & y_dot0. For fixed periods.
+- ``symmetric_2d_fixed_y0``: fix y0, adjust x_dot0 & half-period. For resonant orbits (RO).
 
-**空间策略（3D 对称）：**
+**Spatial (3D symmetric):**
 
-- ``symmetric_3d_fixed_x0`` — 固定 x0，调整 z0、y_dot0 和半周期。
-- ``symmetric_xz_fixed_x0`` — XZ 平面对称，固定 x0。
-- ``symmetric_xz_fixed_z0`` — XZ 平面对称，固定 z0。
-- ``axial_fixed_vz0`` — Axial 轨道（Gómez Type B 分岔），x 轴对称，固定 vz0，调整 x0、y_dot0 和半周期。
+- ``symmetric_3d_fixed_x0``: fix x0, adjust z0, y_dot0 & half-period.
+- ``symmetric_xz_fixed_x0``: XZ-symmetric, x0 fixed.
+- ``symmetric_xz_fixed_z0``: XZ-symmetric, z0 fixed.
+- ``axial_fixed_vz0``: Axial orbits (Gómez Type B); x-symmetric, vz0 fixed,
+  adjusting x0, y_dot0 & half-period.
 
-**Halo 专用策略：**
+**Halo-specific:**
 
-- ``halo_fixed_z0`` — 固定 z 振幅和平动点，调整 x0、y_dot0 和半周期。
-- ``halo_fixed_x0`` — 固定 x 坐标和平动点。
+- ``halo_fixed_z0``: fix z amplitude & libration point; adjust x0, y_dot0 &
+  half-period.
+- ``halo_fixed_x0``: fix x coordinate & libration point.
 
-**L4/L5 三角平动点策略（平面，无对称，全周期闭合）：**
+**L4/L5 triangular strategies (planar, no symmetry, full-period closure):**
 
-- ``spo_fixed_x0`` — L4/L5 短周期（SPO），固定 x0，调整 y0、vx0、vy0 和全周期。
-- ``lpo_fixed_x0`` — L4/L5 长周期（LPO），与 SPO 同框架（大振幅成员呈马蹄形）。
+- ``spo_fixed_x0``: L4/L5 short-period (SPO), x0 fixed; adjust y0, vx0, vy0 &
+  full period.
+- ``lpo_fixed_x0``: L4/L5 long-period (LPO), same framework as SPO
+  (large members are horseshoe-shaped).
 
 CorrectionConfig
-----------------
+~~~~~~~~~~~~~~~~
 
-``CorrectionConfig`` 是 ``frozen=True`` 的数据类：
+``CorrectionConfig`` is a frozen dataclass:
 
 .. code-block:: python
 
@@ -46,8 +51,8 @@ CorrectionConfig
    print(config.free_variables)      # ["x0", "y_dot0", "T_half"]
    print(config.target_conditions)   # {"y": 0.0, "x_dot": 0.0, "z_dot": 0.0}
 
-策略与修正器的协作
-------------------
+How strategies meet correctors
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: text
 
@@ -63,4 +68,4 @@ CorrectionConfig
                                                    │ (periodic)   │
                                                    └──────────────┘
 
-新增策略无需修改迭代器代码，配置可序列化、可对比、可测试。
+New strategies require no solver changes; configs serialize, compare, test.

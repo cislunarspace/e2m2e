@@ -1,84 +1,89 @@
-坐标系
-======
+Coordinate Frames
+=================
 
-e2m2e 的坐标系层负责位置、速度等矢量在不同参考框架之间的变换。
+The coordinate layer converts vectors (position, velocity, …) between reference
+frames.
 
-核心概念
---------
+Core concepts
+~~~~~~~~~~~~~
 
-- **Axes（坐标轴）** — 坐标系的"朝向"部分。给定历元 ``et``，返回旋转矩阵 ``R``，
-  使得 ``r_icrf = R @ r_axes``。
-- **Origin（原点）** — 坐标系的"位置"部分。``state(et)`` 返回原点在 ICRF/J2000 中的绝对状态。
-- **CoordinateSystem（坐标系）** — 一个 Axes 加一个 Origin 拼成的完整数学参考框架。
+- **Axes**: the orientation part of a frame. Given epoch ``et``, returns rotation
+  matrix ``R`` such that ``r_icrf = R @ r_axes``.
+- **Origin**: the position part. ``state(et)`` returns the origin's absolute
+  state in ICRF/J2000.
+- **CoordinateSystem**: a complete mathematical reference frame assembled from an
+  Axes plus an Origin.
 
 .. code-block:: python
 
    from e2m2e.algorithm.coordinate import CoordinateSystem, ICRSAxes, ITRFSpiceAxes, CelestialBodyOrigin
 
-   # ICRF 惯性系（地球中心）
+   # ICRF inertial frame, Earth-centered
    icrf = CoordinateSystem(
        axes=ICRSAxes(),
        origin=CelestialBodyOrigin(body="EARTH", spice=spice),
    )
 
-坐标系族位于 ``e2m2e.algorithm.coordinate`` 子包，上述类从该子包导入。
+Frame families live in the ``e2m2e.algorithm.coordinate`` subpackage — import
+from there.
 
-坐标轴类型
-----------
-
-e2m2e 提供多种坐标轴实现：
+Axes types
+~~~~~~~~~~
 
 .. list-table::
    :header-rows: 1
 
-   * - 类型
-     - 说明
-     - 用途
+   * - Type
+     - Description
+     - Use
    * - ``ICRSAxes``
-     - 惯性 ICRF 系（单位阵）
-     - 星历传播默认
+     - Inertial ICRF frame (identity)
+     - Ephemeris propagation default
    * - ``ITRFSpiceAxes``
-     - SPICE-backed 高精度 ITRF93（需加载 LSK/PCK 内核）
-     - 球谐引力场展开
+     - SPICE-backed high-precision ITRF93 (needs LSK/PCK kernels)
+     - Spherical-harmonics gravity expansion
    * - ``ITRFApproxAxes``
-     - 低精度 ITRF 近似
-     - 大气阻力计算
+     - Low-precision approximate ITRF
+     - Atmospheric drag
    * - ``VNBAxes``
-     - 动态坐标轴（速度-法向-副法向）
-     - 推力方向
+     - Dynamic axes (Velocity-Normal-Binormal)
+     - Thrust direction
    * - ``LVLHAxes``
-     - 动态坐标轴（当地垂直-当地水平）
-     - 轨道保持
+     - Dynamic axes (Local Vertical-Local Horizontal)
+     - Station keeping
 
-动态坐标轴
-----------
+Dynamic axes
+~~~~~~~~~~~~
 
-VNBAxes 和 LVLHAxes 是动态坐标轴——旋转矩阵不仅依赖历元，还依赖航天器瞬时状态。
-使用前必须先调用 ``update(et, state)`` 刷新内部方向缓存。
+VNBAxes and LVLHAxes are dynamic: rotation matrices depend on epoch *and* the
+spacecraft's instantaneous state. Call ``update(et, state)`` to refresh the
+internal direction cache before use.
 
-状态转换
---------
+State transformation
+~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   # 在不同坐标系间转换状态
+   # Transform states between frames
    state_itrf = icrf.transform_state(
        state_j2000, from_cs=j2000_cs, to_cs=itrf_cs, et=et
    )
 
-   # 转换向量（不含原点平移）
+   # Transform vectors (no origin translation)
    accel_j2000 = icrf.transform_vector(
        accel_itrf, from_cs=itrf_cs, to_cs=j2000_cs, et=et
    )
 
-坐标系与单位
-------------
+Frames and units
+~~~~~~~~~~~~~~~~
 
-同一坐标系中的状态可用不同单位系统表示。``UnitSystem`` 枚举标识数值的量纲：
+States in one frame may be expressed in different unit systems. The
+``UnitSystem`` enum tags dimensionality:
 
-- ``DIMENSIONLESS`` — 无量纲单位（DU, TU, VU）
-- ``SI`` — 国际单位制（km, s, km/s）
+- ``DIMENSIONLESS``: nondimensional units (DU, TU, VU)
+- ``SI``: SI (km, s, km/s)
 
-``Orbit`` 状态由绑定的 ``System`` 解释：``frame`` 与 ``unit_system`` 由
-``System`` 基类定义，分别标识参考系与量纲；坐标变换由 ``CoordinateSystem``
-对象完成（星历系统可持有一个默认 ``coordinate_system``）。
+``Orbit`` states are interpreted by the bound ``System``: ``frame`` and
+``unit_system`` come from the ``System`` base, tagging reference frame and
+dimensions; conversions run through ``CoordinateSystem`` objects (an ephemeris
+system may hold a default ``coordinate_system``).

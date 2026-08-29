@@ -1,8 +1,9 @@
-//! CR3BP Hamiltonian 与 e2m2e-forces 解析动力学的对拍（issue #497 验收：
+//! CR3BP Hamiltonian 与 e2m2e-forces 解析动力学的对拍（验收：
 //! 零控向量场与 propagate_cr3bp_py 所用 CR3BP 动力学逐点一致）。
 //!
 //! propagate_cr3bp_py 的动力学内核是 e2m2e-forces 的 `cr3bp_eom`
-//! （6 维，含 z 方向）。平面模型应与其 z = vz = 0 截面逐位一致。
+//! （6 维，含 z 方向）。平面模型应与其 z = vz = 0 截面在舍入误差量级内一致
+//! （两实现浮点运算次序不同，不做逐位相等假设）。
 
 use e2m2e_forces::cr3bp::{cr3bp_eom, propagate_cr3bp};
 use e2m2e_hjb_dynamics::Cr3bpSynodic;
@@ -30,8 +31,13 @@ fn vector_field_matches_cr3bp_eom_planar_slice() {
         let f6 = cr3bp_eom(MU_EARTH_MOON, &state6);
         let planar6 = [f6[0], f6[1], f6[3], f6[4]];
         for d in 0..4 {
+            // 两实现公式相同，但浮点运算次序不同（x1*x1 对 powi(2)、r³ 连乘
+            // 对 powi(3)），允许 ulp 级相对差。纯 atol=1e-14 在 |f|≈68 的维
+            // 度相当于要求逐位相等（1 ulp ≈ 7e-15），超出跨实现运算次序差异
+            // 所能保证的精度，故按参考值幅值缩放容差。
+            let tol = 1e-14 * planar6[d].abs().max(1.0);
             assert!(
-                (f4[d] - planar6[d]).abs() < 1e-14,
+                (f4[d] - planar6[d]).abs() <= tol,
                 "状态 {state4:?} 第 {d} 维：{} vs {}",
                 f4[d],
                 planar6[d]
@@ -54,7 +60,7 @@ fn vector_field_parity_across_mu() {
     }
 }
 
-/// 无控轨迹对拍（issue #497 验收：轨道周期对照）。同一初值传播一个会合
+/// 无控轨迹对拍（验收：轨道周期对照）。同一初值传播一个会合
 /// 周期 2π：本 crate 四维向量场用固定步长 RK4 积分，参考为
 /// propagate_cr3bp（PD78 自适应，传播器实际使用的动力学路径），
 /// 末态应一致。
@@ -148,7 +154,7 @@ fn to_x_axis_crossing(
     None
 }
 
-/// 真周期轨道的周期对照（issue #497 验收）。镜像对称打靶：x 轴初值
+/// 真周期轨道的周期对照。镜像对称打靶：x 轴初值
 /// (x0, 0, 0, vy0)，扫描加二分调整 vy0 使下一次过 x 轴时 vx = 0，
 /// 得周期 T = 2τ（镜像定理）。随后以同初值用 propagate_cr3bp（PD78）
 /// 传播 T，应回到初态——同时验证本 crate 动力学的轨道周期与传播器一致。

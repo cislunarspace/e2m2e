@@ -1,6 +1,6 @@
 """静态门控：禁止 e2m2e 生产代码绕过 ``SPICEManager`` 直接调 furnsh/unload。
 
-背景（issue #334）：Python（spiceypy）与 Rust（cspice-sys）是两个独立 CSPICE
+背景：Python（spiceypy）与 Rust（cspice-sys）是两个独立 CSPICE
 实例，内核池互不共享。``SPICEManager.load_kernel`` 是唯一在两侧同时 furnsh 的
 公开入口；任何直接调 ``spiceypy.furnsh``/``spiceypy.unload`` 的生产路径都会让
 Rust 实例内核池为空，下沉到 Rust 的力模型查询会报晦涩错误或杀进程。
@@ -48,7 +48,9 @@ def _iter_python_files(root: str):
         for name in filenames:
             if name.endswith(".py"):
                 abs_path = os.path.join(dirpath, name)
-                yield os.path.relpath(abs_path, root)
+                # 统一为 POSIX 分隔符：白名单按 POSIX 路径登记，Windows 的
+                # os.path.relpath 产出反斜杠，直接比对永不命中。
+                yield os.path.relpath(abs_path, root).replace(os.sep, "/")
 
 
 def test_no_furnsh_unload_bypass_in_production_code():
@@ -67,5 +69,5 @@ def test_no_furnsh_unload_bypass_in_production_code():
 
     assert not violations, (
         "发现绕过 SPICEManager 的直接 furnsh/unload 调用（应改走 "
-        "SPICEManager.load_kernel / unload_kernel，见 issue #334）：\n" + "\n".join(violations)
+        "SPICEManager.load_kernel / unload_kernel）：\n" + "\n".join(violations)
     )

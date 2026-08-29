@@ -1,8 +1,8 @@
 ---
-title: 收敛状态机
+title: Convergence State Machine
 ---
 
-# 收敛状态机
+# Convergence State Machine
 
 ```mermaid
 stateDiagram-v2

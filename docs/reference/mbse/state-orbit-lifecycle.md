@@ -1,8 +1,8 @@
 ---
-title: 轨道生命周期状态机
+title: Orbit Lifecycle State Machine
 ---
 
-# 轨道生命周期状态机
+# Orbit Lifecycle State Machine
 
 ```mermaid
 stateDiagram-v2

@@ -1,13 +1,15 @@
-Halo 轨道族编排
-===============
+Halo Family Orchestration
+=========================
 
-Halo 轨道族编排模块（``e2m2e.algorithm.family.halo_family``）从 ``continuation.py`` 拆出
-Halo 专用逻辑：种子生成、自然参数族延拓、伪弧长延拓。
+The Halo family orchestration module (``e2m2e.algorithm.family.halo_family``)
+split Halo-specific logic out of ``continuation.py``: seed generation, natural-
+parameter family continuation, pseudo-arclength continuation.
 
-种子生成
---------
+Seed generation
+~~~~~~~~~~~~~~~
 
-``generate_halo_seed_orbit()`` 从延拓器实例出发，生成一条 Halo 种子轨道：
+``generate_halo_seed_orbit()`` grows one Halo seed orbit from a continuation
+instance:
 
 .. code-block:: python
 
@@ -16,39 +18,41 @@ Halo 专用逻辑：种子生成、自然参数族延拓、伪弧长延拓。
    seed = generate_halo_seed_orbit(
        continuation=continuation,
        libration_point=1,
-       amplitude_z=0.001,   # 种子宜取小振幅（Richardson 近似精度高），由延拓放大
+       amplitude_z=0.001,   # seeds should be small-amplitude (Richardson's accuracy is best there); continuation amplifies
        halo_class=0,
    )
 
-参数说明：
+Parameters:
 
-- ``continuation`` — ``Continuation`` 实例
-- ``libration_point`` — 平动点编号（1 或 2）
-- ``amplitude_z`` — z 方向振幅
-- ``halo_class`` — Halo 族分支（0=北族，1=南族）
+- ``continuation``: a ``Continuation`` instance
+- ``libration_point``: point number (1 or 2)
+- ``amplitude_z``: z-direction amplitude
+- ``halo_class``: branch (0=northern, 1=southern)
 
-轨道族生成
-----------
+Family generation
+~~~~~~~~~~~~~~~~~
 
-``generate_halo_family()`` 从种子轨道出发，沿 z 振幅方向自然延拓生成轨道族：
+``generate_halo_family()`` continues naturally along z-amplitude from the seed:
 
 .. code-block:: python
 
    family = continuation.generate_halo_family(
        seed_orbit=seed,
        n_orbits=50,
-       z_range=(0.001, 0.15),   # z 振幅范围
+       z_range=(0.001, 0.15),   # z-amplitude range
    )
 
-   print(f"生成 {len(family)} 条 Halo 轨道")
+   print(f"Generated {len(family)} Halo orbits")
 
-内部流程：以上一条收敛轨道为初值，固定目标 z0 逐点微分修正，
-逐步推进到 ``z_range`` 边界；修正失败时缩减步长重试，触底即终止。
+Internals: each converged orbit seeds the next, fixing target z0 for pointwise
+correction while stepping toward the ``z_range`` boundary; failed corrections
+shrink the step and retry, terminating when the floor is hit.
 
-伪弧长延拓
-----------
+Pseudo-arclength continuation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-对于参数-振幅关系非单调的 Halo 族（如振幅先增后减），使用伪弧长延拓：
+For non-monotonic parameter–amplitude Halo branches (amplitude rising then
+falling), use pseudo-arclength:
 
 .. code-block:: python
 
@@ -57,9 +61,9 @@ Halo 专用逻辑：种子生成、自然参数族延拓、伪弧长延拓。
    family = halo_pseudo_arclength_continuation(
        continuation=continuation,
        seed_orbit=seed,
-       n_orbits=50,               # 每支生成的新轨道条数
-       direction="both",          # 双侧延拓
-       step_size=0.0045,          # 伪弧长步长 ΔS
+       n_orbits=50,               # new members per branch
+       direction="both",          # both sides
+       step_size=0.0045,          # pseudo-arclength step ΔS
    )
 
-返回 ``OrbitFamily`` 对象，包含种子轨道与各延拓支的新轨道。
+Returns an ``OrbitFamily`` containing the seed plus each branch's new members.

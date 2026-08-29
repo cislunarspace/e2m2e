@@ -1,60 +1,66 @@
-轨道
-====
+Orbits
+======
 
-e2m2e 的轨道数据结构。
+The orbit data structures of e2m2e.
 
-Orbit 类
---------
+The Orbit class
+~~~~~~~~~~~~~~~
 
-:class:`~e2m2e.data.types.orbit.Orbit` 是轨道数据容器，存储状态序列与时间序列。
+:class:`~e2m2e.data.types.orbit.Orbit` is the orbit data container holding
+state and time series.
 
-**核心属性：**
+**Core attributes:**
 
-- ``states`` — 状态序列 ``[x, y, z, vx, vy, vz]``，形状 ``(n_points, 6)``
-- ``times`` — 时间序列，形状 ``(n_points,)``
-- ``system`` — 关联的系统对象（``CR3BP_System`` 或 ``EphemerisSystem``）
-- ``family_type`` / ``parameters`` — 轨道族类型与连续参数（由延拓等外部算法填充）
-- ``metadata`` — 元数据字典（创建时间、来源、描述、标签）
+- ``states``: state series ``[x, y, z, vx, vy, vz]``, shape ``(n_points, 6)``
+- ``times``: time series, shape ``(n_points,)``
+- ``system``: the associated system object (``CR3BP_System`` or
+  ``EphemerisSystem``)
+- ``family_type`` / ``parameters``: family type & continuation parameter
+  (filled by external algorithms such as continuation)
+- ``metadata``: metadata dict (creation time, origin, description, tags)
 
 .. code-block:: python
 
    from e2m2e.data.types.orbit import Orbit
    import numpy as np
 
-   # 从状态序列创建
+   # Create from a state series
    orbit = Orbit(
        states=np.array([[0.8, 0, 0, 0, 0.6, 0]]),
        times=np.array([0.0]),
        system=system,
    )
 
-**基本属性：**
+**Basic properties:**
 
-``Orbit.__init__`` 末尾调用 ``compute_basic_properties()``，构造时即自动估计
-``period``（x 方向零交叉检测），并计算 ``amplitudes``、``extrema``、
-``mean_state``、``center``、``is_periodic``、``periodicity_error``——这些字段
-在 ``__init__`` 中显式声明，经 property 代理访问。微分修正的结果写入预声明的
-``correction_*`` 字段（默认 ``None``）。Jacobi 常数、稳定性仍由外部算法按需计算。
+``Orbit.__init__`` ends with ``compute_basic_properties()``, automatically
+estimating ``period`` at construction (x-axis zero-crossing detection) and
+computing ``amplitudes``, ``extrema``, ``mean_state``, ``center``,
+``is_periodic``, ``periodicity_error`` — fields declared explicitly in
+``__init__``, exposed via property proxies. Differential-correction results go
+into pre-declared ``correction_*`` fields (default ``None``). Jacobi constants
+and stability remain on-demand computations by external algorithms.
 
-**序列化：**
+**Serialization:**
 
 .. code-block:: python
 
-   # 保存到 JSON
+   # Save to JSON
    orbit.save_to_file("my_orbit.json")
 
-   # 从 JSON 加载
+   # Load from JSON
    orbit2 = Orbit.load_from_file("my_orbit.json", system=system)
 
-轨道族 (OrbitFamily)
----------------------
+Orbit families (OrbitFamily)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-同类型、由连续参数（如 Jacobi 常数、振幅）索引的一组 ``Orbit`` 集合。
-轨道族是延拓的结果，不是生成它的方法。
+A set of same-type ``Orbit``\ s indexed by continuous parameters (Jacobi
+constant, amplitude…). A family is the *result* of continuation, not the method
+generating it.
 
 .. code-block:: python
 
-   # 延拓返回轨道族
+   # Continuation returns a family
    from e2m2e.algorithm.solver import Continuation
 
    continuation = Continuation(corrector=corrector)
@@ -64,37 +70,37 @@ Orbit 类
        step_size=0.005,
    )
 
-   # 遍历族内轨道（族在 result.family，OrbitFamily 可迭代）
+   # Iterate orbits in the family (the family lives at result.family; OrbitFamily is iterable)
    for orbit in result.family:
-       print(f"周期: {orbit.period:.6f}")
+       print(f"Period: {orbit.period:.6f}")
 
-CR3BP 周期轨道族类型
---------------------
+CR3BP periodic family types
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. list-table::
    :header-rows: 1
 
-   * - 族名
-     - 相关平动点
-     - 物理特征
+   * - Family
+     - Related libration point
+     - Physical character
    * - Lyapunov
      - L1, L2, L3
-     - 平面周期轨道
+     - Planar periodic orbits
    * - Halo
      - L1, L2
-     - 三维周期轨道
+     - Three-dimensional periodic orbits
    * - Vertical
      - L1–L5
-     - 垂直方向振荡
+     - Out-of-plane oscillations
    * - Butterfly
      - L1, L2
-     - 连接两个共线平动点的对称轨道
+     - Symmetric orbits joining two collinear points
    * - Dragonfly
      - L1, L2
-     - 连接两个共线平动点的非对称轨道
+     - Asymmetric orbits joining two collinear points
    * - DRO
      - secondary
-     - 远程逆行轨道
+     - Distant retrograde orbits
    * - RO
-     - 全系统
-     - 满足 m:n 共振比例的周期轨道
+     - whole system
+     - Periodic orbits satisfying m:n resonance ratios

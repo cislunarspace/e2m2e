@@ -3,6 +3,8 @@
 //! 纯数学积分器（Butcher 表、RK/ABM/Cowell、solve_ivp）在
 //! `e2m2e-propagation` crate，力模型在 `e2m2e-forces`，SPICE FFI 在
 //! `e2m2e-spice`；本 crate 只做 PyO3 绑定与 shooting 算法。
+//!
+//! 仓库全貌与一条任务链的走读见 README 的仓库怎么读一节。
 
 use pyo3::prelude::*;
 #[cfg(feature = "spice")]
@@ -16,8 +18,6 @@ pub mod family;
 pub mod family_generation;
 #[cfg(feature = "spice")]
 pub mod frame_convert;
-#[cfg(feature = "spice")]
-pub mod homotopy;
 
 pub mod hjb;
 #[cfg(feature = "spice")]
@@ -120,7 +120,7 @@ fn call_python_rhs(f: &Bound<PyAny>, n: usize, t: f64, y: &[f64]) -> PyResult<Ve
 /// 执行一次显式 Runge-Kutta 单步。
 ///
 /// ``state_error_dim`` ：步长误差控制只统计前 N 维（``None`` 时统计全部）。
-/// 用于 STM 增广传播——物理状态占前 6 维，STM 展平占后 36 维，后者不应
+/// 用于 STM 增广传播：物理状态占前 6 维，STM 展平占后 36 维，后者不应
 /// 主导步长控制。
 #[pyfunction]
 #[pyo3(signature = (method, t, y, h, tol, f, state_error_dim=None))]
@@ -328,58 +328,58 @@ const fn parse_abi_version(s: &str) -> u32 {
 
 /// 从 abi-version.txt 读取（单一来源），build.rs 同步生成 Python 侧 _rust_abi.py。
 ///
-/// # 版本沿革（issue #317 第 3.3 项）
+/// # 版本沿革
 ///
 /// abi-version 只在**新增/改 pyfunction 边界** 时 bump（Rust 内部函数签名
-/// 变更不 bump——它们不是 Python 可见的 ABI）。每次 bump 须在本节补行：
+/// 变更不 bump（它们不是 Python 可见的 ABI）。每次 bump 须在本节补行：
 ///
-/// - **v1** （#300，5b616cc）：初始 ABI 版本戳 + 统一网关 ``_check_rust_abi`` 。
+/// - **v1**（5b616cc）：初始 ABI 版本戳 + 统一网关 ``_check_rust_abi`` 。
 /// - **v2** （3b28353）：新增 ``propagate_with_state_py`` （EphemerisDynamics
 ///   纯状态 Rust 路径）。
 /// - **v3** （ff63403）：新增 ``transfer_grid_search_serial_py`` +
 ///   ``TransferPointResult`` pyclass（转移网格搜索串行评估）。
-/// - **v4** （#334）：新增 ``spice_spkezr`` + ``spice_pxform`` （Rust CSPICE
+/// - **v4**：新增 ``spice_spkezr`` + ``spice_pxform`` （Rust CSPICE
 ///   实例诊断查询 API）。
 /// - **v5**：多重与分段打靶结果将公开 ``converged`` 替换为
 ///   ``status`` / ``cause`` / ``message`` 三元组。
-/// - **v6** （#400，606847c）：新增 ``propagate_segments_py`` （分段打靶逐段
+/// - **v6**（606847c）：新增 ``propagate_segments_py`` （分段打靶逐段
 ///   积分下沉）与 ``frame_convert`` 批量入口（坐标/历元/星历批量转换）。
-/// - **v7** （#443）：新增 ``pal_f_df_tangent_py`` + ``pal_newton_step_py``
+/// - **v7**：新增 ``pal_f_df_tangent_py`` + ``pal_newton_step_py``
 ///   （伪弧长延拓数值内核：F/dF/切向量计算与 PAL 牛顿迭代）。
-/// - **v8** （#451）：新增 ``planar_full_period_pal_py`` 与
+/// - **v8**：新增 ``planar_full_period_pal_py`` 与
 ///   ``PlanarPalRustResult`` ，为 SPO/LPO 平面全周期伪弧长延拓提供 Rust
-///   数值内核；与 #443 合并后统一递增 ABI。
-/// - **v9** （#442）：新增 ``qlaw_propagate_py`` 与
+///   数值内核。
+/// - **v9**：新增 ``qlaw_propagate_py`` 与
 ///   ``qlaw_segment_direction_py`` （Q-law 低推力初猜的反馈积分与 Q 函数
 ///   评估内核）。
-/// - **v10** （#444）：新增 ``nsga2_*_py`` （NSGA-II 约束排序、选择、
+/// - **v10**：新增 ``nsga2_*_py`` （NSGA-II 约束排序、选择、
 ///   SBX 交叉与多项式变异算子）。
-/// - **v11** （#445）：新增低推力打靶批量评估与配点缺陷批量评估入口，
+/// - **v11**：新增低推力打靶批量评估与配点缺陷批量评估入口，
 ///   将低推力直接法的重复数值评估下沉 Rust。
-/// - **v12** （#447）：新增 WSB 三维网格搜索与低能转移流形截面态配对入口。
-/// - **v13** （#441）：新增 ``differential_correction_cr3bp_py`` ，将 CR3BP
+/// - **v12**：新增 WSB 三维网格搜索与低能转移流形截面态配对入口。
+/// - **v13**：新增 ``differential_correction_cr3bp_py`` ，将 CR3BP
 ///   单段微分修正的残差、雅可比、Newton 修正与收敛状态机下沉 Rust。
-/// - **v14** （#428）：新增 ``collinear_center_modes_py`` 、
+/// - **v14**：新增 ``collinear_center_modes_py`` 、
 ///   ``lissajous_bounded_trajectory_py`` 与 ``orbit_family_metric_py`` ，将
 ///   Lissajous 中心模态轨迹和族几何度量下沉 Rust。
-/// - **v15** （#428）：新增 ``generate_cr3bp_family_py`` ，将七类轨道族的
+/// - **v15**：新增 ``generate_cr3bp_family_py`` ，将七类轨道族的
 ///   种子、延拓、筛选与结构化终止收进单次 Rust 调用。
-/// - **v16** （#448）：新增 ``manifold_seeds_py`` 与 ``manifold_propagate_py`` ，
+/// - **v16**：新增 ``manifold_seeds_py`` 与 ``manifold_propagate_py`` ，
 ///   将不变流形种子生成与批量传播调度下沉 Rust。
-/// - **v17** （#464）：新增 ``poly_poisson_py`` / ``poly_simplify_py`` /
+/// - **v17**：新增 ``poly_poisson_py`` / ``poly_simplify_py`` /
 ///   ``polylist_simplify_py`` / ``keys_by_order_py`` / ``trim_degree_py`` ，
 ///   将 normal_form 数值多项式核完整下沉 Rust。
-/// - **v18** （#465）：新增 ``qf_to_cm_py`` 与 ``cm_to_qf_py`` ，将 QF↔CM
-///   高阶 Lie 流（12 实维分裂复积分）下沉 Rust，关闭 #336 复值积分例外。
-/// - **v19** （#466）：新增 ``center_manifold_reduce_py`` ，将中心流形两步
+/// - **v18**：新增 ``qf_to_cm_py`` 与 ``cm_to_qf_py`` ，将 QF↔CM
+///   高阶 Lie 流（12 实维分裂复积分）下沉 Rust，关闭复值积分例外。
+/// - **v19**：新增 ``center_manifold_reduce_py`` ，将中心流形两步
 ///   Lie 同调化简（频域 W、Poisson 链、虚/实基底变换）完整下沉 Rust。
-/// - **v20** （#476）：新增 ``generate_cr3bp_family_windows_py`` ，按 Jacobi
+/// - **v20**：新增 ``generate_cr3bp_family_windows_py`` ，按 Jacobi
 ///   能量窗口批量生成轨道族（延拓 trace 只走一次，各窗口分别筛选成员）。
-/// - **v21** （#497）：新增 ``solve_hjb_py`` （HJB 结构网格求解通用入口，
+/// - **v21**：新增 ``solve_hjb_py`` （HJB 结构网格求解通用入口，
 ///   动力学标识 + 参数表）与 ``solve_planar_lowthrust_hjb_py`` （geo-nrho
 ///   既有签名的兼容包装）。
 ///
-/// 「1→3 跳号」实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
+/// 1→3 跳号实为 1→2→3 两次单步 bump，分别在上述两 commit；不存在跳过的
 /// 中间版本。ADR 0018 记录的 ∂a/∂v 雅可比接口扩是 Rust 内部签名变更，未 bump。
 const RUST_PY_ABI: u32 = parse_abi_version(include_str!("../abi-version.txt"));
 
@@ -731,7 +731,7 @@ pub(crate) fn ensure_bodies_registered() {
 ///
 /// 同时在首次加载时把行星名注册到质心/本体 ID（`register_bodies` ），使本
 /// 实例对 "MARS"/"JUPITER" 等的解析与 Python spiceypy 实例（那边在
-/// manager.load_kernel 里 boddef）以及 DFH 一致——否则 CSPICE 默认表会把
+/// manager.load_kernel 里 boddef）以及 DFH 一致，否则 CSPICE 默认表会把
 /// "MARS" 解析成不存在的本体 499。
 #[cfg(feature = "spice")]
 #[pyfunction]
@@ -757,7 +757,7 @@ static LOADED_KERNELS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec
 ///
 /// Rust cspice 与 Python spiceypy 独立（见 [`spice_furnsh`] 文档）。
 /// `SPICEManager.load_kernel` 双 furnsh，卸载必须对称：否则 Rust 内核池残留
-/// 已卸载文件，测试结果依赖同进程执行顺序（issue #387）。只卸载清单中
+/// 已卸载文件，测试结果依赖同进程执行顺序。只卸载清单中
 /// 确已加载的文件，其余静默跳过（保持幂等语义）。
 #[cfg(feature = "spice")]
 #[pyfunction]
@@ -810,7 +810,7 @@ fn spice_pxform(from: &str, to: &str, et: f64) -> PyResult<Vec<Vec<f64>>> {
 /// 第三体摄动加速度（含直接项 + 间接项）。
 ///
 /// 移植自 Python `ThirdBodyGravity.compute_acceleration` 。一次调用完成
-/// "cspice 查扰动体位置 + 加速度公式"，消除 Python↔cspice 跨界 + numpy
+/// cspice 查扰动体位置 + 加速度公式，消除 Python↔cspice 跨界 + numpy
 /// 数组分配开销。
 ///
 /// # 参数
@@ -1271,7 +1271,7 @@ pub(crate) fn parse_force_tuple(
 ///
 /// 与唯一使用者 `propagate_compiled` 同步 cfg：无 spice feature 时该函数被
 /// 编译期剔除，alias 须一并剔除，否则 `cargo clippy --workspace` （默认无 spice）
-/// 报 dead_code（#318 CI）。
+/// 报 dead_code。
 #[cfg(feature = "spice")]
 type CompiledPropResult = (Vec<f64>, Vec<Vec<f64>>, usize, usize, usize);
 
@@ -1279,7 +1279,7 @@ type CompiledPropResult = (Vec<f64>, Vec<Vec<f64>>, usize, usize, usize);
 ///
 /// 无 Python 对象交互（力模型序列已解析为 [`CompiledForce`]），可安全置于
 /// `allow_threads` 区并 rayon 并发。输出语义：``t_eval`` 逐点对应输出
-/// （``t_eval[0]≈t0`` 时含初值；不追加 t_span 终点——追加是 Python 侧
+/// （``t_eval[0]≈t0`` 时含初值；不追加 t_span 终点，追加是 Python 侧
 /// ``ForceModel._prepare_t_eval`` 的行为）。
 #[cfg(feature = "spice")]
 #[allow(clippy::too_many_arguments)]
@@ -1302,8 +1302,6 @@ fn propagate_compiled_core(
     // 输出起点跟随 t_eval：当 t_eval[0]==t0 时记录初始状态、eval_idx 从 1 起步；
     // 当 t_eval[0]>t0（逐段积分常态：patch point 时刻非整数小时，et_grid 整数
     // 小时点严格大于 t0）时不预设 t0 到输出，eval_idx 从 0 起步由循环匹配。
-    // 此前硬编码 vec![t0] + eval_idx=1 假设 t_eval[0]==t0，导致 t_eval[0]>t0
-    // 时首个输出点状态错置为初值、与后续点错位。
     let mut times: Vec<f64> = Vec::with_capacity(t_eval.len());
     let mut states: Vec<Vec<f64>> = Vec::with_capacity(t_eval.len());
     let mut eval_idx = 0usize;
@@ -1323,8 +1321,7 @@ fn propagate_compiled_core(
     while t < t_eval[t_eval.len() - 1] && n_steps < max_steps {
         n_steps += 1;
         // 限制步长不超过下一个评估点（提高 t_eval 命中率），且不超过
-        // h_init（作为最大步长：稀疏 t_eval 下自适应步长失控，实测
-        // 2 点 vs 31 点网格的 30 天结果差 22 万 km）
+        // h_init（作为最大步长：稀疏 t_eval 下自适应步长失控）
         let t_final = t_eval[t_eval.len() - 1];
         let mut t_next = if eval_idx < t_eval.len() {
             t_eval[eval_idx]
@@ -1443,7 +1440,7 @@ fn propagate_compiled(
 
     // 主积分循环包进 py.allow_threads 释放 GIL：compiled 力模型为纯 Rust
     // （compute_total_acceleration 不回调 Python，cspice 走 FFI），与
-    // multiple_shooting_correct / transfer_grid_search 路径同理（#318）。
+    // multiple_shooting_correct / transfer_grid_search 路径同理。
     // 释 GIL 段（闭包内）：RK 主循环 + 每步 compute_total_acceleration；
     // 持 GIL 段（闭包外）：上面的 force 元组解析 + 下面的 PyDict 返回构造。
     // 闭包内不构造 PyErr（不借 Python 对象），仅回传 String，闭包外 map_err 转 PyErr。
@@ -1465,7 +1462,7 @@ fn propagate_compiled(
     Ok(dict.into())
 }
 
-/// 多段并发积分（segmented 逐段积分填 et_grid 用，issue #400 性能下沉）。
+/// 多段并发积分（segmented 逐段积分填 et_grid 用）。
 ///
 /// 每段从 ``seg_states[i]`` 积分到 ``seg_t1[i]`` ，输出 ``t_eval_list[i]``
 /// 逐点对应的状态序列（不追加段终点，语义同 `propagate_compiled_core` ）。
@@ -1657,7 +1654,6 @@ fn propagate_compiled_lowthrust(
     let mut h = h_init;
     // 输出起点跟随 t_eval：当 t_eval[0]==t0 时记录初值、eval_idx 从 1 起步；
     // 否则（逐段积分常态）不预设 t0 到输出、eval_idx 从 0 起步由循环匹配。
-    // 与 propagate_compiled 同源 bug 修复对齐（此前硬编码 vec![t0] + eval_idx=1）。
     let mut times: Vec<f64> = Vec::with_capacity(t_eval.len());
     let mut states: Vec<Vec<f64>> = Vec::with_capacity(t_eval.len());
     let mut eval_idx = 0usize;
@@ -1851,8 +1847,7 @@ fn propagate_compiled_lowthrust_sensitivity(
 
     // 记录落在 t_eval 的点。输出起点跟随 t_eval：当 t_eval[0]==t0 时记录初值
     // （含 Φ=I₆、S=0）、eval_idx 从 1 起步；否则（逐段积分常态）不预设 t0 到
-    // 输出、eval_idx 从 0 起步由循环匹配。与 propagate_compiled 同源 bug 修复
-    // 对齐（此前硬编码 vec![t0] + eval_idx=1）。
+    // 输出、eval_idx 从 0 起步由循环匹配。
     let mut eval_idx = 0usize;
     let mut times: Vec<f64> = Vec::with_capacity(t_eval.len());
     let mut states: Vec<Vec<f64>> = Vec::with_capacity(t_eval.len());
@@ -2126,13 +2121,18 @@ fn propagate_with_state_py(
 /// - ``rtol``, ``atol``: 积分容差
 /// - ``max_step``: 最大步长（秒），``None`` 则不限制
 /// - ``max_steps``: 最大步数，``None`` 则用默认上限
+/// - ``sens_params``: 可选，``[(force_index, "cr"|"cd"), ...]`` 参数敏感列。
+///   ``force_index`` 是 ``forces_py`` 中的下标；每条参数追加
+///   ``∂[r,v]/∂p`` 敏感列（ASSIST 式一阶变分方程）。
 ///
 /// **返回**
 ///
-/// Python dict：``{"states": [[6], ...], "stm": [[36], ...], "time": [...], "n_steps": int, "n_rejected": int}``
+/// Python dict：``{"states": [[6], ...], "stm": [[36], ...], "time": [...],
+/// "n_steps": int, "n_rejected": int}``；带 ``sens_params`` 时额外含
+/// ``"sensitivity": [[6·n_params], ...]``（列序同 ``sens_params``）。
 #[cfg(feature = "spice")]
 #[pyfunction]
-#[pyo3(signature = (observer, forces_py, t_span, t_eval, initial_state, rtol, atol, max_step=None, max_steps=None, method=RkMethod::Pd78))]
+#[pyo3(signature = (observer, forces_py, t_span, t_eval, initial_state, rtol, atol, max_step=None, max_steps=None, method=RkMethod::Pd78, sens_params=None))]
 #[allow(clippy::too_many_arguments)]
 fn propagate_compiled_stm_py(
     observer: &str,
@@ -2145,10 +2145,11 @@ fn propagate_compiled_stm_py(
     max_step: Option<f64>,
     max_steps: Option<usize>,
     method: RkMethod,
+    sens_params: Option<Vec<(usize, String)>>,
     py: Python<'_>,
 ) -> PyResult<PyObject> {
     use e2m2e_forces::forces::compiled::CompiledForce;
-    use e2m2e_forces::forces::compiled_stm::propagate_compiled_stm;
+    use e2m2e_forces::forces::compiled_stm::propagate_compiled_stm_sens;
 
     if initial_state.len() != 6 {
         return Err(pyo3::exceptions::PyValueError::new_err(format!(
@@ -2166,12 +2167,13 @@ fn propagate_compiled_stm_py(
     for item in forces_py.iter() {
         forces.push(parse_force_tuple(&item)?);
     }
+    let sens = parse_sens_params(sens_params, forces.len())?;
 
     let mut state0 = [0.0_f64; 6];
     state0.copy_from_slice(&initial_state);
 
-    let result = propagate_compiled_stm(
-        &forces, observer, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps, method,
+    let result = propagate_compiled_stm_sens(
+        &forces, observer, t_span, &t_eval, &state0, rtol, atol, max_step, max_steps, method, &sens,
     )
     .map_err(|e| {
         pyo3::exceptions::PyRuntimeError::new_err(format!("STM propagation failed: {}", e))
@@ -2186,6 +2188,122 @@ fn propagate_compiled_stm_py(
     dict.set_item("time", result.times)?;
     dict.set_item("n_steps", result.n_steps)?;
     dict.set_item("n_rejected", result.n_rejected)?;
+    if !sens.is_empty() {
+        dict.set_item("sensitivity", result.sensitivities)?;
+    }
+    Ok(dict.into())
+}
+
+/// 解析 ``sens_params`` 为 ``(force_index, SensParam)`` 列表。
+#[cfg(feature = "spice")]
+fn parse_sens_params(
+    sens_params: Option<Vec<(usize, String)>>,
+    n_forces: usize,
+) -> PyResult<Vec<(usize, e2m2e_forces::forces::compiled::SensParam)>> {
+    use e2m2e_forces::forces::compiled::SensParam;
+    let mut out = Vec::new();
+    for (force_idx, kind) in sens_params.unwrap_or_default() {
+        if force_idx >= n_forces {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "sens_params force index {force_idx} out of range ({n_forces} forces)"
+            )));
+        }
+        let param = SensParam::parse(&kind).ok_or_else(|| {
+            pyo3::exceptions::PyValueError::new_err(format!(
+                "unknown sensitivity parameter {kind:?} (valid: \"cr\", \"cd\")"
+            ))
+        })?;
+        out.push((force_idx, param));
+    }
+    Ok(out)
+}
+
+/// 编译型力模型的 IAS15 传播（15 阶 Gauss-Radau，补偿求和）。
+///
+/// 与 RK 路径的差异：变阶预测-校正、容差 ``tol`` 为相对加速度采样量级
+/// （单参数，无 rtol/atol 之分）、长弧段误差按 Brouwer 律 n^(1/2) 增长。
+/// 适合高精度长弧段外推与近距交会（步长自动收缩）。
+///
+/// **参数**
+///
+/// - ``observer``, ``forces_py``, ``t_span``, ``t_eval``, ``initial_state``:
+///   同 ``propagate_compiled_stm_py``
+/// - ``tol``: 相对容差（建议 1e-12 ~ 1e-14）
+/// - ``max_step``, ``max_steps``: 同 ``propagate_compiled_stm_py``
+/// - ``with_stm``: 是否同时积分 6×6 STM（初值单位阵）
+/// - ``sens_params``: 可选参数敏感列，格式同 ``propagate_compiled_stm_py``
+///
+/// **返回**
+///
+/// Python dict：``{"states": [[6], ...], "time": [...], "n_steps": int,
+/// "n_rejected": int}``；``with_stm=True`` 时含 ``"stm"``，带
+/// ``sens_params`` 时含 ``"sensitivity"``。
+#[cfg(feature = "spice")]
+#[pyfunction]
+#[pyo3(signature = (observer, forces_py, t_span, t_eval, initial_state, tol, max_step=None, max_steps=None, with_stm=false, sens_params=None))]
+#[allow(clippy::too_many_arguments)]
+fn propagate_compiled_ias15_py(
+    observer: &str,
+    forces_py: &Bound<'_, PyList>,
+    t_span: (f64, f64),
+    t_eval: Vec<f64>,
+    initial_state: Vec<f64>,
+    tol: f64,
+    max_step: Option<f64>,
+    max_steps: Option<usize>,
+    with_stm: bool,
+    sens_params: Option<Vec<(usize, String)>>,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use e2m2e_forces::forces::compiled::CompiledForce;
+    use e2m2e_forces::forces::compiled_ias15::propagate_compiled_ias15;
+
+    if initial_state.len() != 6 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "initial_state must have length 6, got {}",
+            initial_state.len()
+        )));
+    }
+    if t_eval.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "t_eval must not be empty",
+        ));
+    }
+
+    let mut forces: Vec<CompiledForce> = Vec::with_capacity(forces_py.len());
+    for item in forces_py.iter() {
+        forces.push(parse_force_tuple(&item)?);
+    }
+    let sens = parse_sens_params(sens_params, forces.len())?;
+
+    let mut state0 = [0.0_f64; 6];
+    state0.copy_from_slice(&initial_state);
+
+    let result = py
+        .allow_threads(|| {
+            propagate_compiled_ias15(
+                &forces, observer, t_span, &t_eval, &state0, tol, max_step, max_steps, with_stm,
+                &sens,
+            )
+        })
+        .map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("IAS15 propagation failed: {}", e))
+        })?;
+
+    let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
+
+    let dict = PyDict::new(py);
+    dict.set_item("states", states_list)?;
+    dict.set_item("time", result.times)?;
+    dict.set_item("n_steps", result.n_steps)?;
+    dict.set_item("n_rejected", result.n_rejected)?;
+    if with_stm {
+        let stm_list: Vec<Vec<f64>> = result.stms.iter().map(|s| s.to_vec()).collect();
+        dict.set_item("stm", stm_list)?;
+    }
+    if !sens.is_empty() {
+        dict.set_item("sensitivity", result.sensitivities)?;
+    }
     Ok(dict.into())
 }
 
@@ -2194,7 +2312,7 @@ fn propagate_compiled_stm_py(
 /// 所有内部 ``PropagateError`` → ``e2m2e.exceptions.PropagationFailure``
 /// （``E2M2EError`` 子类）。消息前缀都加 ``prefix`` （形如
 /// "CR3BP propagation failed: ..."）。Python 侧据此按类型捕获，不再依赖
-/// 错误消息字符串前缀匹配——改 Rust 措辞不影响 ``except PropagationFailure`` 。
+/// 错误消息字符串前缀匹配，改 Rust 措辞不影响 ``except PropagationFailure`` 。
 fn propagate_error_to_pyerr(py: Python<'_>, prefix: &str, e: impl std::fmt::Display) -> PyErr {
     let msg = format!("{prefix}: {e}");
     match py
@@ -2255,7 +2373,7 @@ fn propagate_cr3bp_py(
     state0.copy_from_slice(&initial_state);
 
     // 积分包进 py.allow_threads 释放 GIL：PD78 纯 Rust（不回调 Python），与
-    // propagate_compiled / multiple_shooting_correct 同理（#313）。释 GIL 段 =
+    // propagate_compiled / multiple_shooting_correct 同理。释 GIL 段 =
     // propagate_cr3bp 主循环；持 GIL 段 = 上面的入参校验 + 下面的 PyDict 构造。
     // 闭包内不构造 PyErr，仅回传 PropagateError，闭包外按类型翻译成 Python 异常。
     let result = py
@@ -2319,7 +2437,7 @@ fn propagate_cr3bp_stm_py(
     state0.copy_from_slice(&initial_state);
 
     // 积分包进 py.allow_threads 释放 GIL：PD78 纯 Rust（不回调 Python），与
-    // propagate_compiled 同理（#313，design_dro STM 修正段冻结主线程的根因）。
+    // propagate_compiled 同理；积分期间持 GIL 会冻结主线程。
     // 释 GIL 段 = propagate_cr3bp_stm 主循环；持 GIL 段 = 入参校验 + PyDict 构造。
     let result = py
         .allow_threads(|| {
@@ -2399,7 +2517,7 @@ fn propagate_bcr4bp_py(
     state0.copy_from_slice(&initial_state);
 
     // 积分包进 py.allow_threads 释放 GIL：PD78 纯 Rust（不回调 Python），与
-    // propagate_compiled 同理（#313）。释 GIL 段 = propagate_bcr4bp 主循环；
+    // propagate_compiled 同理。释 GIL 段 = propagate_bcr4bp 主循环；
     // 持 GIL 段 = 入参校验 + PyDict 构造。
     let result = py
         .allow_threads(|| {
@@ -2474,7 +2592,7 @@ fn propagate_bcr4bp_stm_py(
     state0.copy_from_slice(&initial_state);
 
     // 积分包进 py.allow_threads 释放 GIL：PD78 纯 Rust（不回调 Python），与
-    // propagate_compiled 同理（#313）。释 GIL 段 = propagate_bcr4bp_stm 主循环；
+    // propagate_compiled 同理。释 GIL 段 = propagate_bcr4bp_stm 主循环；
     // 持 GIL 段 = 入参校验 + PyDict 构造。
     let result = py
         .allow_threads(|| {
@@ -2560,7 +2678,7 @@ fn porkchop_parallel_enabled(parallel: Option<bool>) -> bool {
     parallel.unwrap_or_else(|| std::env::var("E2M2E_PORKCHOP_PARALLEL").map_or(true, |v| v != "0"))
 }
 
-/// porkchop 网格扫描 Rust 后端（规格路径，#446）：终端传播 + Lambert + ΔV 组装。
+/// porkchop 网格扫描 Rust 后端（规格路径）：终端传播 + Lambert + ΔV 组装。
 ///
 /// 照搬 ``transfer_grid_search_py`` 的 ``py.allow_threads`` + Rayon + 环境变量
 /// 开关范式（对称 ``E2M2E_SEARCH_PARALLEL`` ）：默认并行，``parallel=False`` 或
@@ -2668,7 +2786,7 @@ fn porkchop_grid_py(
     .map_err(|e| propagate_error_to_pyerr(py, "CR3BP 轨道状态传播失败", e))
 }
 
-/// porkchop 网格扫描 Rust 后端（状态网格路径，#446）：终端状态已由 Python
+/// porkchop 网格扫描 Rust 后端（状态网格路径）：终端状态已由 Python
 /// 按 `get_arrival_state` 协议预提取，本入口只做 Lambert + ΔV 组装。
 ///
 /// **参数**
@@ -2914,7 +3032,7 @@ fn check_collision_py(
     ))
 }
 
-/// Q-law 低推力反馈积分（完整热路径在 Rust，#442）。
+/// Q-law 低推力反馈积分（完整热路径在 Rust）。
 #[pyfunction]
 #[pyo3(signature = (t0, tf, y0, target_oe, mu, t_max, isp, h_init, tol, max_steps))]
 #[allow(clippy::too_many_arguments)]
@@ -3011,7 +3129,7 @@ fn qlaw_segment_direction_py(
     Ok(output.into())
 }
 
-/// PAL 延拓：XZ 平面对称约束的 F/dF/切向量单次计算（#443）。
+/// PAL 延拓：XZ 平面对称约束的 F/dF/切向量单次计算。
 ///
 /// 对应 Python `continuation.compute_F_and_dF_symmetric_xz_plane` +
 /// `compute_tangent_vector` （纯数值，非 SPICE 门控）。供延拓收敛轨道后的
@@ -3065,7 +3183,7 @@ fn pal_f_df_tangent_py(
     Ok(dict.into())
 }
 
-/// PAL 延拓：单步牛顿迭代（#443）。
+/// PAL 延拓：单步牛顿迭代。
 ///
 /// 对应 Python `pseudo_arclength_continuation` 的内层牛顿循环：从预测点
 /// `x_start` 出发解 `G = [F; (Xnew - x_ref)·tangent_ref - ds] = 0` ，先判
@@ -3285,11 +3403,11 @@ impl From<e2m2e_forces::transfer_grid_search::TransferPointResult> for TransferP
     }
 }
 
-/// 建进度回调 drainer（#316 item ①）。
+/// 建进度回调 drainer。
 ///
 /// `callback=Some(cb)` 时建 unbounded channel，spawn 独立 OS 线程排空 rx：
 /// 每次先 `recv` 阻塞拿一个 delta，再 `try_recv` 聚合已入队但未处理的 delta，
-/// 合并后 `Python::with_gil` reacquire GIL 调 `cb(delta)`——聚合减少 GIL 获取
+/// 合并后 `Python::with_gil` reacquire GIL 调 `cb(delta)`，聚合减少 GIL 获取
 /// 次数。返回 `(Some(tx), Some(handle))` ，tx 喂给 e2m2e-forces 网格内核。
 ///
 /// `callback=None` 返回 `(None, None)` ，内核 `progress_tx=None` 不发。
@@ -3710,7 +3828,7 @@ fn low_energy_patch_py(
 /// 展平 POD 输入，调纯 Rust ``transfer_grid_search_serial`` ，
 /// 返回 ``Vec<TransferPointResult>`` （保序：外层 departure、内层 alpha）。
 /// 串行不用 Rayon，但传入 ``progress_callback`` 时仍走 ``py.allow_threads``
-/// 释放 GIL——否则 drainer 线程拿不到 GIL，回调退化为 compute 结束后批量触发。
+/// 释放 GIL，否则 drainer 线程拿不到 GIL，回调退化为 compute 结束后批量触发。
 ///
 /// **参数**
 ///
@@ -3790,7 +3908,7 @@ fn transfer_grid_search_serial_py(
 /// 照搬 ``multiple_shooting_correct_py`` 的
 /// ``py.allow_threads`` + 环境变量开关范式（``multiple_shooting.rs:660-676`` ）。
 /// 默认走并行 ``transfer_grid_search_parallel`` ，``parallel=False`` 或
-/// ``E2M2E_SEARCH_PARALLEL=0`` 回退串行 ``transfer_grid_search_serial``——
+/// ``E2M2E_SEARCH_PARALLEL=0`` 回退串行 ``transfer_grid_search_serial``，
 /// 供并行/串行位级一致性对照（两者结果逐位相同：``par_iter``+``collect`` 保序、
 /// ``evaluate_point`` 纯函数）。
 ///
@@ -3802,13 +3920,13 @@ fn transfer_grid_search_serial_py(
 ///   其余/未设→并行）；显式 ``True``/``False`` 覆盖环境变量。
 /// - ``n_workers``: ``None`` （默认）时用 Rayon 全局线程池（线程数由
 ///   ``RAYON_NUM_THREADS`` 决定，未设则 cpu 核数）；显式 ``Some(n)`` 时建一次性
-///   ``ThreadPoolBuilder`` 限定 ``n.max(1)`` 个线程并 ``install`` 本次 compute——
+///   ``ThreadPoolBuilder`` 限定 ``n.max(1)`` 个线程并 ``install`` 本次 compute，
 ///   覆盖 ``RAYON_NUM_THREADS`` 。串行模式忽略此参数（无线程池）。
 /// - ``progress_callback``: 同 ``transfer_grid_search_serial_py`` 。
 ///
 /// **GIL 与并行**
 ///
-/// ``py.allow_threads`` 释放 GIL 是 Rayon 真并行 + drainer 实时回调的前提——
+/// ``py.allow_threads`` 释放 GIL 是 Rayon 真并行 + drainer 实时回调的前提，
 /// 不释放则 GIL 序列化所有 Rayon worker、drainer 拿不到 GIL。channel 创建 +
 /// ThreadPoolBuilder + compute + drainer join 全在闭包内，tx 在闭包内 drop，
 /// drainer 干净退出。内部直接调纯 Rust ``transfer_grid_search`` 核心，不绕道持 GIL 的
@@ -3858,7 +3976,7 @@ fn transfer_grid_search_py(
     };
 
     // 仅并行模式 + 显式 n_workers 时建一次性线程池（install 覆盖 RAYON_NUM_THREADS）。
-    // 在 allow_threads 之前构建——build 失败走 PyResult 而非 FFI 边界 panic（线程创建
+    // 在 allow_threads 之前构建，build 失败走 PyResult 而非 FFI 边界 panic（线程创建
     // OOM/OS 限制极少见，但 panic 会拖垮整个 Python 进程）；串行模式不建池（install
     // 对单线程 work 无意义，省一次线程创建）。
     let pool = match n_workers {
@@ -3972,7 +4090,7 @@ fn disable_ephem_cache() {
     e2m2e_spice::ephem_cache::disable();
 }
 
-/// 返回 cspice FFI 调用计数（验证"零 cspice"用）。
+/// 返回 cspice FFI 调用计数（验证零 cspice 场景用）。
 #[cfg(feature = "spice")]
 #[pyfunction]
 fn ephem_ffi_call_count() -> u64 {
@@ -4101,6 +4219,16 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
         lowthrust::lowthrust_collocation_defects_py,
         m
     )?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(
+        lowthrust::lowthrust_discrete_collocation_defects_py,
+        m
+    )?)?;
+    #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(
+        lowthrust::lowthrust_variable_time_collocation_defects_py,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(nsga2::nsga2_sort_py, m)?)?;
     m.add_function(wrap_pyfunction!(
         nsga2::nsga2_environmental_selection_py,
@@ -4163,6 +4291,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(propagate_compiled_stm_py, m)?)?;
     #[cfg(feature = "spice")]
+    m.add_function(wrap_pyfunction!(propagate_compiled_ias15_py, m)?)?;
+    #[cfg(feature = "spice")]
     m.add_function(wrap_pyfunction!(
         differential_correction::differential_correction_cr3bp_py,
         m
@@ -4220,7 +4350,7 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<MultistepResult>()?;
     m.add_class::<CowellResult>()?;
 
-    // Rust 物理常量同源核对入口（#377 阶段2）：把 e2m2e-propagation 从
+    // Rust 物理常量同源核对入口：把 e2m2e-propagation 从
     // constants.toml 生成的常量以 `_propagation_constants` 子模块挂出，
     // 供 Python 侧逐位对拍。
     m.add_submodule(&e2m2e_propagation::_propagation_constants_module_bound(
