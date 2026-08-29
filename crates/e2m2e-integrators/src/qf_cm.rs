@@ -3,7 +3,7 @@
 //! 对应 Python ``e2m2e.algorithm.normal_form.coord_trans.qf_cm`` 与 qiao
 //! ``qpQF2qpCM`` / ``qpCM2qpQF``。复值 Hamilton 流 ``dX/dt = J·∇W`` 用
 //! **12 实维分裂**（``[Re X, Im X]``）走现有实值 DOP853 ``solve_ivp``，
-//! 语义与 scipy 对复 ``y0`` 的内部分裂等价（issue #465，关闭 #336 例外）。
+//! 语义与 scipy 对复 ``y0`` 的内部分裂等价。
 //!
 //! 完整链：实→复基底 ``D⁻¹`` → 逐阶 Lie 流（正向 W 取反升序；反向不取反降序）
 //! → 复→实基底 ``D`` 取实部。阶集合由输入决定，不硬编码截断。
@@ -488,11 +488,12 @@ mod tests {
         let d = d_matrix();
         let inv = d_inv_matrix();
         // inv · D ≈ I
-        for i in 0..6 {
+        for (i, inv_row) in inv.iter().enumerate() {
+            #[allow(clippy::needless_range_loop)] // j 同时用于索引与 i==j 判别，迭代器化反而绕
             for j in 0..6 {
                 let mut acc = C64::ZERO;
                 for k in 0..6 {
-                    acc = acc.add(inv[i][k].mul(d[k][j]));
+                    acc = acc.add(inv_row[k].mul(d[k][j]));
                 }
                 let expect = if i == j { 1.0 } else { 0.0 };
                 assert!(
@@ -532,8 +533,8 @@ mod tests {
         let dx = hamilton_flow_rhs(&x, &poly);
         assert!((dx[0].re - 0.7).abs() < 1e-14);
         assert!((dx[0].im + 0.4).abs() < 1e-14);
-        for i in 1..6 {
-            assert!(dx[i].re.abs() < 1e-14 && dx[i].im.abs() < 1e-14);
+        for dx_v in &dx[1..] {
+            assert!(dx_v.re.abs() < 1e-14 && dx_v.im.abs() < 1e-14);
         }
     }
 

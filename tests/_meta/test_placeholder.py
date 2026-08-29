@@ -30,7 +30,7 @@ def test_control_orbit_implemented():
 
 
 def test_momentum_management_implemented():
-    """角动量管理（原 #261）已实现：发动机布局校验先于占位抛错。"""
+    """角动量管理已实现：发动机布局校验先于占位抛错。"""
     import numpy as np
 
     from e2m2e.algorithm.station_keeping import EngineLayout
@@ -78,7 +78,7 @@ def test_family_design_implemented():
 
 
 def test_ecom_srp_implemented():
-    """ECOM 光压（原 #253）已实现：可正常构造并输出 to_rust_spec。"""
+    """ECOM 光压已实现：可正常构造并输出 to_rust_spec。"""
     from e2m2e.algorithm.forces import EcomSolarRadiationPressure
 
     dyb = [0.01] + [0.0] * 8
@@ -121,6 +121,10 @@ def test_facade_placeholder():
 
 def test_mcp_server_placeholder():
     """MCP create_server 占位。"""
+    pytest.importorskip(
+        "anyio",
+        reason="MCP 协议层为可选依赖 [mcp]，未安装时跳过（ADR 0014）",
+    )
     from e2m2e.api.mcp.server import create_server
 
     with pytest.raises(NotImplementedError, match="MCP"):

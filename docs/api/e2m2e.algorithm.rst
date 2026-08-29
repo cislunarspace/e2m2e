@@ -4,9 +4,16 @@ e2m2e.algorithm package
 .. automodule:: e2m2e.algorithm
    :no-index:
 
+Top-level modules
+-----------------
 
-顶层模块
---------
+e2m2e.algorithm.catalog_sweep module
+------------------------------------
+
+.. automodule:: e2m2e.algorithm.catalog_sweep
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 
 e2m2e.algorithm.propagation module
@@ -555,6 +562,24 @@ e2m2e.algorithm.family.spo_initial_guess module
    :show-inheritance:
 
 
+e2m2e.algorithm.family.planar_continuation module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: e2m2e.algorithm.family.planar_continuation
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+e2m2e.algorithm.family.rust_generation module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: e2m2e.algorithm.family.rust_generation
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
 e2m2e.algorithm.family.triangular_initial_guess module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -832,6 +857,26 @@ e2m2e.algorithm.normal_form.coord_trans.cm_param module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: e2m2e.algorithm.normal_form.coord_trans.cm_param
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+e2m2e.algorithm.levelset package
+--------------------------------
+
+Python-side utilities for the level-set value function (ADR 0032, decision 4).
+The Rust solver kernel lives in the e2m2e-levelset crate (ToolboxLS port, ACM
+non-commercial license).
+
+.. automodule:: e2m2e.algorithm.levelset
+   :no-index:
+
+
+e2m2e.algorithm.levelset.value_function module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: e2m2e.algorithm.levelset.value_function
    :members:
    :undoc-members:
    :show-inheritance:

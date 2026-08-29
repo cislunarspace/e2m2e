@@ -1,115 +1,206 @@
-# ADR 0031：轨道库 catalog——记录格式、存储布局与查询接口
+# ADR 0031: Orbit catalog — record format, storage layout, query interface
 
-**状态**：已采纳
-**日期**：2026-08-19
-**关联**：`docs/architecture/architecture.md`（§5 数据管理模块）、ADR 0014（接口层 Facade/MCP/CLI）、ADR 0024（统一算法结果状态契约）、ADR 0029（统一 Rust 族生成）；transfer-orbit-design ADR 0008（output/ 持久化，本篇修订其适用面）、ADR 0013（星历可视化四槽位契约）
+**Status**: Adopted
+**Date**: 2026-08-19
+**Related**: `docs/architecture/architecture.md` (§5 data management), ADR 0014
+(interface Facade/MCP/CLI), ADR 0024 (unified result status contract),
+ADR 0029 (unified Rust family generation); transfer-orbit-design ADR 0008
+(output/ persistence — its scope revised by this entry); ADR 0013 (ephemeris
+visualization's four-slot contract)
 
-## 背景
+## Context
 
-轨道越算越多，产物却越堆越乱。现状是：计算结果按时间戳文件名堆在 output/ 下，分类靠"子目录名 + 文件名正则"事后猜测，维度只有 orbit_type 一个字段；"哪条轨道喂给了轨道保持"这类谱系关系只存在 GUI 内存里，进程退出即断。这样的文件堆撑不起两类使用：数据分析（按族、能量、几何参数过滤与统计）与教学（精选案例、加标注、打包子集分发）。
+Orbits keep accumulating while artifacts pile up chaotically. Status quo:
+results dumped under output/ with timestamp filenames; classification guessed
+after the fact from subdirectory names plus filename regexes; a single orbit_type
+field for all dimensions; lineage like "this orbit fed station keeping" lives
+only in GUI memory and dies at process exit. Such file heaps can't serve two use
+cases: data analysis (filter/statistics by family, energy, geometry) and teaching
+(curated cases, annotations, packaged subset distribution).
 
-架构文档 §5 对此早有立项：数据管理模块"后续还会扩展支持智能博弈，作为大数据研究的数据基础"，并指出现状 npz 产物"无 schema、无版本号"，需要详细设计。本篇兑现这一设计。时机也合适：ADR 0024 正在做持久化格式的破坏性迁移，旧产物约定全部删除、不做迁移，新格式没有兼容包袱。
+Architecture doc §5 filed this long ago: the data management module will later
+extend toward intelligent game-theoretic research as big-data foundation, noting
+current npz artifacts have no schema, no versioning, needing detailed design.
+This entry delivers that design. Timing is also right: ADR 0024 is executing a
+breaking migration of persistence formats — legacy artifact conventions deleted
+wholesale with no migration — so the new format carries no compatibility burden.
 
-分类体系参照胡佳鑫等《面向地月空间感知任务设计与分析的智能仿真系统架构与实现》（中国图象图形学报，2025）的轨道动力学模型库：该库按"动力学模型 × 轨道类型"两个维度组织 4 类 27 种三体轨道。其核心思想——同一条轨道同时属于多个可独立过滤的维度——是本篇分类设计的原型。
+The classification system references Hu Jiaxin et al., "Intelligent Simulation
+System Architecture and Implementation for Cislunar Space Awareness Mission
+Design and Analysis" (Journal of Image and Graphics, 2025)'s orbital dynamics
+model library: it organizes 4 classes / 27 kinds of three-body orbits along
+dynamics-model × orbit-type dimensions. Its core idea — one orbit simultaneously
+belonging to multiple independently filterable dimensions — is this entry's
+classification prototype.
 
-## 决策
+## Decision
 
-### 1. 记录 = JSON 元数据 + NPZ 数组，双段并存
+### 1. Record = JSON metadata + NPZ arrays, dual segments
 
-一条 catalog 记录由一个 JSON（元数据全文）和一个同名 NPZ（数组段）组成。轨道数据双段并存：
+A catalog record = one JSON (full metadata) + same-named NPZ (array segments).
+Orbit data keeps both:
 
-- `cr3bp_segment`：Orbit 原生类型（无量纲 states/times）；
-- `ephemeris_segment`：EphemerisTable（GCRS、会合系、times_et）。
+- `cr3bp_segment`: Orbit-native types (nondimensional states/times);
+- `ephemeris_segment`: EphemerisTable (GCRS, synodic, times_et).
 
-两段各自可空：轨道保持产物只有星历段；族周期成员只有 CR3BP 段（初态与周期）。记录带 `schema_version`，自 1 起。
+Either segment may be null: station-keeping products carry only ephemeris;
+periodic family members only CR3BP (initial state + period). Records carry
+`schema_version`, starting at 1.
 
-实施补充（2026-08-19）：轨道保持记录在双段之外另带 `result/` 小数组段（机动序列 maneuvers、站保统计 sk_rows）——它们是站保产物的一部分，丢了记录就不完整；体积很小，不构成第三段轨道数据。
+Implementation note (2026-08-19): beyond dual segments, station-keeping records
+additionally carry a small `result/` array segment (maneuver sequences,
+sk_rows statistics) — part of the station-keeping product without which records
+are incomplete; tiny, not a third orbit-data segment.
 
-### 2. 分类是多维字段集合，不是单值类型
+### 2. Classification is a multi-dimensional field set, not a single-valued type
 
-每条记录由算法层在生成时填写以下维度，各维度可独立过滤：
+Each record's dimensions, filled by the algorithm layer at generation time,
+each independently filterable:
 
-| 字段 | 含义 |
+| Field | Meaning |
 |---|---|
-| `orbit_family` | dro / halo / nrho / lyapunov / lissajous / dpo / axial / ro / spo / lpo / horseshoe 等 |
+| `orbit_family` | dro / halo / nrho / lyapunov / lissajous / dpo / axial / ro / spo / lpo / horseshoe etc. |
 | `libration_point` | 1–5 |
-| `jacobi` | CR3BP 段 Jacobi 常数 |
-| `amplitude` | 主振幅（km） |
-| `has_cr3bp` / `has_ephemeris` | 段存在性 |
+| `jacobi` | CR3BP-segment Jacobi constant |
+| `amplitude` | principal amplitude (km) |
+| `has_cr3bp` / `has_ephemeris` | segment presence |
 
-不设单值"动力学模型"字段：双段并存下一条记录天然跨模型，过滤语义由段存在性布尔组合表达。结果状态沿用 ADR 0024 三元组（status/cause/message）。原始请求模型以 JSON 快照随记录保存（`request`），可追溯、可复算；任务标量（历元、时长、mu、迭代次数等）随结果段保存。分类字段由算法层填，不做事后推断——打靶与延拓时族类型、平动点、能量都是已知量。
+No single-valued dynamics-model field: dual segments make every record naturally
+cross-model; filtering semantics express via segment-presence boolean combos.
+Result status follows ADR 0024's triple (status/cause/message). Raw request models
+are saved as JSON snapshots with records (`request`) — traceable, recomputable;
+mission scalars (epoch, duration, mu, iteration counts…) save alongside result
+segments. Classification fields come from the algorithm layer, never inferred
+afterwards: during shooting/continuation, family type, libration point, energy are
+all known quantities.
 
-实施补充（2026-08-19）：记录构建器（`api/catalog_ingest.py`）实际落在接口层 Facade 接缝——请求快照依赖 api 请求模型，依赖方向（ADR 0012）不允许算法层持有它们；"生成时填写"指计算完成时同步填写，区别于事后从文件名/路径推断，决策意图不变。另：各族"参数振幅"定义不一（Halo 的 z0、SPO 的径向距离、NRHO 不直接用振幅），分类字段 `amplitude` 统一为**几何主振幅**（CR3BP 段位置三分量半极差最大值 × 特征长度，km），生成时从已知几何度量；请求里的参数振幅保留在 `request` 快照。
+Implementation note (2026-08-19): the record builder (`api/catalog_ingest.py`)
+actually lands at the interface-layer Facade seam: request snapshots depend on api
+request models whose ownership (ADR 0012) forbids algorithm-layer holding;
+"filled at generation time" means filled synchronously when computation completes,
+distinct from after-the-fact inference from filenames/paths — decision intent
+unchanged. Also: amplitude is defined differently per family (Halo's z0, SPO's
+radial distance, NRHO doesn't use amplitude directly); the classification field
+`amplitude` unifies as **geometric principal amplitude** (max half-range of CR3BP-
+segment position components × characteristic length, km), measured from known
+geometry at generation; request-level parameter amplitudes stay in the `request`
+snapshot.
 
-### 3. 谱系在生成时写入
+### 3. Lineage written at generation time
 
-`source_record_id`（可空）由算法层在产出结果时写入：轨道保持产物指向被控轨道，提升的族成员指向所属族。谱系不再依赖调用方内存。
+`source_record_id` (nullable) written by the algorithm layer when producing
+results: station-keeping products point at controlled orbits; lifted members point
+at their families. Lineage no longer depends on caller memory.
 
-### 4. 族粒度：一族一条记录
+### 4. Family granularity: one record per family
 
-OrbitFamily 整体为一条记录，成员参数与数组在记录内部。成员可提升为独立记录（`source_record_id` 指向族），供轨道保持等下游消费。
+An entire OrbitFamily is one record; member parameters & arrays inside. Members
+may lift into standalone records (`source_record_id` → family) for downstream
+consumption such as station keeping.
 
-### 5. 存储布局：扁平记录文件 + SQLite 派生索引
+### 5. Storage layout: flat record files + SQLite derived index
 
 ```
 catalog/
-├── records/<record_id>.json + <record_id>.npz   # 事实来源
-└── catalog.db                                    # SQLite 索引，派生物
+├── records/<record_id>.json + <record_id>.npz   # source of truth
+└── catalog.db                                    # SQLite index, derived
 ```
 
-记录文件是事实来源；catalog.db 只存过滤维度与文件指针，删除后扫描 records/ 全量重建。目录不承担分类职责：不按族分子目录，文件名即 record_id。库存放目录经 Config 注入（ADR 0014 决策 7）。
+Record files are the source of truth; catalog.db stores only filter dimensions +
+file pointers, deletable and fully rebuilt by scanning records/. Directories bear
+no classification duty: no family subdirectories; filename = record_id. Storage dir
+injects via Config (ADR 0014 decision 7).
 
-### 6. 教学标注随 JSON 走
+### 6. Teaching annotations travel with JSON
 
-`tags`（字符串列表）与 `note`（自由文本）写入 JSON 记录。导出子集时标注随文件走，不依赖本地 db。
+`tags` (string list) + `note` (free text) live in the JSON record. Subset exports
+carry annotations in files, independent of local db.
 
-### 7. 查询与批量生成进 Facade
+### 7. Query & batch generation enter Facade
 
-新增 Facade 方法：`catalog_query`（多维过滤，返回摘要列表）、`catalog_get`、`catalog_delete`、`catalog_tag`、`catalog_export`（子集打包）、`catalog_sweep`（参数空间扫描批量生成并入库，编排复用 ADR 0029 的 Rust 族生成）。CLI 与 MCP 按 ADR 0014 纯派生自动获得。
+New Facade methods: `catalog_query` (multi-dimensional filters → summary list),
+`catalog_get`, `catalog_delete`, `catalog_tag`, `catalog_export` (subset
+packaging), `catalog_sweep` (parameter-space scan batch generation + ingestion;
+orchestration reuses ADR 0029's Rust family generation). CLI and MCP derive
+automatically per ADR 0014 pure derivation.
 
-### 8. 自动入库
+### 8. Automatic ingestion
 
-Facade 的产物型计算方法（design_orbit、orbit_family_generation、control_orbit 等）成功产出后自动入库，不要求调用方显式请求。Config 可关闭（测试场景）。
+Facade's artifact-producing methods (design_orbit, orbit_family_generation,
+control_orbit etc.) auto-ingest on success — callers never explicitly request.
+Config can disable (testing).
 
-### 9. 旧产物不迁移
+### 9. No migration of legacy artifacts
 
-现有 output/ 下旧格式产物全部删除，不写迁移工具，不做兼容读取。
+All old-format products under output/ get deleted — no migration tool, no
+compatibility reads.
 
-## 理由
+## Rationale
 
-1. **双段并存，不统一转 EphemerisTable**：CR3BP 初猜与星历是两种动力学模型下的产物，单向强转丢失初猜的可修正性（微分修正消费无量纲状态）；并存也与 transfer-orbit-design ADR 0013 的四槽位可视化契约一致，GUI 消费方式不变。
-2. **多维字段，不单值 orbit_type**：分类的价值在过滤组合（"含星历段、L2、Jacobi 3.0–3.1 的 NRHO"），单值类型表达不了。字段由算法层填而不是事后猜——生成时信息最全，事后推断正是现状乱源。
-3. **SQLite 作派生索引而非事实来源**：文件为源保留了可手动复制、备份、分享、CLI 与 GUI 共享的优点；索引只是查询加速，损坏或格式升级时删掉重建，查询维度变更不动记录文件。
-4. **扁平目录**：路径编码分类是现状痼疾——改名即丢类型、正则失配即丢产物。分类收归索引后，目录组织自由。
-5. **族一条记录**：族成员动辄数十上百，各自成记录会淹没查询结果；族的语义（延拓参数、振幅序列）也无处安放。
-6. **自动入库**：库的价值在"算过的都在"；显式入库是调用方会忘记的步骤。
-7. **标注随 JSON**：教学分发的单位是文件子集，标注必须跟数据走。
-8. **不迁移**：旧产物数量少、保留价值低，迁移工具的成本高于产物价值；ADR 0024 已确立"旧格式读取失败并提示迁移"的先例，本篇更进一步，连提示迁移也不做。
+1. **Dual segments, not forced EphemerisTable unification**: CR3BP initial guesses
+   vs ephemerides are products of different dynamical models; one-way coercion
+   loses guesses' correctability (differential correction consumes nondimensional
+   states). Coexistence also matches transfer-orbit-design ADR 0013's four-slot
+   visualization contract — GUI consumption unchanged.
+2. **Multi-dimensional fields, not single-valued orbit_type**: classification's
+   value lies in filter combinations (has-ephemeris AND L2 AND Jacobi 3.0–3.1
+   NRHO-type conditions) that single values can't express. Fields from the
+   algorithm layer rather than retro-guesses: generation time has maximal
+   information; after-the-fact inference is precisely today's chaos source.
+3. **SQLite as derived index, not source of truth**: files-as-source keep manual
+   copy/backup/sharing and CLI+GUI sharing; index is query acceleration only —
+   corrupted or format-upgraded, delete and rebuild; query-dimension changes never
+   touch record files.
+4. **Flat directories**: path-encoded classification is today's chronic disease:
+   renames lose types; regex misses lose products. With classification moved into
+   the index, directory organization goes free.
+5. **One record per family**: families hold tens-to-hundreds of members —
+   individual records would flood query results; family semantics (continuation
+   parameter, amplitude sequence) would otherwise have nowhere to live.
+6. **Automatic ingestion**: catalog value = everything computed is there;
+   explicit ingestion is the step callers forget.
+7. **Annotations with JSON**: teaching distribution units are file subsets;
+   annotations must travel with data.
+8. **No migration**: few legacy products, low retention value; tool cost exceeds
+   product value. ADR 0024 already established fail-on-read + hint-migration for
+   old formats; this entry goes further — not even migration hints.
 
-## 结果
+## Consequences
 
-### 新增
+### Added
 
-- `data/catalog/`：记录类型、存储引擎（写入/读取/索引重建）、SQLite 索引。
-- `algorithm/`：catalog_sweep 参数扫描编排。
-- `api/`：Facade catalog 方法与 Pydantic 模型、记录构建器（`catalog_ingest.py`，见决策 2 实施补充）；CLI、MCP 自动派生。
+- `data/catalog/`: record types, storage engine (write/read/index rebuild),
+  SQLite index.
+- `algorithm/`: catalog_sweep parameter-scan orchestration.
+- `api/`: Facade catalog methods & Pydantic models; record builder
+  (`catalog_ingest.py`, see decision 2 implementation note); CLI/MCP auto-derived.
 
-### 变更
+### Changed
 
-- 架构文档 §5 数据管理模块的"后续设计"落地，产物格式进入带 schema 与版本号的状态。
-- Facade 产物型方法增加自动入库副作用。
+- Architecture doc §5's planned design lands; artifact formats enter schema'd,
+  versioned state.
+- Facade artifact methods gain auto-ingest side effects.
 
-### 不变
+### Unchanged
 
-- Orbit / OrbitFamily / EphemerisTable 的领域数据职责不变（ADR 0024）；catalog 记录引用它们，不替代它们。
-- `algorithm/normal_form/catalog.py`（平动点参数目录变换器）与本篇的轨道库是两个概念，维持原名不动；文档中"轨道库"专指本篇 catalog。
+- Orbit/OrbitFamily/EphemerisTable domain-data duties (ADR 0024); catalog records
+  reference them, never replace them.
+- `algorithm/normal_form/catalog.py` (libration-point parameter-catalog
+  transformer) and this orbit catalog are different concepts; original name kept;
+  docs reserve "orbit catalog" for this entry's catalog.
 
-### 移交
+### Handover
 
-- transfer-orbit-design 的 output/ 扫描（discovery.py）废弃；其 ADR 0008 经修订：产物清单改经 Facade catalog 查询获得，文件为事实来源这一点不变。
+- transfer-orbit-design's output/ scanning (discovery.py) deprecated; its ADR 0008
+  revised: artifact lists now come via Facade catalog queries — files-as-source-of-
+  truth unchanged.
 
-## 取舍
+## Trade-offs
 
-- 双段并存使设计产物的单条记录体积约增一倍（同一轨道两套表示），换取信息无损与消费方零转换；站保产物本就只有星历段，不受影响。
-- 自动入库使纯计算调用产生文件 I/O 副作用；以 Config 注入目录并可关闭，测试场景不受影响。
-- SQLite 引入一个二进制文件，但它是派生物，不构成格式锁定。
+- Dual segments roughly double each design-product record's size (two
+  representations of one orbit) for lossless information and zero-conversion
+  consumers; station-keeping products already had ephemeris-only segments —
+  unaffected.
+- Auto-ingest gives pure computation calls file-I/O side effects; Config-injected
+  directory + disable switch keep testing unaffected.
+- SQLite adds a binary file — but derived, never format lock-in.

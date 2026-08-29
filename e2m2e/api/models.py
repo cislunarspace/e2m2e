@@ -365,7 +365,7 @@ class DesignOrbitRequest(_ApiModel):
 
         未显式指定时静默分派默认值；显式传入与族冲突的值时告警后改写
         （不拒绝，兼容既有调用方）。请求对象经此即为事实，算法层只做
-        防御检查、不再改写。
+        防御检查。
         """
         if selection not in SEGMENTED_CORRECTION_ORBIT_TYPES:
             return
@@ -436,7 +436,7 @@ class FamilyGenerationResponse(_ApiModel, OrbitFamily):
 class DesignOrbitResponse(ResultResponse):
     """任务轨道设计输出。
 
-    几何字段（``mu`` / ``states`` / ``times`` / ``ephemeris``，#312）让下游
+    几何字段（``mu`` / ``states`` / ``times`` / ``ephemeris``）让下游
     （画图 / 落盘 / design→control 链式）可仅依赖 Facade，不必穿透 algorithm
     层。``states`` / ``times`` 为 CR3BP 参考周期轨道（无量纲会合系），
     ``ephemeris`` 为标称星历（GCRS km / 速度 m/s + 会合系，``EphemerisTable``
@@ -632,7 +632,7 @@ class ControlOrbitRequest(_ApiModel):
 class ControlOrbitResponse(ResultResponse):
     """轨道保持输出。
 
-    几何字段（``controlled_ephemeris`` / ``mu``，#312）：``controlled_ephemeris``
+    几何字段（``controlled_ephemeris`` / ``mu``）：``controlled_ephemeris``
     为最后一次蒙特卡洛样本的受控真实轨道星历（``EphemerisTable`` 全字段；
     全失败时 ``None``）；``mu`` 由请求透传（算法层不产 mu）。
     """
@@ -663,7 +663,15 @@ class TransferDesignRequest(_ApiModel):
     incl_deg: float = Field(default=28.5, ge=0.0, le=180.0, description="轨道倾角 (度)")
     flight_path_deg: float = Field(default=0.0, ge=0.0, le=0.0, description="航迹角 (度，仅支持 0)")
     target_ephemeris: Any = Field(
-        default=None, description="目标星历（EphemerisTable/NominalOrbit/ndarray）"
+        default=None,
+        description=(
+            "目标星历（EphemerisTable/NominalOrbit/ndarray），LGA/WSB 必需。"
+            "坐标系契约按转移类型区分：LGA/WSB 要求会合旋转系（synodic）物理单位"
+            "（km, km/s）状态，编排器直接无量纲化，不做惯性系→旋转系转换，"
+            "orbit_propagation/design_orbit 产出的惯性星历必须先经 "
+            "spacetime_transform(j2000_to_synodic) 转换后再传入，否则目标态几何全错；"
+            "HMN/low_thrust 按地心惯性系 km/km/s 状态解释。"
+        ),
     )
     target_orbit_radius_km: float | None = Field(
         default=None, gt=0.0, description="目标轨道半径 (km)，HMN 必需"
@@ -671,6 +679,38 @@ class TransferDesignRequest(_ApiModel):
     tof_range: list[float] | None = Field(default=None, description="飞行时间范围 [min, max]（天）")
     lga_search_params: Any = Field(default=None, description="LGA 搜索参数（LgaSearchParams 实例）")
     wsb_search_params: Any = Field(default=None, description="WSB 搜索参数（WsbSearchParams 实例）")
+    engine_config: dict[str, Any] | None = Field(
+        default=None,
+        description="推进配置（low_thrust 必需）：{'t_max': 最大推力 N, 'isp': 比冲 s}",
+    )
+    initial_mass: float | None = Field(
+        default=None, gt=0.0, description="初始质量 (kg)，low_thrust 必需"
+    )
+    n_segments: int = Field(default=10, gt=0, description="求解器段数（low_thrust，默认 10）")
+    target_oe: list[float] | None = Field(
+        default=None,
+        min_length=3,
+        max_length=3,
+        description="Q-law 目标 [a_T (km), e_T, i_T (弧度)]（low_thrust 可选）",
+    )
+    solver_method: str = Field(
+        default="shooting", description="求解方法 shooting/collocation（low_thrust）"
+    )
+    duration_days: float = Field(
+        default=30.0, gt=0.0, description="飞行时间（天）（low_thrust，默认 30.0）"
+    )
+    departure_state: list[float] | None = Field(
+        default=None,
+        min_length=6,
+        max_length=6,
+        description="出发状态 [x,y,z,vx,vy,vz]（地心惯性系，km, km/s）（low_thrust 可选）",
+    )
+    target_state: list[float] | None = Field(
+        default=None,
+        min_length=6,
+        max_length=6,
+        description="目标末态 [x,y,z,vx,vy,vz]（地心惯性系，km, km/s）（low_thrust 可选）",
+    )
 
 
 class TransferDesignResponse(ResultResponse):
@@ -714,7 +754,10 @@ class SpacetimeTransformRequest(_ApiModel):
     """时空坐标转换输入。"""
 
     states: list[list[float]] = Field(description="状态列表，每项 [x,y,z,vx,vy,vz]")
-    times: list[float] = Field(description="每个状态的 JD_TDB 时间值")
+    times: list[float] = Field(
+        description="每个状态的时间值：GCRS↔EBCRS 用 JD_TDB；会合系转换用"
+        "无量纲会合时间 t_syn（0 = et0_jd 参考历元）"
+    )
     transform_type: str = Field(
         description="synodic_to_j2000/j2000_to_synodic/gcrs_to_ebcrs/ebcrs_to_gcrs"
     )
@@ -732,12 +775,13 @@ class SpacetimeTransformResponse(ResultResponse):
 
 
 # ---------------------------------------------------------------------------
-# 轨道族生成（#411）：公开平动点统一术语 libration_point（1=L1 … 5=L5）。
+# 轨道族生成：公开平动点统一术语 libration_point（1=L1 … 5=L5）。
 # 各族允许的平动点取值域与默认值；Halo 族振幅上限为固定 z0 延拓的
 # 折叠点（同 seed._HALO_FOLD_Z0，按平动点区分）。
 # ---------------------------------------------------------------------------
 
-#: orbit_type → 允许的平动点取值域。DRO/DPO 等无平动点概念，不进本模型。
+#: orbit_type → 允许的平动点取值域。DRO 是月心族不绑定平动点（空元组），
+#: DPO 等其余无平动点族不进本模型。
 _FAMILY_LIBRATION_POINT_RANGES: Mapping[str, tuple[int, ...]] = MappingProxyType(
     {
         "HALO": (1, 2),
@@ -747,6 +791,7 @@ _FAMILY_LIBRATION_POINT_RANGES: Mapping[str, tuple[int, ...]] = MappingProxyType
         "SPO": (4, 5),
         "LPO": (4, 5),
         "HORSESHOE": (4, 5),
+        "DRO": (),
     }
 )
 
@@ -820,6 +865,7 @@ _FAMILY_SPECIFIC_FIELDS: Mapping[str, frozenset[str]] = MappingProxyType(
                 "match_tolerance_km",
             }
         ),
+        "DRO": frozenset({"min_amplitude_km", "max_amplitude_km", "sampling_mode"}),
     }
 )
 _FAMILY_OPTION_VALUES: Mapping[str, Mapping[str, tuple[str, ...]]] = MappingProxyType(
@@ -856,6 +902,7 @@ _FAMILY_OPTION_VALUES: Mapping[str, Mapping[str, tuple[str, ...]]] = MappingProx
                 "sampling_mode": ("full-period-pal",),
             }
         ),
+        "DRO": MappingProxyType({"sampling_mode": ("natural-x0",)}),
     }
 )
 
@@ -867,7 +914,8 @@ class FamilyGenerationRequest(_ApiModel):
     Facade 映射到各族算法参数。按 ``orbit_type`` 分派校验取值域
     （与 ``DesignOrbitRequest`` 同构）：共线族（Halo/NRHO/Axial）仅
     L1/L2，Lissajous 支持 L1/L2/L3，三角族（SPO/LPO/Horseshoe）仅
-    L4/L5。七族均已实现（#428）：周期族返回严格周期成员，Lissajous
+    L4/L5，DRO 是月心族不绑定平动点（请求不得携带 ``libration_point``）。
+    八族均已实现：周期族返回严格周期成员，Lissajous
     返回拟周期有界轨迹的参数采样（族上显式标注 quasi-periodic）。
 
     按族适用的字段：
@@ -876,23 +924,25 @@ class FamilyGenerationRequest(_ApiModel):
     - NRHO：``north_south``、``perilune_height_max_km``、``continuation_direction``
     - LISSAJOUS：``amplitude_in_km``、``amplitude_out_km``、``phase_in``、``phase_out``
     - SPO/LPO/HORSESHOE：振幅上下限、延拓方向与 ``match_tolerance_km``
+    - DRO：振幅上下限（距月心距离 min/max 均值，km）
 
     ``sampling_mode`` 显式登记各族固定的首版采样规则；传入其他规则会
     结构化拒绝，而不是静默改用默认算法。
     """
 
-    orbit_type: str = Field(description="HALO/NRHO/AXIAL/LISSAJOUS/SPO/LPO/HORSESHOE")
+    orbit_type: str = Field(description="HALO/NRHO/AXIAL/LISSAJOUS/SPO/LPO/HORSESHOE/DRO")
     libration_point: int | None = Field(
-        default=None, ge=1, le=5, description="平动点编号：1=L1 … 5=L5；缺省按族填默认"
+        default=None, ge=1, le=5, description="平动点编号：1=L1 … 5=L5；缺省按族填默认；DRO 不适用"
     )
     max_amplitude_km: float | None = Field(
         default=None,
         description="族振幅上限（km）；HALO/AXIAL 带符号区分北/南（上/下）族，"
-        "SPO/LPO/HORSESHOE 为正值（距 L4/L5 径向距离 min/max 均值）",
+        "SPO/LPO/HORSESHOE 为正值（距 L4/L5 径向距离 min/max 均值），"
+        "DRO 为距月心距离 min/max 均值",
     )
     min_amplitude_km: float | None = Field(
         default=None,
-        description="族振幅下限（km），仅 SPO/LPO/HORSESHOE 用",
+        description="族振幅下限（km），仅 SPO/LPO/HORSESHOE/DRO 用",
     )
     north_south: int | None = Field(
         default=None, ge=1, le=2, description="北/南族：1=北，2=南；仅 NRHO 用"
@@ -945,19 +995,24 @@ class FamilyGenerationRequest(_ApiModel):
         if selection not in _FAMILY_LIBRATION_POINT_RANGES:
             raise ValueError(f"不支持的 orbit_type: {orbit_type!r}")
         allowed = _FAMILY_LIBRATION_POINT_RANGES[selection]
-        ranges: dict[str, NumericRange] = {
-            "libration_point": NumericRange(min(allowed), max(allowed))
-        }
-        point = (
-            _FAMILY_DEFAULT_LIBRATION_POINT[selection]
-            if libration_point is None
-            else libration_point
-        )
-        if point not in allowed:
-            raise ValueError(
-                f"{selection} libration_point 必须为 {sorted(allowed)}，当前 {point!r}"
+        ranges: dict[str, NumericRange] = {}
+        point: int | None = None
+        if allowed:
+            ranges["libration_point"] = NumericRange(min(allowed), max(allowed))
+            point = (
+                _FAMILY_DEFAULT_LIBRATION_POINT[selection]
+                if libration_point is None
+                else libration_point
             )
+            if point not in allowed:
+                raise ValueError(
+                    f"{selection} libration_point 必须为 {sorted(allowed)}，当前 {point!r}"
+                )
+        elif libration_point is not None:
+            # 月心族（DRO）不绑定平动点，显式携带即为跨族字段
+            raise ValueError(f"{selection} 不绑定平动点，请求不得携带 libration_point")
         if selection == "HALO":
+            assert point is not None  # HALO 必有平动点
             fold_km = _HALO_FOLD_KM[point]
             ranges["max_amplitude_km"] = NumericRange(-fold_km, fold_km, excluded_values=(0.0,))
         elif selection == "NRHO":
@@ -976,7 +1031,12 @@ class FamilyGenerationRequest(_ApiModel):
             ranges["amplitude_out_km"] = amp_range
             ranges["phase_in"] = NumericRange(0.0, 1.0)
             ranges["phase_out"] = NumericRange(0.0, 1.0)
-        else:  # SPO/LPO/HORSESHOE：声明范围不得超出可达包络（#435 标定）
+        elif selection == "DRO":
+            # 与 DesignOrbitRequest 的 DRO 振幅包络一致（月面以上）
+            amp_range = NumericRange(1737.0, 110000.0)
+            ranges["min_amplitude_km"] = amp_range
+            ranges["max_amplitude_km"] = amp_range
+        else:  # SPO/LPO/HORSESHOE：声明范围不得超出可达包络
             if selection == "SPO":
                 amp_range = NumericRange(1737.0, 75000.0)
             elif selection == "LPO":
@@ -1012,7 +1072,8 @@ class FamilyGenerationRequest(_ApiModel):
         if invalid_fields:
             names = ", ".join(sorted(invalid_fields))
             raise ValueError(f"{sel} 不适用字段：{names}")
-        if self.libration_point is None:
+        if _FAMILY_LIBRATION_POINT_RANGES[sel] and self.libration_point is None:
+            # 月心族（DRO）不填平动点默认值；显式携带由 valid_ranges 拒绝
             self.libration_point = _FAMILY_DEFAULT_LIBRATION_POINT[sel]
         # 先经公开范围接口校验平动点取值域（越界在此被拒）
         ranges = self.valid_ranges(sel, libration_point=self.libration_point)
@@ -1035,6 +1096,7 @@ class FamilyGenerationRequest(_ApiModel):
             )
         # 按族填默认值
         if sel == "HALO":
+            assert self.libration_point is not None  # HALO 必有平动点
             if self.max_amplitude_km is None:
                 self.max_amplitude_km = _HALO_DEFAULT_MAX_AMPLITUDE_KM[self.libration_point]
             if self.max_amplitude_km == 0:
@@ -1058,6 +1120,11 @@ class FamilyGenerationRequest(_ApiModel):
                 self.phase_in = 0.01
             if self.phase_out is None:
                 self.phase_out = 0.55
+        elif sel == "DRO":
+            if self.min_amplitude_km is None:
+                self.min_amplitude_km = 2000.0
+            if self.max_amplitude_km is None:
+                self.max_amplitude_km = 60000.0
         else:  # SPO/LPO/HORSESHOE
             if self.min_amplitude_km is None:
                 self.min_amplitude_km = 50000.0 if sel == "HORSESHOE" else 2000.0
@@ -1072,7 +1139,7 @@ class FamilyGenerationRequest(_ApiModel):
                 raise ValueError(
                     f"{sel} {field} 应在 {numeric_range.format_interval()}，实际 {value}"
                 )
-        if sel in ("SPO", "LPO", "HORSESHOE"):
+        if sel in ("SPO", "LPO", "HORSESHOE", "DRO"):
             assert self.min_amplitude_km is not None
             assert self.max_amplitude_km is not None
             if self.min_amplitude_km >= self.max_amplitude_km:
@@ -1181,7 +1248,7 @@ class CatalogRecordResponse(CatalogRecordSummary):
     )
 
     def to_ephemeris_table(self) -> Any | None:
-        """把星历段重建为 ``EphemerisTable``（供接续计算）；无星历段返回 None。"""
+        """把星历段重建为 ``EphemerisTable`` 实例（供接续计算）；无星历段返回 None。"""
         from e2m2e.data.catalog import ephemeris_from_arrays
 
         if not self.has_ephemeris:

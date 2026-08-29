@@ -6,12 +6,14 @@ BCR4BP 纯数值测试不需要 SPICE，用 BCR4BPSystem.earth_moon() 构造。
 
 from __future__ import annotations
 
+import functools
 import math
 
 import numpy as np
 import pytest
 
 from e2m2e.algorithm.dynamics import BCR4BP_Dynamics, BCR4BPSystem, CR3BP_Dynamics, CR3BP_System
+from e2m2e.algorithm.results import CandidateSearchResult
 from e2m2e.algorithm.transfer import WsbSearchParams, transfer_orbit
 from e2m2e.algorithm.transfer.hohmann import TliParams
 from e2m2e.algorithm.transfer.wsb import compute_kepler_energy_moon, search_wsb_trajectories
@@ -328,6 +330,54 @@ class TestWsbTransferOrbit:
         with pytest.raises(ValueError, match="low_thrust"):
             transfer_orbit("low_thrust")
 
+    @staticmethod
+    def _run_wsb_with_stubbed_search(monkeypatch, capture, **kwargs):
+        """以 stub 替掉 WSB 网格搜索，调用 facade 并返回 details。
+
+        stub 返回空候选，使编排走 "无候选" 分支，details.search_params
+        即为编排实际使用的合并后搜索参数。
+        """
+        import e2m2e.algorithm.transfer as transfer_module
+
+        def _stub_search(departure, target, system, params, **kw):
+            if capture is not None:
+                capture.append(params)
+            return CandidateSearchResult(
+                (),
+                ConvergenceState.INFEASIBLE,
+                FailureCause.NO_INTERSECTION,
+                "stub：无候选",
+            )
+
+        monkeypatch.setattr(transfer_module, "search_wsb_trajectories", _stub_search)
+        result = transfer_orbit(
+            "WSB",
+            tli_params=TliParams(parking_alt_km=200.0, inclination_deg=0.0),
+            target_ephemeris=np.zeros((1, 6)),
+            **kwargs,
+        )
+        return result.details
+
+    def test_facade_tof_range_overrides_wsb_default_grid(self, monkeypatch):
+        """facade 的 tof_range 应覆盖 WsbSearchParams 默认 tof 网格。"""
+        details = self._run_wsb_with_stubbed_search(monkeypatch, None, tof_range=(30.0, 120.0))
+        assert details.search_params.tof_range == (30.0, 120.0)
+        assert details.n_candidates_searched > 0
+
+    def test_explicit_wsb_search_params_take_priority_over_facade_tof_range(self, monkeypatch):
+        """显式传入 wsb_search_params 时，其 tof 网格优先于 facade 的 tof_range。"""
+        explicit = WsbSearchParams(tof_range=(100.0, 140.0))
+        details = self._run_wsb_with_stubbed_search(
+            monkeypatch, None, tof_range=(30.0, 120.0), wsb_search_params=explicit
+        )
+        assert details.search_params.tof_range == (100.0, 140.0)
+        assert details.search_params is explicit
+
+    def test_facade_without_tof_range_uses_wsb_default(self, monkeypatch):
+        """不传 tof_range 且不传 wsb_search_params 时，保持 WSB 默认网格。"""
+        details = self._run_wsb_with_stubbed_search(monkeypatch, None)
+        assert details.search_params.tof_range == WsbSearchParams().tof_range
+
 
 # ---------------------------------------------------------------------------
 # TestWsbAcceptance：验收测试（SI1-SI5）
@@ -342,27 +392,30 @@ class TestWsbAcceptance:
     """
 
     @staticmethod
-    def _run_small_search(
-        n_sun_phase: int = 3,
-        n_departure_phase: int = 10,
-        n_tof: int = 5,
-    ):
-        """运行小规模 BCR4BP 网格搜索，返回候选列表。"""
+    @functools.cache
+    def _cached_small_search() -> tuple:
+        """小网格搜索结果缓存（消除重复计算）。"""
+        from e2m2e.algorithm.transfer.wsb import search_wsb_trajectories
+
         system = _make_bcr4bp_system()
         dep_state = _make_departure_state(system)
         target_state = _make_target_state(system)
 
         params = WsbSearchParams(
-            n_sun_phase=n_sun_phase,
-            n_departure_phase=n_departure_phase,
-            n_tof=n_tof,
+            n_sun_phase=3,
+            n_departure_phase=10,
+            n_tof=5,
             tof_range=(1.0, 10.0),
             max_total_dv=100.0,
         )
 
-        from e2m2e.algorithm.transfer.wsb import search_wsb_trajectories
+        result = search_wsb_trajectories(dep_state, target_state, system, params)
+        return tuple(result)
 
-        return search_wsb_trajectories(dep_state, target_state, system, params)
+    @classmethod
+    def _run_small_search(cls) -> tuple:
+        """运行小规模 BCR4BP 网格搜索，返回候选列表。"""
+        return cls._cached_small_search()
 
     def test_ballistic_capture_h2_negative(self):
         """SI1: 验证 WSB 候选的 H₂ < 0（弹道捕获判据）。"""

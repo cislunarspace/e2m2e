@@ -1,22 +1,23 @@
-DPO 顺行轨道族
-==============
+DPO Family
+==========
 
-DPO（Distant Prograde Orbit）是月球附近的顺行远距离轨道族，位于月球 L2 平动点附近。
-与 DRO（逆行）相对，DPO 轨道在旋转系中沿月球公转方向运动。
+The DPO (Distant Prograde Orbit) family consists of prograde distant orbits near
+the Moon's L2. Opposite to retrograde DROs, DPOs move along the Moon's
+revolution direction in the rotating frame.
 
-设计方法
---------
+Design method
+~~~~~~~~~~~~~
 
-DPO 轨道族通过 CR3BP 框架设计：
+Designed within the CR3BP framework:
 
-1. **种子生成**：从 L2 平动点附近的小振幅初猜出发
-2. **微分修正**：使用对称策略修正周期轨道
-3. **自然延拓**：沿振幅方向延拓生成轨道族
+1. **Seed generation**: small-amplitude initial guesses near L2
+2. **Differential correction**: symmetric strategies refine the periodic orbit
+3. **Natural continuation**: grow the family along amplitude
 
-使用方式
---------
+Usage
+~~~~~
 
-通过 ``Facade`` 一档接口设计：
+Via Facade tier-1:
 
 .. code-block:: python
 
@@ -28,40 +29,44 @@ DPO 轨道族通过 CR3BP 框架设计：
        collinear_point=2,
        amplitude=15000.0,  # km
        epoch=[2024, 1, 1, 0, 0, 0.0],
-       duration=1.0,  # 年
+       duration=365.25 * 86400.0,  # one-year arc (seconds)
    )
 
-或使用底层 API：
+Or lower-level:
 
 .. code-block:: python
 
+   from e2m2e.api.models import DesignOrbitRequest
    from e2m2e.algorithm.design import design_orbit
 
-   result = design_orbit(
+   request = DesignOrbitRequest(
        orbit_type="DPO",
        collinear_point=2,
        amplitude=15000.0,
        epoch=[2024, 1, 1, 0, 0, 0.0],
    )
+   result = design_orbit(request)
 
-星历修正
---------
+Ephemeris correction
+~~~~~~~~~~~~~~~~~~~~
 
-DPO 属于不稳定轨道族，不能采用 DRO 的单圈修正后自由外推路径。
-``DesignOrbitRequest`` 校验时按族分派 ``correction_method``：DPO 未显式
-指定时默认即为 ``segmented``（全程分段打靶）；显式传入 ``two_level`` /
-``standard`` 等冲突值时告警并改写为 ``segmented``，设计结果与响应的
-``correction_method`` 字段记录实际执行的方法。圈间的准周期漂移仍由
-``station_keeping`` 处理。
+DPOs are unstable-family: no DRO-style correct-one-rev-and-drift path exists.
+``DesignOrbitRequest`` validation dispatches ``correction_method`` per family:
+DPO defaults to ``segmented`` (full-arc segmented shooting) when unspecified;
+explicit conflicting values like ``two_level``/``standard`` warn and rewrite to
+``segmented``, with actual method recorded in result/response
+``correction_method`` fields. Inter-rev quasi-periodic drift remains
+``station_keeping``'s job.
 
-默认振幅 20000 km 的 DPO 周期约 23 天。为把不稳定方向的误差限制在每段
-打靶的收敛范围内，生产采样使用每圈 64 个等时间 patch 点，首层最多将两圈
-放入同一段，并固定节点时刻。该配置已覆盖约 30 天、1 小时输出步长的 GUI
-默认量级；更长弧段的可维持性不由本设计步骤承诺。
+A default-20000-km DPO has period ≈ 23 days. Keeping unstable-direction error
+within per-segment shooting convergence bounds, production sampling uses 64
+uniform-time patch points per rev, at most two revs merged into one segment,
+nodes pinned in time. This covers GUI-default magnitudes (~30 days, 1-hour
+output steps); longer arcs' maintainability isn't promised by this design stage.
 
-特性
-----
+Properties
+~~~~~~~~~~
 
-- 顺行轨道（prograde），与月球公转方向一致
-- 位于 L2 平动点附近
-- 可用于月球背面通信中继轨道设计
+- Prograde, aligned with the Moon's revolution direction
+- Near libration point L2
+- Suitable for lunar-farside communication relay design

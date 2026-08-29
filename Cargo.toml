@@ -6,10 +6,11 @@ members = [
     "crates/e2m2e-forces",
     "crates/e2m2e-spice",
     "crates/e2m2e-levelset",
+    "crates/e2m2e-hjb-dynamics",
 ]
 
 [workspace.package]
-version = "5.8.1"
+version = "5.8.6"
 edition = "2021"
 license = "Apache-2.0"
 homepage = "https://github.com/cislunarspace/e2m2e"

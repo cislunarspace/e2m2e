@@ -80,6 +80,8 @@ if TYPE_CHECKING:
     solid_tide_step1: Any
     solid_tide_step2: Any
     solve_ivp_events_py: Any
+    solve_hjb_py: Any
+    solve_planar_lowthrust_hjb_py: Any
     spice_furnsh: Any
     spice_pxform: Any
     spice_spkezr: Any
@@ -183,6 +185,8 @@ _RUST_SYMBOLS = (
     "solid_tide_step1",
     "solid_tide_step2",
     "solve_ivp_events_py",
+    "solve_hjb_py",
+    "solve_planar_lowthrust_hjb_py",
     "spice_furnsh",
     "spice_pxform",
     "spice_spkezr",
@@ -280,8 +284,8 @@ def _check_rust_abi() -> None:
     """校验 Rust 扩展 ABI 版本；过期或缺失即报，结果进程级缓存。
 
     在首次使用 Rust 扩展符号时调用（惰性）。扩展不存在时抛
-    :class:`RustExtensionUnavailableError` （带 ``make dev`` 指引）——
-    不再静默降级（issue #378）。过期二进制抛 ``RuntimeError``。
+    :class:`RustExtensionUnavailableError` （带 ``make dev`` 指引），
+    不静默降级。过期二进制抛 ``RuntimeError``。
     """
     global _abi_ok
     if _abi_ok:
@@ -311,8 +315,8 @@ def require_rust_extension(*required_symbols: str) -> None:
 
     在使用 Rust 扩展符号的每个入口调用。扩展未构建、构建不含 spice
     feature、或符号缺失时，抛带 ``make dev`` 指引的
-    :class:`RustExtensionUnavailableError`——不允许静默回退到 Python/scipy
-    （issue #378）。``required_symbols`` 是 ``e2m2e.integrators`` 模块级
+    :class:`RustExtensionUnavailableError`，不允许静默回退到 Python/scipy。
+    ``required_symbols`` 是 ``e2m2e.integrators`` 模块级
     符号名；扩展缺失时符号为 ``None``。
 
     Example:
@@ -412,6 +416,8 @@ __all__ = [
     "solid_tide_step2",
     "solve_ivp_events",
     "solve_ivp_events_py",
+    "solve_hjb_py",
+    "solve_planar_lowthrust_hjb_py",
     "spice_furnsh",
     "spice_pxform",
     "spice_spkezr",
@@ -668,17 +674,19 @@ def wsb_search_rust(
     perilune_alt_range_km: tuple[float, float],
     max_total_dv: float,
     h2_energy_threshold: float,
+    tli_speed_factor: float,
     n_propagation_samples: int,
     rtol: float,
     atol: float,
     max_step: float,
+    max_steps: int,
     secondary_radius_km: float,
     characteristic_length_km: float,
     characteristic_time_sec: float,
     parallel: bool | None = None,
     n_workers: int | None = None,
     progress_callback: Callable[[int], Any] | None = None,
-) -> tuple[list[dict[str, Any]], int]:
+) -> tuple[list[dict[str, Any]], int, int]:
     """WSB 三维网格搜索的 Rust 后端。
 
     参数全部是已无量纲化的 POD 数值；BCR4BP 传播、截面求精和候选筛选均在
@@ -690,7 +698,7 @@ def wsb_search_rust(
     if departure_arr.shape != (6,) or target_arr.shape != (6,):
         raise ValueError("departure_state 与 target_state 必须都是长度 6 的状态")
 
-    raw_candidates, n_propagation_failures = wsb_search_py(
+    raw_candidates, n_propagation_failures, n_perilune_in_window = wsb_search_py(
         departure_arr.tolist(),
         target_arr.tolist(),
         float(mu),
@@ -710,10 +718,12 @@ def wsb_search_rust(
         float(perilune_alt_range_km[1]),
         float(max_total_dv),
         float(h2_energy_threshold),
+        float(tli_speed_factor),
         int(n_propagation_samples),
         float(rtol),
         float(atol),
         float(max_step),
+        int(max_steps),
         float(secondary_radius_km),
         float(characteristic_length_km),
         float(characteristic_time_sec),
@@ -741,6 +751,7 @@ def wsb_search_rust(
             for candidate in raw_candidates
         ],
         int(n_propagation_failures),
+        int(n_perilune_in_window),
     )
 
 

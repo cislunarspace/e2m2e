@@ -80,6 +80,57 @@ class TestFacadeDelegation:
         assert exc_info.value.status is ConvergenceState.MAX_ITERATIONS
         assert exc_info.value.cause is FailureCause.MAX_ITERATIONS_REACHED
 
+    def test_low_thrust_passes_engine_and_solver_params_to_algorithm(self, monkeypatch):
+        import e2m2e.algorithm.transfer as transfer
+
+        captured: dict[str, Any] = {}
+
+        def fake_transfer(*args, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(
+                status=ConvergenceState.CONVERGED,
+                cause=FailureCause.NONE,
+                message="任务完成",
+                transfer_type="low_thrust",
+                delta_v=1.0,
+                trajectory=None,
+                details={},
+            )
+
+        monkeypatch.setattr(transfer, "transfer_orbit", fake_transfer)
+        Facade().transfer_design(
+            transfer_type="low_thrust",
+            tli_epoch="2025-06-21T11:00:00",
+            engine_config={"t_max": 0.5, "isp": 3000.0},
+            initial_mass=1000.0,
+            n_segments=20,
+            solver_method="collocation",
+            duration_days=45.0,
+            target_oe=[7000.0, 0.1, 0.2],
+            departure_state=[7000.0, 0.0, 0.0, 0.0, 7.5, 0.0],
+            target_state=[8000.0, 0.0, 0.0, 0.0, 7.0, 0.0],
+        )
+
+        engine = captured["engine_config"]
+        assert isinstance(engine, transfer.EngineConfig)
+        assert engine.t_max == 0.5
+        assert engine.isp == 3000.0
+        assert captured["initial_mass"] == 1000.0
+        assert captured["n_segments"] == 20
+        assert captured["solver_method"] == "collocation"
+        assert captured["duration_days"] == 45.0
+        assert captured["target_oe"] == (7000.0, 0.1, 0.2)
+        assert np.allclose(captured["departure_state"], [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
+        assert np.allclose(captured["target_state"], [8000.0, 0.0, 0.0, 0.0, 7.0, 0.0])
+
+    def test_low_thrust_missing_engine_config_is_invalid_params(self):
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            Facade().transfer_design(
+                transfer_type="low_thrust",
+                tli_epoch="2025-06-21T11:00:00",
+                initial_mass=1000.0,
+            )
+
     def test_control_passes_model_values_and_config_to_algorithm(self, monkeypatch):
         import e2m2e.algorithm.station_keeping as station_keeping
 
@@ -207,6 +258,12 @@ class TestFacadeCallChains:
                 {"libration_point": 4, "min_amplitude_km": 50000.0, "max_amplitude_km": 100000.0},
                 (4, 50000.0, 100000.0),
             ),
+            (
+                "DRO",
+                "design_dro_family",
+                {"min_amplitude_km": 5000.0, "max_amplitude_km": 20000.0},
+                (5000.0, 20000.0),
+            ),
         ],
     )
     def test_non_halo_family_dispatches_to_algorithm(
@@ -238,7 +295,7 @@ class TestFacadeCallChains:
             expected_kwargs["continuation_direction"] = "increase-amplitude"
         elif orbit_type == "LISSAJOUS":
             expected_kwargs["sampling_mode"] = "linear-amplitudes"
-        else:
+        elif orbit_type in ("SPO", "LPO", "HORSESHOE"):
             expected_kwargs.update(
                 continuation_direction="decrease-x0",
                 match_tolerance_km=50.0 if orbit_type == "HORSESHOE" else 20.0,
@@ -337,6 +394,14 @@ class TestFacadeCallChains:
                     "max_amplitude_km": 110000.0,
                 },
             ),
+            (
+                "dro",
+                {
+                    "orbit_type": "DRO",
+                    "min_amplitude_km": 5000.0,
+                    "max_amplitude_km": 20000.0,
+                },
+            ),
         ],
     )
     def test_non_halo_family_end_to_end_smoke(self, expected_type, params):
@@ -380,6 +445,8 @@ class TestFacadeToolInventory:
             "orbit_family_generation": FamilyGenerationRequest,
         }
         placeholders = {
+            # 需 Orbit 对象入参，无法经 JSON 信封表达；记录引用式入参落地前不注册
+            "orbit_stability",
             "transfer_search",
             "low_thrust_design",
             "manifold_analysis",
@@ -390,5 +457,3 @@ class TestFacadeToolInventory:
         assert all(by_name[name].request_model is model for name, model in implemented.items())
         assert all(by_name[name].status == "placeholder" for name in placeholders)
         assert all(by_name[name].request_model is None for name in placeholders)
-        assert by_name["orbit_stability"].status == "implemented"
-        assert by_name["orbit_stability"].request_model is None

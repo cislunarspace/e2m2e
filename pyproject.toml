@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "e2m2e"
-version = "5.8.1"
+version = "5.8.6"
 description = "Earth to Moon, Moon to Earth — 地月空间转移轨道设计库"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -52,9 +52,14 @@ normal-form = [
     "sympy>=1.12",
 ]
 # MCP 协议层（api/mcp）：部署 MCP 服务器时装。
+# anyio 显式声明（server 的线程池与 CLI 事件循环直接用它，不只是 mcp 传递依赖）。
 mcp = [
-    "mcp>=1.0",
+    "mcp>=2.0",
+    "anyio>=3",
 ]
+
+[project.scripts]
+e2m2e = "e2m2e.api.cli.main:main"
 
 [project.urls]
 Homepage = "https://github.com/cislunarspace/e2m2e"
@@ -68,6 +73,9 @@ python-source = "."
 include = [
     { path = "e2m2e/data/frames/fixtures/gmat/*", format = "sdist" },
     { path = "e2m2e/data/frames/fixtures/gmat/*", format = "wheel" },
+    # CR3BP 基线轨道族数据集（ADR 0036），随包分发的 catalog 记录
+    { path = "e2m2e/data/catalog_baseline/*", format = "sdist" },
+    { path = "e2m2e/data/catalog_baseline/*", format = "wheel" },
 ]
 # spice 为必选 feature（ crates/*/Cargo.toml 的 default 已含 spice，此处显式
 # 再声明一次作双保险）：maturin build/develop 永远带 CSPICE，不产无 spice 子集。

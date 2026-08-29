@@ -68,9 +68,12 @@ def _make_target_state(system):
     return np.array([x_target, 0.0, 0.0, 0.0, v_circ_dim, 0.0])
 
 
-# 通用搜索参数：角度网格 90 点（4° 间距），确保覆盖 ~83-85° 区间
+# 通用搜索参数：角度网格 90 点（4° 间距），确保覆盖 ~83-85° 区间。
+# 网格再加密（如 360 点）会让全文件超过超时上限。倾角覆盖测试
+# （test_inclination_*）依赖网格密度，90 保留面外
+# 采样能力；多个候选排序类断言（len >= 2）在 90 下依然满足。
 _SEARCH_PARAMS = LgaSearchParams(
-    n_departure_phase=360,
+    n_departure_phase=90,
     n_tof=5,
     max_total_dv=25.0,
     perilune_alt_min=100.0,
@@ -445,3 +448,197 @@ class TestLgaTransferOrbit:
 
         with pytest.raises(ValueError, match="target_ephemeris"):
             transfer_orbit("LGA", tli_params=TliParams(parking_alt_km=200.0, inclination_deg=0.0))
+
+
+# ---------------------------------------------------------------------------
+# TestLgaOutOfPlane：面外搜索维度
+# ---------------------------------------------------------------------------
+
+
+class TestLgaOutOfPlane:
+    """非零出发倾角下 LGA 搜索应通过面外角维度找到可行候选。"""
+
+    @pytest.fixture
+    def inclined_setup(self):
+        """20°/28.5° 倾角出发态（经 construct_departure_state → 无量纲）。"""
+        from e2m2e.algorithm.transfer.hohmann import construct_departure_state
+
+        system, dynamics = _make_cr3bp_system()
+        tgt_state = _make_target_state(system)
+        dep_states = {}
+        for incl in (20.0, 28.5):
+            r0, v0 = construct_departure_state(
+                TliParams(parking_alt_km=200.0, inclination_deg=incl)
+            )
+            dep_states[incl] = system.physical_to_dimensionless(np.concatenate([r0, v0]))
+        return system, dynamics, dep_states, tgt_state
+
+    def test_search_inclined_departure_finds_candidates(self, inclined_setup):
+        """倾角 20° 与 28.5° 的搜索都应返回非空候选。"""
+        system, dynamics, dep_states, tgt_state = inclined_setup
+        for incl, dep_state in dep_states.items():
+            candidates = search_lga_trajectories(
+                dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS
+            )
+            assert len(candidates) > 0, f"倾角 {incl}° 应找到可行候选"
+
+    def test_out_of_plane_grid_centered_keeps_coplanar_candidates(self, inclined_setup):
+        """共面出发态（倾角 0）在默认面外网格下仍找到候选，且不劣于纯共面网格。"""
+        system, dynamics, _, tgt_state = inclined_setup
+        dep_state = _make_departure_state(system)
+        candidates = search_lga_trajectories(dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS)
+        assert len(candidates) > 0, "共面出发态不应因面外网格退化"
+
+
+# ---------------------------------------------------------------------------
+# TestLgaMaxTotalDvUnits：max_total_dv 的 km/s 语义
+# ---------------------------------------------------------------------------
+
+
+class TestLgaMaxTotalDvUnits:
+    """max_total_dv 以 km/s 语义参与筛选。"""
+
+    @pytest.fixture
+    def cr3bp_setup(self):
+        system, dynamics = _make_cr3bp_system()
+        dep_state = _make_departure_state(system)
+        tgt_state = _make_target_state(system)
+        return system, dynamics, dep_state, tgt_state
+
+    def test_candidates_physical_dv_within_limit(self, cr3bp_setup):
+        """所有候选的物理总 Δv（total_dv × 特征速度）≤ max_total_dv (km/s)。"""
+        system, dynamics, dep_state, tgt_state = cr3bp_setup
+        vu = system.characteristic_velocity
+        candidates = search_lga_trajectories(dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS)
+        for c in candidates:
+            assert c.total_dv * vu <= _SEARCH_PARAMS.max_total_dv + 1e-9, (
+                f"物理总 Δv {c.total_dv * vu:.3f} km/s 超过 max_total_dv="
+                f"{_SEARCH_PARAMS.max_total_dv} km/s"
+            )
+
+    def test_tighter_dv_limit_reduces_candidates(self, cr3bp_setup):
+        """把 max_total_dv 压到最优候选物理 Δv 之下，搜索应无候选。"""
+        system, dynamics, dep_state, tgt_state = cr3bp_setup
+        vu = system.characteristic_velocity
+        baseline = search_lga_trajectories(dep_state, tgt_state, system, dynamics, _SEARCH_PARAMS)
+        assert len(baseline) > 0
+        best_physical_km_s = baseline[0].total_dv * vu
+        tight = LgaSearchParams(
+            n_departure_phase=_SEARCH_PARAMS.n_departure_phase,
+            n_tof=_SEARCH_PARAMS.n_tof,
+            max_total_dv=best_physical_km_s - 0.1,
+            perilune_alt_min=_SEARCH_PARAMS.perilune_alt_min,
+            perilune_alt_max=_SEARCH_PARAMS.perilune_alt_max,
+        )
+        reduced = search_lga_trajectories(dep_state, tgt_state, system, dynamics, tight)
+        assert len(reduced) == 0, (
+            f"max_total_dv={best_physical_km_s - 0.1:.3f} km/s 应滤掉全部候选"
+            f"（最优物理 Δv={best_physical_km_s:.3f} km/s），实际剩 {len(reduced)} 个"
+        )
+
+
+# ---------------------------------------------------------------------------
+# TestLgaInclinedEndToEnd：transfer_orbit("LGA") 非零倾角端到端
+# ---------------------------------------------------------------------------
+
+
+class TestLgaInclinedEndToEnd:
+    """发射倾角 28.5°（文昌纬度）端到端收敛复现场景。"""
+
+    def test_transfer_orbit_inclination_28_5_converges(self):
+        """incl=28.5° 时 transfer_orbit("LGA") 应 CONVERGED 且候选 > 0。"""
+        import warnings
+
+        system, _ = _make_cr3bp_system()
+        target_state = _make_target_state(system)
+        du, vu = system.characteristic_length, system.characteristic_velocity
+        target_ephemeris = np.array(
+            [
+                target_state[0] * du,
+                0.0,
+                0.0,
+                0.0,
+                target_state[4] * vu,
+                0.0,
+            ]
+        ).reshape(1, 6)
+        params = LgaSearchParams(
+            n_departure_phase=120,
+            n_tof=5,
+            max_total_dv=25.0,
+            perilune_alt_min=100.0,
+            perilune_alt_max=10000.0,
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            result = transfer_orbit(
+                "LGA",
+                tli_params=TliParams(parking_alt_km=200.0, inclination_deg=28.5),
+                target_ephemeris=target_ephemeris,
+                lga_search_params=params,
+            )
+        assert result.status is ConvergenceState.CONVERGED, (
+            f"28.5° 倾角应收敛，实际 {result.status}: {result.message}"
+        )
+        assert result.details.n_candidates_feasible > 0
+        assert result.delta_v <= params.max_total_dv + 1e-6
+
+    def test_low_inclination_dv_not_degraded(self):
+        """倾角 0°/5°/10°/20° 端到端收敛且 Δv ≤ max_total_dv。
+
+        端到端总 Δv 应低于 max_total_dv=25 km/s，满足不劣于基线 5%
+        （低倾角基线约 50~70 km/s，基线×1.05 ≈ 52~74）。
+        """
+        import warnings
+
+        system, _ = _make_cr3bp_system()
+        target_state = _make_target_state(system)
+        du, vu = system.characteristic_length, system.characteristic_velocity
+        target_ephemeris = np.array(
+            [
+                target_state[0] * du,
+                0.0,
+                0.0,
+                0.0,
+                target_state[4] * vu,
+                0.0,
+            ]
+        ).reshape(1, 6)
+        params = LgaSearchParams(
+            n_departure_phase=120,
+            n_tof=5,
+            max_total_dv=25.0,
+            perilune_alt_min=100.0,
+            perilune_alt_max=10000.0,
+        )
+        for incl in (0.0, 5.0, 10.0, 20.0):
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                result = transfer_orbit(
+                    "LGA",
+                    tli_params=TliParams(parking_alt_km=200.0, inclination_deg=incl),
+                    target_ephemeris=target_ephemeris,
+                    lga_search_params=params,
+                )
+            assert result.status is ConvergenceState.CONVERGED, (
+                f"倾角 {incl}° 应收敛，实际 {result.status}: {result.message}"
+            )
+            assert result.delta_v <= params.max_total_dv + 1e-6, (
+                f"倾角 {incl}° 总 Δv {result.delta_v:.3f} km/s 超过 max_total_dv=25"
+            )
+
+    def test_search_high_inclination_iss_finds_candidates(self):
+        """大倾角 51.6°（ISS 倾角）搜索层应找到可行候选（经验面外带覆盖 0°~90°）。"""
+        import dataclasses
+
+        from e2m2e.algorithm.transfer.hohmann import construct_departure_state
+
+        system, dynamics = _make_cr3bp_system()
+        tgt_state = _make_target_state(system)
+        r0, v0 = construct_departure_state(TliParams(parking_alt_km=200.0, inclination_deg=51.6))
+        dep_state = system.physical_to_dimensionless(np.concatenate([r0, v0]))
+        # 大倾角候选的命中瓶颈在出发相位网格密度（面外加宽不补），
+        # 90 点漏检；120 点 + n_tof=2 实测 8 候选 / 7s（ADR 0037 预算内）
+        params = dataclasses.replace(_SEARCH_PARAMS, n_departure_phase=120, n_tof=2)
+        candidates = search_lga_trajectories(dep_state, tgt_state, system, dynamics, params)
+        assert len(candidates) > 0, "倾角 51.6° 应找到可行候选（面外带覆盖 0°~90°）"

@@ -1,8 +1,8 @@
 ---
-title: 传播序列
+title: Propagation Sequence
 ---
 
-# 传播序列
+# Propagation Sequence
 
 ```mermaid
 sequenceDiagram

@@ -305,7 +305,7 @@ pub fn propagate_cr3bp(
 /// 与 `propagate_cr3bp` 一致，保证两条路径的 states 逐位相同。
 ///
 /// # 错误
-/// `t_eval` 为空、步长塌缩、或输出点数不足（不允许静默截断，issue #246）。
+/// `t_eval` 为空、步长塌缩、或输出点数不足（不允许静默截断）。
 #[allow(clippy::too_many_arguments)]
 pub fn propagate_cr3bp_stm(
     mu: f64,
@@ -660,13 +660,13 @@ mod tests {
         assert_eq!(bwd.states.len(), 2);
         assert!((bwd.times[0] - 1.0).abs() < 1e-12);
         assert!(bwd.times[1].abs() < 1e-12);
-        for i in 0..6 {
+        for (i, (got, &want)) in bwd.states[1].iter().zip(state0.iter()).enumerate() {
             assert!(
-                (bwd.states[1][i] - state0[i]).abs() < 1e-7,
+                (got - want).abs() < 1e-7,
                 "backward roundtrip state[{}] = {} vs {}",
                 i,
-                bwd.states[1][i],
-                state0[i]
+                got,
+                want
             );
         }
     }
