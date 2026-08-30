@@ -60,18 +60,23 @@ def test_propagate_orbit_implemented():
 
 
 def test_family_design_implemented():
-    """六类初猜已实现：真实数值族行走，非 NotImplementedError 占位。"""
-    from e2m2e.algorithm.family import Cr3bpOrbitError, design_dro
+    """五类初猜已实现：源码级断言无 NotImplementedError 占位（零计算）。
 
-    # 极小振幅在族行走内报收敛失败（Cr3bpOrbitError），证明已接入真实实现。
-    with pytest.raises(Cr3bpOrbitError):
-        design_dro(1.0)
-
+    原实现用 design_dro(1.0) 的真实族行走报 Cr3bpOrbitError 作行为证明，
+    单次 ~55s 超 ADR 0037 预算；与下方四族同款源码级断言替代，族行走
+    行为覆盖由 design/continuation 的最小延拓链承担。
+    """
     import inspect
 
     from e2m2e.algorithm import family
 
-    for name in ("design_halo", "design_nrho", "design_lissajous", "design_triangular"):
+    for name in (
+        "design_dro",
+        "design_halo",
+        "design_nrho",
+        "design_lissajous",
+        "design_triangular",
+    ):
         fn = getattr(family, name)
         assert callable(fn)
         assert "NotImplementedError" not in (inspect.getsource(fn) or "")

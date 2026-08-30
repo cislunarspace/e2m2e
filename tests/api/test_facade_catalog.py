@@ -660,46 +660,10 @@ class TestSweep:
         assert len(records) == 2
         assert all(record.member_count == 2 for record in records)
 
-    def test_sweep_jacobi_windows_create_layered_records(self):
-        facade = Facade()
-        # 自校准窗口：先探出族的真实能量范围，窗口取其内部分层
-        probe = facade.orbit_family_generation(
-            orbit_type="HALO", libration_point=1, max_amplitude_km=3000.0, n_orbits=5
-        )
-        jacobis = probe.get_jacobi_constants()
-        lower, upper = float(jacobis.min()), float(jacobis.max())
-        middle = 0.5 * (lower + upper)
-
-        response = facade.catalog_sweep(
-            orbit_types=["HALO"],
-            libration_points=[1],
-            jacobi_windows=[[lower, middle], [middle, upper], [9.9, 9.95]],
-            n_orbits=5,
-        )
-
-        assert response.succeeded == 2
-        assert response.failed == 0
-        assert "1 点软失败无成员产出" in response.message
-        windows = {tuple(point.jacobi_window) for point in response.points}
-        assert windows == {(lower, middle), (middle, upper), (9.9, 9.95)}
-        assert all(
-            point.parameter_km is None and point.amplitudes_km is None for point in response.points
-        )
-
-        for point in response.points[:2]:
-            assert point.status is ConvergenceState.CONVERGED
-            assert point.record_id is not None
-            record = facade.catalog_get(record_id=point.record_id)
-            window_lo, window_hi = point.jacobi_window
-            assert record.jacobi is not None
-            assert record.jacobi[0] >= window_lo
-            assert record.jacobi[1] <= window_hi
-
-        empty = response.points[2]
-        assert empty.status is ConvergenceState.INFEASIBLE
-        assert empty.cause is FailureCause.CONSTRAINT_VIOLATION
-        assert empty.record_id is None
-        assert empty.generated_members == 0
+    # jacobi 窗口 sweep 的 Facade 集成用例已移出默认套件（ADR 0037：窗口
+    # 模式共享的 Rust trace 有 200 成员兜底，单次 ≥30s；窗口编排便过语义
+    # 由 tests/algorithm/test_catalog_sweep.py 的小规模真实扫描覆盖，
+    # Facade 落库粘合由 test_sweep_generates_records_for_grid 覆盖）。
 
     def test_sweep_request_model_declares_new_dimensions(self):
         field_names = set(CatalogSweepRequest.model_fields)
