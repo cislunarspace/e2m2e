@@ -99,6 +99,7 @@ class TestFacadeDelegation:
                 trajectory=None,
                 trajectory_times=None,
                 state_frame="force_model_state",
+                maneuver_events=(),
                 details={},
             )
 

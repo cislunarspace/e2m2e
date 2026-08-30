@@ -119,13 +119,13 @@ def test_facade_placeholder():
         facade.relative_motion()
 
 
-def test_mcp_server_placeholder():
-    """MCP create_server 占位。"""
+def test_mcp_server_implemented():
+    """MCP create_server 已实现（#511）：构造即返回命名 server（不触碰 facade）。"""
     pytest.importorskip(
         "anyio",
         reason="MCP 协议层为可选依赖 [mcp]，未安装时跳过（ADR 0014）",
     )
     from e2m2e.api.mcp.server import create_server
 
-    with pytest.raises(NotImplementedError, match="MCP"):
-        create_server(None)
+    server = create_server(None)
+    assert server.name == "e2m2e"
