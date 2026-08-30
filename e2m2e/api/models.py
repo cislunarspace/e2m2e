@@ -61,6 +61,8 @@ __all__ = [
     "SpatiographyClassifyResponse",
     "SpatiographyBoundariesRequest",
     "SpatiographyBoundariesResponse",
+    "SpatiographyAtlasRequest",
+    "SpatiographyAtlasResponse",
 ]
 
 
@@ -1719,5 +1721,69 @@ class SpatiographyBoundariesResponse(ResultResponse):
         description="几何的数据系标签：synodic_planar 输出为 synodic_barycentric_km"
         "（地月会合旋转系、质心原点、物理 km）；ae_curves 输出在根数空间，标签为"
         " element_space_ae（横轴 a 单位 km、纵轴 e 无量纲，ADR 0041 登记的新词汇）"
+    )
+    details: dict[str, Any]
+
+
+class SpatiographyAtlasRequest(_ApiModel):
+    """共振图集输入（Primer §4.2–§4.4 / §5.3，ADR 0041 Phase 3a）。"""
+
+    products: list[str] = Field(
+        default_factory=lambda: ["gallardo_widths", "secular_loci", "vzlk_portrait"],
+        description="输出产品子集：gallardo_widths = Gallardo 半解析共振半宽包络"
+        "（式 100–104，Fig. 8）；secular_loci = 拱线驻定 loci（式 75–78，Fig. 5）；"
+        "vzlk_portrait = vZLK 相图（式 64–68）与时间尺度（式 69–71）",
+    )
+    resonance_pairs: list[list[int]] | None = Field(
+        default=None,
+        description="Gallardo 包络的 [k, k_body] 互素对（k 为卫星侧整数）；"
+        "None = Table 1 内月 9 条 + 1:1 + 外月 9 条",
+    )
+    e_min: float = Field(default=0.0, ge=0.0, lt=1.0, description="包络偏心率下限")
+    e_max: float = Field(default=0.9, gt=0.0, lt=1.0, description="包络偏心率上限")
+    n_e: int = Field(default=19, ge=3, le=201, description="包络偏心率切片数")
+    varpi_offset_deg: float = Field(
+        default=180.0,
+        description="卫星近日点黄经相对月球近日点黄经的夹角（缺省 180° 反平行，"
+        "与 §7.3 制图切片同约定）",
+    )
+    n_sigma: int = Field(default=72, ge=12, le=720, description="共振角采样点数")
+    n_lambda: int = Field(default=180, ge=24, le=1440, description="λ☾ 每 2π 的采样数")
+    locus_e_slices: list[float] = Field(
+        default_factory=lambda: [0.0, 0.3, 0.6],
+        description="secular loci 的偏心率切片",
+    )
+    a_over_a_moon_min: float = Field(
+        default=1.02, gt=1.0, description="translunar loci 半长轴下限（a/a☾）"
+    )
+    a_over_a_moon_max: float = Field(
+        default=3.9, gt=1.0, description="translunar loci 半长轴上限（a/a☾，地球 Hill 界内）"
+    )
+    n_locus: int = Field(default=73, ge=5, le=1001, description="loci 半长轴采样数")
+    vzlk_c1: float = Field(
+        default=0.3,
+        gt=0.0,
+        le=1.0,
+        description="vZLK 相图第一积分 c1 = (1−e²)cos²I（式 67）；c1 < 0.6 存在分离线",
+    )
+
+
+class SpatiographyAtlasResponse(ResultResponse):
+    """共振图集输出（元素空间曲线 + vZLK 标量，前端只做归一与绘制）。"""
+
+    elements: list[dict[str, Any]] = Field(
+        description="曲线元素：kind=envelope_ae（points=[a_km,e]，半宽包络上下沿）|"
+        " vertical_ae（a_km，名义中心竖线）| locus_ai（points=[a_km,I_deg]，"
+        "拱线驻定 loci）| portrait_curve（points=[omega_deg,y]，c2 等值线，"
+        "y=sqrt(1−e²)；附带 c2 等值）"
+    )
+    state_frames: dict[str, str] = Field(
+        description="kind → 数据系标签：envelope_ae/vertical_ae = element_space_ae；"
+        "locus_ai = element_space_ai（新词汇，ADR 0041 Phase 3 登记）；"
+        "portrait_curve = vzlk_phase_plane（新词汇，同上）"
+    )
+    vzlk: dict[str, float] = Field(
+        description="vZLK 标量：critical_inclination_deg（式 64）、nu_vzlk_rad_s 与"
+        " t_vzlk_days（式 69/71，取 a=a☾ 处）等"
     )
     details: dict[str, Any]

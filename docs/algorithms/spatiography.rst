@@ -21,7 +21,14 @@ translunar → heliocentric，边界量全部闭式解析。理论依据为 Rose
   影响球（Laplace–Tisserand / Chebotarev / Battin 非对称 / 角依赖活动面）、
   日月潮汐平权 a_TP、Tisserand 参数、GEO 参考半径。
 - ``resonances``：Table 1/2 共振梯（内月 9 + 外月 9 + 日 5+1 + 月心外地球
-  16 条名义中心与开普勒周期）。
+  16 条名义中心与开普勒周期）；Gallardo 半解析共振半宽（式 100–104）——
+  共面切片、2ρ_H 近遇截断、Simon 1994 月根数，计算设置对齐论文 Fig. 8，
+  输出 (a, e) 平面半宽包络。
+- ``secular``：长期共振 loci 与 vZLK 骨架（式 64–78）——外支/月内支
+  四极长期前置频率（式 47/56）、cislunar 拱线驻定水平线（式 76）、
+  translunar 混合驻定倾角曲线（式 78，两极限 1/5 与 (1−e²)/5）、
+  vZLK 相图（式 65–68 的 c2 等值线）、特征频率与时间尺度（式 69–71）、
+  有效性筛选（J2 在 r_L 内抑制、α = a/a☾ → 1 破坏双平均）。
 - ``regions``：五省分类器（Table 1 / Table 4 双口径，重叠带多标签）、
   Jacobi 五拓扑 Case I–V 与临界值（平动点精确求根）。
 - ``boundaries``：可视化几何——会合系（质心原点，z=0）圆族 + Battin
@@ -40,6 +47,12 @@ MCP 工具（经 Facade 派生）
 - ``spatiography_boundaries``：边界几何数据（``state_frame`` 为
   ``synodic_barycentric_km`` 或 ``element_space_ae``）；前端只做单位归一
   与绘制。
+- ``spatiography_resonance_atlas``：共振图集（Primer §4.2–§4.4 / §5.3）。
+  Gallardo 半宽包络（envelope_ae/vertical_ae，``element_space_ae``）、
+  拱线驻定 loci（locus_ai，``element_space_ai``）、vZLK 相图
+  （portrait_curve，``vzlk_phase_plane`）与 vZLK 标量（临界倾角、
+  ν_vZLK、t_vZLK）；后三个标签为 ADR 0041 Phase 3 登记的新词汇。
+  1:1 共振带宽系统性高估（论文 §5.3 声明），不得当 gateway 边界用。
 
 黄金值速查（tests/algorithm/spatiography 锚定）
 -----------------------------------------------
@@ -54,7 +67,9 @@ r_L（地心 Laplace 半径）                48812.40 km     Primer Eq. 98
 (ρ_B)^☾ 朝地 / 背地（Battin）           52009 / 64201   Primer Eq. 118
 a_TP（日月潮汐平权）                    447948 km       Primer Eq. 127
 T☾（派生，禁硬编码 27.346）             27.34460 d      Table 1 caption
+Δa(2:1☾, e=0.5)（Gallardo 半宽）        ≈ 24030 km      Primer Eq. 100–104
+I_c（vZLK 临界倾角）                     39.2315°        Primer Eq. 64
+translunar 驻定倾角极限（a→a☾）          63.4°/116.6°    Primer Eq. 79/80
 =====================================  ==============  =================
 
-后续批次（见 ADR 0041 第 6 节）：Gallardo 共振半宽、长期共振 loci、vZLK
-相图、MEGNO + fate 数值制图。
+后续批次（见 ADR 0041 第 6 节）：MEGNO + fate 数值制图与六域制图管线。

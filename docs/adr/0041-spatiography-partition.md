@@ -144,3 +144,42 @@ adversarial verification.
   `ConstantSource`.
 - Table 1's 1:3☾ period (82.00 d) is internally inconsistent with its own
   caption formula (82.03 d); tests tolerate 0.05 d on that single row.
+
+## Amendment: Phase 3 cartography batch (#578/#579/#580)
+
+**Status**: Phase 3a (analytic layer, #578) implemented; 3b/3c registered
+below as they land.
+
+### Phase 3a — Gallardo widths, secular loci, vZLK portraits (#578)
+
+Delivered in `resonances.py` (width half of the module) and the new
+`secular.py`, exposed as `spatiography_resonance_atlas`.
+
+1. **γ-invariance of the coplanar width.** The resonant angle is
+   σ = k☾λ − kλ☾ + γ (Eq. 100). For the coplanar slice, shifting γ only
+   translates the numerically averaged R(σ) horizontally, so ΔR (Eq. 103)
+   and the half-width (Eq. 104) are γ-invariant; the implementation fixes
+   γ = 0 and documents it. The satellite–Moon **apsidal offset**
+   (varpi_offset_deg, default 180° anti-aligned, the §7.3 map convention)
+   is a physical parameter and does change ΔR.
+2. **Stable/unstable equilibria convention** (derived, test-locked): the
+   a-Hessian of the semi-secular Hamiltonian K (Eq. 102) is
+   K_aa = −(3/4)μ⊕/a³ < 0, so the stable equilibrium σ_s sits at the
+   **minimum** of R(σ) and σ_u at its maximum; ΔR = R_max − R_min ≥ 0.
+3. **Encounter truncation** (2ρ_H per Fig. 8 caption / Gallardo et al.
+   2021): samples with |r − r☾| < 2ρ_H are excluded and the average is
+   renormalized over the kept samples. `truncated_fraction` is reported
+   per profile; near-Moon/exterior slices where it is large are
+   encounter-dominated and their widths are not trustworthy as island
+   half-widths (the corotation 1:1 overprediction — Primer §5.3, line
+   959 — is the canonical example; the tool response carries the caveat).
+4. **New state_frame vocabulary** registered: `element_space_ai`
+   (apsidal-stationary loci, a in km, I in deg) and `vzlk_phase_plane`
+   (ω in deg, y = √(1−e²)); `envelope_ae`/`vertical_ae` reuse
+   `element_space_ae`.
+5. **Eq. 96 vs Eq. 47 factor discipline**: the secular prefactors
+   (ω_ext, ω_int, Eqs. 47/56) use K = 1 − (3/2)sin²I☾ (Eq. 48), distinct
+   from the Laplace-radius characteristic rates (Eq. 96, factor
+   1 − sin²I☾/2); a test pins the two apart.
+6. vZLK double-averaging warning threshold α = a/a☾ > 0.8 is an
+   implementer calibration (registered free parameter).
