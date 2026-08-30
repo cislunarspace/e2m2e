@@ -68,8 +68,9 @@ class TestSmoothFunctionAccuracy:
     """非多项式光滑函数：接口梯度误差应低于中心差分至少一个量级。"""
 
     def test_gradient_beats_central_difference(self) -> None:
-        # ADR 0037 预算内：网格从 (41,43,39,37) 缩到 (21,23,19,17)。样条为四阶、
-        # 中心差分为二阶，网格变粗反而拉大二者精度差距，"低一个量级"的断言更稳。
+        # ADR 0037 预算内：网格从 (41,43,39,37) 缩到 (21,23,19,17)。样条梯度为三阶、
+        # 中心差分为二阶，此网格密度下前者仍保有一个量级以上优势（变粗会收窄
+        # 裕度，故网格不宜再粗）。
         shape = (21, 23, 19, 17)
         axes = _grid(((-1.0, 1.0),) * 4, shape)
         mesh = np.meshgrid(*axes, indexing="ij")

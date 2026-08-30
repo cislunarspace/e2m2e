@@ -138,3 +138,15 @@ double-CSPICE-instance guard), `test_kernel_future_coverage` pxform regression
 (#556), and the seconds-scale minimal real solves (three-body Lambert,
 low-thrust shooting, multi-impulse, WSB Rust backend) retained as the ADR 0021
 rationale-4 minimal real-call anchors.
+
+**Post-review corrections** (the pre-merge review caught two over-deletions,
+restored): (1) the `design_orbit` orchestrator's decision-2 minimal real call
+had been removed with the heavy ephemeris-correction files — restored as a
+~1.6 s ELFO smoke (`tests/algorithm/design/test_design_orbit_smoke.py`; ELFO is
+the cheapest real path — no ephemeris correction, `correction=None`); (2)
+`test_low_thrust_variable_mass.py` had lost its only fast analytic comparisons
+(mass-consumption / semi-major-axis-rate / Rust-7D-path / zero-thrust guard,
+all <2 s) along with the two over-budget SRP cases — the four fast math-derivation
+tests are restored, the two SRP cases (17 s / 10 s) stay removed. The
+transfer-side anchors listed above never covered `design_orbit`; each
+orchestrator entry needs its own minimal real call, which this restores.
