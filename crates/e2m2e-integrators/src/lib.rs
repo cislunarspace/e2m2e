@@ -2810,6 +2810,130 @@ fn parse_initial_delta(initial_delta: Option<Vec<f64>>) -> PyResult<Option<[f64;
     }
 }
 
+/// Python 接口：地心 EM/EMS 六域制图单格传播（命运 + MEGNO，式 142）。
+///
+/// 模型：地心点质量 + 摄动天体固定开普勒椭圆（月，EMS 另加日）；
+/// 命运事件在积分循环内检测（终端早停可关）。
+///
+/// # 参数
+/// - `earth_gm` / `moon_gm` / `sun_gm`：GM，km³/s²；`sun_gm = 0` 表示 EM 模型。
+/// - `moon_elements` / `sun_elements`：`[a_km, ecc, inc_rad, raan_rad, argp_rad, m0_rad]`；
+///   EM 模型下 `sun_elements` 忽略（可传 None）。
+/// - `earth_radius_km` / `moon_radius_km`：几何半径（再入/撞月判据）。
+/// - `hill_earth_km` / `hill_moon_km`：Hill 界（逃逸/进入计数）。
+/// - `span_s`：积分窗，s；`stop_on_terminal`：终端事件早停；`n_out`：输出状态数。
+/// - `initial_state`：6 维地心情性系初态（km / km/s）。
+/// - `rtol` / `max_step` / `max_steps`：积分器配置（max_step 缺省 6 小时）。
+///
+/// # 返回
+/// Python dict：`{states, times, y, ybar, reentry, t_reentry_s, impact,
+/// t_impact_s, escaped, t_escape_s, min_r_geo_km, min_r_sel_km,
+/// moon_hill_entries, terminal, n_steps, n_rejected}`；未触发的时刻字段为 None。
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn propagate_geocentric_fate_map_py(
+    earth_gm: f64,
+    moon_gm: f64,
+    moon_elements: Vec<f64>,
+    sun_gm: f64,
+    sun_elements: Option<Vec<f64>>,
+    earth_radius_km: f64,
+    moon_radius_km: f64,
+    hill_earth_km: f64,
+    hill_moon_km: f64,
+    span_s: f64,
+    stop_on_terminal: bool,
+    n_out: usize,
+    initial_state: Vec<f64>,
+    rtol: f64,
+    max_step: Option<f64>,
+    max_steps: Option<usize>,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use e2m2e_forces::cartography::{propagate_geocentric_fate_map, FateMapConfig, KeplerBody};
+
+    if moon_elements.len() != 6 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "moon_elements must have length 6 [a, e, i, raan, argp, m0]",
+        ));
+    }
+    if initial_state.len() != 6 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "initial_state must have length 6, got {}",
+            initial_state.len()
+        )));
+    }
+    let moon = KeplerBody {
+        gm: moon_gm,
+        a_km: moon_elements[0],
+        ecc: moon_elements[1],
+        inc_rad: moon_elements[2],
+        raan_rad: moon_elements[3],
+        argp_rad: moon_elements[4],
+        m0_rad: moon_elements[5],
+    };
+    let sun = if sun_gm > 0.0 {
+        let els =
+            sun_elements.unwrap_or_else(|| vec![1.495978707e8, 0.0167086342, 0.0, 0.0, 0.0, 0.0]);
+        if els.len() != 6 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "sun_elements must have length 6",
+            ));
+        }
+        Some(KeplerBody {
+            gm: sun_gm,
+            a_km: els[0],
+            ecc: els[1],
+            inc_rad: els[2],
+            raan_rad: els[3],
+            argp_rad: els[4],
+            m0_rad: els[5],
+        })
+    } else {
+        None
+    };
+    let config = FateMapConfig {
+        earth_gm,
+        moon,
+        sun,
+        earth_radius_km,
+        moon_radius_km,
+        hill_earth_km,
+        hill_moon_km,
+        span_s,
+        stop_on_terminal,
+        n_out,
+    };
+    let mut state0 = [0.0_f64; 6];
+    state0.copy_from_slice(&initial_state);
+
+    let result = py
+        .allow_threads(|| {
+            propagate_geocentric_fate_map(&config, &state0, rtol, max_step, max_steps)
+        })
+        .map_err(|e| propagate_error_to_pyerr(py, "geocentric fate map propagation failed", e))?;
+
+    let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
+    let dict = PyDict::new(py);
+    dict.set_item("states", states_list)?;
+    dict.set_item("times", result.times)?;
+    dict.set_item("y", result.y)?;
+    dict.set_item("ybar", result.ybar)?;
+    dict.set_item("reentry", result.reentry)?;
+    dict.set_item("t_reentry_s", result.t_reentry_s)?;
+    dict.set_item("impact", result.impact)?;
+    dict.set_item("t_impact_s", result.t_impact_s)?;
+    dict.set_item("escaped", result.escaped)?;
+    dict.set_item("t_escape_s", result.t_escape_s)?;
+    dict.set_item("min_r_geo_km", result.min_r_geo_km)?;
+    dict.set_item("min_r_sel_km", result.min_r_sel_km)?;
+    dict.set_item("moon_hill_entries", result.moon_hill_entries)?;
+    dict.set_item("terminal", result.terminal)?;
+    dict.set_item("n_steps", result.n_steps)?;
+    dict.set_item("n_rejected", result.n_rejected)?;
+    Ok(dict.into())
+}
+
 /// MEGNO 结果 → Python dict。
 fn megno_result_to_dict(
     py: Python<'_>,
@@ -4354,6 +4478,7 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(propagate_bcr4bp_stm_py, m)?)?;
     m.add_function(wrap_pyfunction!(propagate_cr3bp_megno_py, m)?)?;
     m.add_function(wrap_pyfunction!(propagate_bcr4bp_megno_py, m)?)?;
+    m.add_function(wrap_pyfunction!(propagate_geocentric_fate_map_py, m)?)?;
     m.add_function(wrap_pyfunction!(compute_distance_series_py, m)?)?;
     m.add_function(wrap_pyfunction!(compute_min_distance_py, m)?)?;
     m.add_function(wrap_pyfunction!(detect_intersection_py, m)?)?;

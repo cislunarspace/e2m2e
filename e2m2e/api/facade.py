@@ -87,6 +87,8 @@ from .models import (
     SpatiographyBoundariesResponse,
     SpatiographyClassifyRequest,
     SpatiographyClassifyResponse,
+    SpatiographyMapRequest,
+    SpatiographyMapResponse,
     SpatiographyScalesRequest,
     SpatiographyScalesResponse,
     TransferDesignRequest,
@@ -1859,6 +1861,101 @@ class Facade:
                     "count": len(elements),
                     "products": sorted(products),
                     "varpi_offset_deg": request.varpi_offset_deg,
+                },
+            )
+        except OrbitError:
+            raise
+        except (ValueError, TypeError) as exc:
+            raise OrbitError("INVALID_PARAMS", str(exc)) from exc
+        except Exception as exc:
+            status, cause, message = _exception_triplet(exc)
+            raise OrbitError("SPATIOGRAPHY_FAILED", message, status=status, cause=cause) from exc
+
+    @mcp_exposed(request_model=SpatiographyMapRequest)
+    def spatiography_dynamical_map(self, **params) -> SpatiographyMapResponse:
+        """六域两层天图（spatiography，二档）。/ Spatiographic dynamical map (tier 2).
+
+        Primer §7.3 (a, e) 天图管线：Table 4 六制图域网格 × 命名场景
+        （2027-08-02 日全食历元统一初值切片），逐格传播 EM/EMS 点质量
+        模型，输出 MEGNO Ȳ 场与八类命运场 + 诊断量。大数组建议走
+        sidecar 二进制帧（E2M2 帧，ADR 0035）。
+        """
+        try:
+            request = SpatiographyMapRequest(**params)
+            from e2m2e.algorithm.spatiography import cartography as cart
+            from e2m2e.algorithm.spatiography.fate import FATE_CLASSES, FateThresholds
+
+            result = cart.dynamical_map(
+                request.zone,
+                model=request.model,
+                n_a=request.n_a,
+                n_e=request.n_e,
+                e_min=request.e_min,
+                e_max=request.e_max,
+                span_years=request.span_years,
+                thresholds=FateThresholds(
+                    ybar_ordered_band=request.ybar_ordered_band,
+                    ybar_chaotic_excess=request.ybar_chaotic_excess,
+                ),
+                rtol=request.rtol,
+                max_step_hours=request.max_step_hours,
+                stop_on_terminal=request.stop_on_terminal,
+            )
+
+            def _field(array):
+                return [[None if not np.isfinite(v) else float(v) for v in row] for row in array]
+
+            c = cart.PRIMER_DEFAULTS
+            from e2m2e.algorithm.spatiography import regions as sp_regions
+            from e2m2e.algorithm.spatiography import scales as sp_scales
+
+            system = sp_regions.primer_cr3bp_system(c)
+            system.compute_libration_points()
+            crit = sp_regions.jacobi_critical_values(system, c)
+            t_moon = sp_scales.tisserand_parameter(c.moon_a_km, 0.0, 0.0, c)
+            return SpatiographyMapResponse(
+                status=result.status,
+                cause=result.cause,
+                message=result.message,
+                zone=result.zone,
+                model=result.model,
+                span_years=result.span_years,
+                a_over_a_moon=[float(v) for v in result.a_over_a_moon],
+                e_grid=[float(v) for v in result.e_grid],
+                ybar_field=_field(result.ybar_field),
+                fate_ids=result.fate_ids.astype(int).tolist(),
+                t_escape_years_field=_field(result.t_escape_years_field),
+                min_r_sel_km_field=_field(result.min_r_sel_km_field),
+                min_r_geo_km_field=_field(result.min_r_geo_km_field),
+                fate_legend={str(i): name for i, name in enumerate(FATE_CLASSES)},
+                thresholds={
+                    "ybar_ordered_band": result.thresholds.ybar_ordered_band,
+                    "ybar_chaotic_excess": result.thresholds.ybar_chaotic_excess,
+                },
+                scenario={
+                    "epoch_utc": result.scenario.epoch_utc,
+                    "raan_deg": result.scenario.raan_deg,
+                    "argp_deg": result.scenario.argp_deg,
+                    "mean_anom_deg": result.scenario.mean_anom_deg,
+                    "inclination_is_moon_plane": result.scenario.inclination_is_moon_plane,
+                    "provenance": result.scenario.provenance,
+                },
+                diagnostic_focus=result.diagnostic_focus,
+                details={
+                    "cells": result.cells,
+                    "zone_bands_a_over_a_moon": [
+                        [lo, hi]
+                        for lo, hi in zip(
+                            sp_regions.table4_bands(c).lower,
+                            sp_regions.table4_bands(c).upper,
+                            strict=True,
+                        )
+                    ],
+                    "gateway_tisserand_note": (
+                        f"共面 T☾(a=a☾, e=0) = {t_moon:.3f}，低于第一颈口阈值 "
+                        f"C1 = {crit['C1']:.3f}（精确求根口径）：CG 域为开放"
+                        " gateway 拓扑（论文 §7.3）"
+                    ),
                 },
             )
         except OrbitError:

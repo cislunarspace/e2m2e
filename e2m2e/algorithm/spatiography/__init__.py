@@ -34,6 +34,17 @@ from .boundaries import (
     ae_curves,
     synodic_planar_elements,
 )
+from .cartography import (
+    ECLIPSE_EPOCH_SCENARIO,
+    MAP_ZONE_NAMES,
+    MapResult,
+    Scenario,
+    compare_models,
+    default_scenario,
+    dynamical_map,
+    elements_to_state,
+    zone_grid,
+)
 from .constants import PRIMER_CITATION, PRIMER_DEFAULTS, PrimerConstants
 from .fate import (
     FATE_CLASSES,
@@ -112,6 +123,9 @@ __all__ = [
     "AE_CURVE_NAMES",
     "BoundaryElement",
     "BoundarySetResult",
+    "ECLIPSE_EPOCH_SCENARIO",
+    "MAP_ZONE_NAMES",
+    "MapResult",
     "PRIMER_CITATION",
     "PRIMER_DEFAULTS",
     "PRIMER_RESONANCE_KINDS",
@@ -122,6 +136,7 @@ __all__ = [
     "ResonanceWidthProfile",
     "ResonanceWidthResult",
     "RegionId",
+    "Scenario",
     "SYNODIC_ELEMENT_NAMES",
     "FATE_CLASSES",
     "FATE_THRESHOLDS_DEFAULT",
@@ -148,6 +163,10 @@ __all__ = [
     "chebotarev_radius_moon",
     "classify_by_semi_major_axis",
     "classify_state",
+    "compare_models",
+    "default_scenario",
+    "dynamical_map",
+    "elements_to_state",
     "build_cr3bp_fate_events",
     "classify_fate",
     "extract_cr3bp_fate",
@@ -182,4 +201,5 @@ __all__ = [
     "vzlk_tidal_sum",
     "vzlk_timescale_days",
     "vzlk_validity",
+    "zone_grid",
 ]

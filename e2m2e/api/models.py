@@ -63,6 +63,8 @@ __all__ = [
     "SpatiographyBoundariesResponse",
     "SpatiographyAtlasRequest",
     "SpatiographyAtlasResponse",
+    "SpatiographyMapRequest",
+    "SpatiographyMapResponse",
 ]
 
 
@@ -1722,6 +1724,80 @@ class SpatiographyBoundariesResponse(ResultResponse):
         "（地月会合旋转系、质心原点、物理 km）；ae_curves 输出在根数空间，标签为"
         " element_space_ae（横轴 a 单位 km、纵轴 e 无量纲，ADR 0041 登记的新词汇）"
     )
+    details: dict[str, Any]
+
+
+class SpatiographyMapRequest(_ApiModel):
+    """六域两层天图输入（Primer §7.3 / Table 4，ADR 0041 Phase 3c）。
+
+    网格初值按命名场景（2027-08-02 日全食历元、(Ω,ω,M) 固定角、
+    i = 月轨面、反 aligned 拱线）生成；逐格传播 EM/EMS 点质量模型
+    （MEGNO + 命运两层）。网格分辨率与积分窗按需收缩——CI 走抽查
+    小网格，全量制图走 scripts/ 手动（ADR 0037 预算口径）。
+    """
+
+    zone: Literal["SC", "CR", "CG", "IT", "OT", "TF"] = Field(
+        description="制图域（Table 4 行序）：SC = secular cislunar；"
+        "CR = cislunar resonant；CG = circumlunar gateway；IT/OT = 内/"
+        "外 translunar；TF = translunar fringe"
+    )
+    model: Literal["em", "ems"] = Field(
+        default="em",
+        description="动力学模型：em = 椭圆点质量地月（星历初值后孤立"
+        "演化）；ems = +太阳点质量（架构持续性检验）",
+    )
+    n_a: int = Field(default=12, ge=2, le=400, description="a/a☾ 轴格点数")
+    n_e: int = Field(default=8, ge=2, le=400, description="e 轴格点数")
+    e_min: float = Field(default=0.0, ge=0.0, lt=1.0, description="偏心率下限")
+    e_max: float = Field(default=0.9, gt=0.0, lt=1.0, description="偏心率上限")
+    span_years: float | None = Field(
+        default=None,
+        gt=0.0,
+        le=60.0,
+        description="积分窗（年）；None = Table 4 区带缺省（SC/CR/CG 19、IT 38、OT/TF 57）",
+    )
+    rtol: float = Field(default=1e-9, gt=1e-14, lt=1e-4, description="积分相对容差")
+    max_step_hours: float = Field(
+        default=6.0, gt=0.1, le=48.0, description="最大步长（小时；近点漏检防护）"
+    )
+    stop_on_terminal: bool = Field(default=True, description="终端事件（再入/撞月/逃逸）早停")
+    ybar_ordered_band: float = Field(
+        default=0.2, gt=0.0, description="|Ȳ−2| ≤ 带内记 ordered（Phase 3b 定标）"
+    )
+    ybar_chaotic_excess: float = Field(
+        default=1.0, gt=0.0, description="Ȳ ≥ 2+excess 记 chaotic（Phase 3b 定标）"
+    )
+
+
+class SpatiographyMapResponse(ResultResponse):
+    """六域两层天图输出（Ȳ 场 + 命运场 + 诊断量；大数组可走 sidecar 帧）。"""
+
+    zone: str = Field(description="制图域名")
+    model: str = Field(description="动力学模型（em/ems）")
+    span_years: float = Field(description="实际积分窗（年）")
+    a_over_a_moon: list[float] = Field(description="a/a☾ 轴（升序）")
+    e_grid: list[float] = Field(description="偏心率轴（升序）")
+    ybar_field: list[list[float | None]] | None = Field(
+        description="Ȳ 场（n_a×n_e，行序 = a 轴）；终端短路格为 None；"
+        "sidecar 帧路径下为 None 占位（帧序第 1 帧）"
+    )
+    fate_ids: list[list[int]] | None = Field(
+        description="命运类 id 场（索引 fate_legend；sidecar 帧路径下为 None 占位，"
+        "帧序第 2 帧，以 f32 编码的类 id）"
+    )
+    t_escape_years_field: list[list[float | None]] | None = Field(
+        description="首次逃逸时刻场（年，未逃逸 None；帧序第 3 帧）"
+    )
+    min_r_sel_km_field: list[list[float | None]] | None = Field(
+        description="最小月心距场（km；帧序第 4 帧）"
+    )
+    min_r_geo_km_field: list[list[float | None]] | None = Field(
+        description="最小地心距场（km；帧序第 5 帧）"
+    )
+    fate_legend: dict[str, str] = Field(description="命运类 id → 名称（八类）")
+    thresholds: dict[str, float] = Field(description="命运分类阈值（登记自由参数回显）")
+    scenario: dict[str, Any] = Field(description="命名场景回显（历元、固定角、出处）")
+    diagnostic_focus: str = Field(description="该区诊断聚焦（Table 4 Description 口径）")
     details: dict[str, Any]
 
 

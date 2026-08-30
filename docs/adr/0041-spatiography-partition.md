@@ -212,3 +212,32 @@ and `fate.py` (diagnostics + 8-class classifier).
 3. BCR4BP MEGNO shares the loop structure; its Python reference is not
    provided (mu_sun = 0 degenerates to CR3BP, covered by the CR3BP
    parity test).
+
+### Phase 3c — six-domain dynamical map pipeline + MCP tool (#580)
+
+Delivered in `crates/e2m2e-forces/src/cartography.rs` (geocentric
+EM/EMS kernel), `e2m2e/algorithm/spatiography/cartography.py`
+(scenario/grid/comparison orchestration), and the
+`spatiography_dynamical_map` tool (sidecar `_BINARY_TOOLS`, five E2M2
+frames: Ȳ / fate ids / t_escape / min selenocentric / min geocentric).
+
+1. **EM/EMS model**: geocentric point-mass; perturbers (Moon; Sun for
+   EMS) on **fixed Kepler ellipses** initialized from the scenario
+   ("ephemeris-init then isolated evolution"). The Moon's 18.6-yr nodal
+   regression is therefore absent — a documented deviation accepted for
+   the architectural-persistence test (solar tide topology, not
+   encounter phasing, is what the comparison isolates).
+2. **MEGNO tangent in the map kernel is local** (δv̇ = J·δr; bodies
+   fixed-model, REBOUND variational-particle semantics).
+3. **Free parameters registered** (inheriting Phase 3b's, issue #580's
+   own gaps): body initial phases (Moon (Ω☾, ω☾) = (311.07°, 175.84°)
+   from the paper's anti-aligned convention, M☾ = 0; solar true
+   longitude = lunar at the eclipse epoch), terminal early-stop
+   (default on), max_step = 6 h (pericentre-dip miss guard at
+   step-end-only event detection), per-zone grid resolutions (CI uses
+   probe grids within ADR 0037 budget; production maps run manually via
+   `scripts/spatiography_map_production.py`).
+4. Golden checks test-locked: SC low-inclination slice Ȳ ≈ 2 (Primer
+   line 1419, probe window), Table 4 bands bracket the #578 nominal
+   resonance ladder, CG open-gateway note T☾(a☾, 0) = 3 < C1 (exact
+   root-finding convention).

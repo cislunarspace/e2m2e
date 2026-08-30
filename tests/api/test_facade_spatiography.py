@@ -128,3 +128,29 @@ class TestSpatiographyResonanceAtlas:
             Facade().spatiography_resonance_atlas(products=["bogus"])
         with pytest.raises(OrbitError, match="INVALID_PARAMS"):
             Facade().spatiography_resonance_atlas(e_min=0.5, e_max=0.2)
+
+
+class TestSpatiographyDynamicalMap:
+    def test_map_smoke_with_gateway_note(self):
+        response = Facade().spatiography_dynamical_map(zone="SC", n_a=3, n_e=2, span_years=0.5)
+        assert response.status.value == "converged"
+        assert response.zone == "SC" and response.model == "em"
+        assert len(response.a_over_a_moon) == 3 and len(response.e_grid) == 2
+        assert len(response.ybar_field) == 3 and len(response.ybar_field[0]) == 2
+        assert set(response.fate_legend.values()) >= {"stable_quasiperiodic", "earth_reentry"}
+        assert response.scenario["epoch_utc"] == "2027-08-02T10:06:37"
+        # CG 开放 gateway 拓扑注记（T☾ = 3 < C1 精确口径）。
+        assert "T☾" in response.details["gateway_tisserand_note"]
+        assert "3.188" in response.details["gateway_tisserand_note"]
+
+    def test_invalid_zone_and_model_rejected(self):
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            Facade().spatiography_dynamical_map(zone="XX")
+        with pytest.raises(OrbitError, match="INVALID_PARAMS"):
+            Facade().spatiography_dynamical_map(zone="SC", model="bogus")
+
+    def test_ems_model_routes_through_facade(self):
+        response = Facade().spatiography_dynamical_map(
+            zone="CG", n_a=2, n_e=2, model="ems", span_years=0.2
+        )
+        assert response.model == "ems"
