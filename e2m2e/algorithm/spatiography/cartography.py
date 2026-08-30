@@ -40,7 +40,6 @@ from .scales import hill_radius_earth, hill_radius_moon
 __all__ = [
     "MAP_ZONE_NAMES",
     "ECLIPSE_EPOCH_SCENARIO",
-    "MapCell",
     "MapResult",
     "Scenario",
     "compare_models",
@@ -223,35 +222,6 @@ def zone_grid(
         np.linspace(lo, hi, n_a),
         np.linspace(e_min, e_max, n_e),
     )
-
-
-@dataclass(frozen=True)
-class MapCell:
-    """单格诊断（Rust 内核返回 → Python 组装）。
-
-    Attributes:
-        a_over_a_moon / ecc: 格点坐标。
-        ybar: 终态 Ȳ（终端早停时为触发时刻前的值）。
-        fate: 八类命运标签。
-        terminal: 终端码（0=再入、1=撞月、2=逃逸；None=走满窗）。
-        t_escape_years / t_reentry_years / t_impact_years: 终端时刻，年。
-        min_r_geo_km / min_r_sel_km: 最小地心/月心距。
-        moon_hill_entries: 月 Hill 进入次数。
-        n_steps: 积分步数（预算审计用）。
-    """
-
-    a_over_a_moon: float
-    ecc: float
-    ybar: float
-    fate: str
-    terminal: int | None
-    t_escape_years: float | None
-    t_reentry_years: float | None
-    t_impact_years: float | None
-    min_r_geo_km: float
-    min_r_sel_km: float
-    moon_hill_entries: int
-    n_steps: int
 
 
 @dataclass(frozen=True)

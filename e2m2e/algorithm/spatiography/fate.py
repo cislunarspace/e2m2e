@@ -36,7 +36,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from ...status import ConvergenceState, FailureCause, ResultStatus
+from ...status import ConvergenceState, FailureCause
 
 if TYPE_CHECKING:
     from ..dynamics.cr3bp_system import CR3BP_System
@@ -305,5 +305,4 @@ def classify_fate(
             label = "bounded_unclassified"
             message = "有界但变分特征在窗内未干净分辨"
 
-    ResultStatus(ConvergenceState.CONVERGED, FailureCause.NONE, "ok")
     return label, ConvergenceState.CONVERGED, FailureCause.NONE, message

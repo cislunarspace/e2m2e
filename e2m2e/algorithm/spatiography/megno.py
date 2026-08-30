@@ -51,6 +51,7 @@ def _pack_result(sol: solve_ivp, times: np.ndarray) -> dict[str, Any]:
         "deltas": y14[6:12].T,
         "y": np.where(times > 0.0, 2.0 * y14[12] / t_safe, 0.0),
         "ybar": np.where(times > 0.0, y14[13] / t_safe, 0.0),
+        # 参照实现不统计积分步：n_steps 取输出点数占位（仅键形一致）。
         "n_steps": sol.t.size,
         "n_rejected": 0,
     }
@@ -163,7 +164,7 @@ def propagate_cr3bp_megno(
         initial_state,
         initial_delta,
         rtol=rtol,
-        atol=atol * 1e-2,
+        atol=atol,
     )
 
 
