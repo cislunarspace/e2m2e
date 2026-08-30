@@ -21,7 +21,12 @@ from typing import Any
 
 import pytest
 
-pytestmark = [pytest.mark.interface]
+pytestmark = [
+    pytest.mark.interface,
+    # kill 子进程后 asyncio proactor 管道 __del__ 的 GC 噪声（CPython 已知
+    # 现象，非资源泄漏），触发时机随 GC 漂移：文件级静音
+    pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning"),
+]
 
 pytest.importorskip("mcp")  # [mcp] extra 未装时整文件跳过（协议层依赖）
 
@@ -375,7 +380,6 @@ class _E2E:
         await self.notify("notifications/initialized", {})
 
 
-@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 def test_e2e_cancelled_notification_kills_worker(fake_worker, facade):
     """验收 1：客户端发 notifications/cancelled → 长任务进程被终止，
     被取消的请求不回结果，server 之后仍健康应答。"""

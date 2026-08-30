@@ -207,9 +207,7 @@ def handle_call_tool(
     """
     spec = next((s for s in tools.tool_specs(facade) if s.name == name), None)
     if spec is None:
-        env = envelope.error_envelope(
-            "TOOL_NOT_FOUND", f"未知工具 {name!r}（placeholder 或未暴露的方法不注册）"
-        )
+        env = envelope.tool_not_found(name)
     else:
         env = envelope.invoke_tool(spec.method, arguments, extra_kwargs=extra_kwargs)
     return _to_result(env)

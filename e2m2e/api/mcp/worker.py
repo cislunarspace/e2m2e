@@ -70,9 +70,7 @@ def run_request(request: dict[str, Any], emit_line: Callable[[str], None]) -> No
         facade = Facade(config=Config())
         spec = next((s for s in tools.tool_specs(facade) if s.name == tool), None)
         if spec is None:
-            env = envelope.error_envelope(
-                "TOOL_NOT_FOUND", f"未知工具 {tool!r}（placeholder 或未暴露的方法不注册）"
-            )
+            env = envelope.tool_not_found(tool)
         else:
             env = envelope.invoke_tool(
                 spec.method, arguments, extra_kwargs={"progress_callback": emit_progress}

@@ -36,6 +36,10 @@ is where that vision gets delivered.
 6. **MCP deployment = in-process library as the main body + thin CLI wrapper
    `mcp-serve`**: `create_server(facade)` function + `e2m2e mcp-serve`
    subcommand. One Facade instance = one server.
+   *(Revision note 2026-08-30, #588: the two long-running tools now execute
+   in worker subprocesses — each call constructs its own worker Facade via
+   environment inheritance; see the amendment at the end of this ADR.
+   Everything else keeps the in-process path.)*
 7. **config.py constructor injection**: `Facade(config=Config(...))`,
    covering only runtime environment (kernel paths/precision thresholds/
    logging); physical constants belong to data/templates/. SPICEManager's
