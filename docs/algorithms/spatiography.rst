@@ -31,6 +31,11 @@ translunar → heliocentric，边界量全部闭式解析。理论依据为 Rose
   有效性筛选（J2 在 r_L 内抑制、α = a/a☾ → 1 破坏双平均）。
 - ``regions``：五省分类器（Table 1 / Table 4 双口径，重叠带多标签）、
   Jacobi 五拓扑 Case I–V 与临界值（平动点精确求根）。
+- ``megno``：MEGNO 混沌指标（式 142）——Rust 内核（14 维增广：状态 +
+  切变分 + 两累加器）的调度入口与 scipy 参照实现（仅等价性对照）。
+- ``fate``：命运诊断量与八类分类器（§7.2）——事件面复用
+  ``Dynamics.propagate`` 的 scipy 语义；MEGNO 阈值带/撞月判据/优先序
+  为登记自由参数（ADR 0041 Phase 3b）。
 - ``boundaries``：可视化几何——会合系（质心原点，z=0）圆族 + Battin
   闭合曲线 + L1–L5；(a, e) 根数平面走廊曲线族（掠地线、Hill 远点线、
   月 Hill 相遇走廊、GEO 穿越线、共振竖线、Tisserand 等值线；元素空间
@@ -72,4 +77,4 @@ I_c（vZLK 临界倾角）                     39.2315°        Primer Eq. 64
 translunar 驻定倾角极限（a→a☾）          63.4°/116.6°    Primer Eq. 79/80
 =====================================  ==============  =================
 
-后续批次（见 ADR 0041 第 6 节）：MEGNO + fate 数值制图与六域制图管线。
+后续批次（见 ADR 0041 第 6 节）：六域两层天图制图管线（Phase 3c）。

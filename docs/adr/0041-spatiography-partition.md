@@ -183,3 +183,32 @@ Delivered in `resonances.py` (width half of the module) and the new
    1 − sin²I☾/2); a test pins the two apart.
 6. vZLK double-averaging warning threshold α = a/a☾ > 0.8 is an
    implementer calibration (registered free parameter).
+
+### Phase 3b — MEGNO kernel + fate diagnostics/classifier (#579)
+
+Delivered in `crates/e2m2e-forces/src/megno.rs` (Rust kernel),
+`e2m2e/algorithm/spatiography/megno.py` (re-export + scipy reference),
+and `fate.py` (diagnostics + 8-class classifier).
+
+1. **MEGNO formulation details** (Eq. 142): augmented 14-dim state
+   [state(6), tangent(6), I₁, I₂]; the integrand's inner product
+   δ·δ̇ is the **full phase-space** 6-dim inner product (δr·δv +
+   δv·δv̇) — the Ȳ → 2 benchmark for regular motion hinges on the
+   linear-in-t growth of the flow-aligned tangent component. Tangent
+   renormalization at step boundaries (|δ| ∉ [1e-100, 1e100]) needs no
+   accumulator compensation (integrand is scale-invariant). Step error
+   control counts only the first 6 dims (same convention as
+   `propagate_cr3bp_stm`).
+2. **Free parameters registered** (trap ⑥ resolution, implementer
+   calibration, subject to revisit):
+   - MEGNO ordered/chaotic bands: |Ȳ − 2| ≤ 0.2 ordered,
+     Ȳ ≥ 2 + 1.0 chaotic, in-between unclassified. Calibration
+     cross-check: #578 resonance positions (SC low-inclination slice
+     nearly all Ȳ ≈ 2, Primer line 1419).
+   - Lunar-impact geometric criterion: surface collision
+     r_sel ≤ R☾ (distinct from Moon-Hill entry, which is counted,
+     non-terminal).
+   - Terminal-event priority: earth reentry → moon impact → escape.
+3. BCR4BP MEGNO shares the loop structure; its Python reference is not
+   provided (mu_sun = 0 degenerates to CR3BP, covered by the CR3BP
+   parity test).

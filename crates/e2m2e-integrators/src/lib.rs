@@ -2678,6 +2678,156 @@ fn porkchop_parallel_enabled(parallel: Option<bool>) -> bool {
     parallel.unwrap_or_else(|| std::env::var("E2M2E_PORKCHOP_PARALLEL").map_or(true, |v| v != "0"))
 }
 
+/// Python 接口：CR3BP MEGNO 传播（14 维：状态 + 切变分 + 两累加器）。
+///
+/// 纯数学（无量纲），不依赖 SPICE。返回式 142 的 Y(t) 与 Ȳ(t)；正则
+/// 轨迹 Ȳ → 2，混沌轨迹线性增长（斜率 ∝ 最大 Lyapunov 指数）。
+///
+/// # 参数
+/// 同 `propagate_cr3bp_stm_py` ，另加 `initial_delta`（切向量初值，
+/// None = (1,0,0,0,0,0)）。
+///
+/// # 返回
+/// Python dict：`{"states": [[6], ...], "y": [...], "ybar": [...],
+/// "time": [...], "n_steps": int, "n_rejected": int}`。
+#[pyfunction]
+#[pyo3(signature = (mu, t_span, t_eval, initial_state, rtol, atol, initial_delta=None, max_step=None, max_steps=None))]
+#[allow(clippy::too_many_arguments)]
+fn propagate_cr3bp_megno_py(
+    mu: f64,
+    t_span: (f64, f64),
+    t_eval: Vec<f64>,
+    initial_state: Vec<f64>,
+    rtol: f64,
+    atol: f64,
+    initial_delta: Option<Vec<f64>>,
+    max_step: Option<f64>,
+    max_steps: Option<usize>,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use e2m2e_forces::megno::propagate_cr3bp_megno;
+
+    if initial_state.len() != 6 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "initial_state must have length 6, got {}",
+            initial_state.len()
+        )));
+    }
+    let delta = parse_initial_delta(initial_delta)?;
+    if t_eval.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "t_eval must not be empty",
+        ));
+    }
+    let mut state0 = [0.0_f64; 6];
+    state0.copy_from_slice(&initial_state);
+
+    // 释 GIL 段 = propagate_cr3bp_megno 主循环；持 GIL 段 = 入参校验 + 构造。
+    let result = py
+        .allow_threads(|| {
+            propagate_cr3bp_megno(
+                mu, t_span, &t_eval, &state0, delta, rtol, atol, max_step, max_steps,
+            )
+        })
+        .map_err(|e| propagate_error_to_pyerr(py, "CR3BP MEGNO propagation failed", e))?;
+
+    megno_result_to_dict(py, result)
+}
+
+/// Python 接口：BCR4BP MEGNO 传播（太阳参数语义同 `propagate_bcr4bp_py`）。
+#[pyfunction]
+#[pyo3(signature = (mu, mu_sun, sun_distance, sun_angular_rate, sun_phase0, t_span, t_eval, initial_state, rtol, atol, initial_delta=None, max_step=None, max_steps=None))]
+#[allow(clippy::too_many_arguments)]
+fn propagate_bcr4bp_megno_py(
+    mu: f64,
+    mu_sun: f64,
+    sun_distance: f64,
+    sun_angular_rate: f64,
+    sun_phase0: f64,
+    t_span: (f64, f64),
+    t_eval: Vec<f64>,
+    initial_state: Vec<f64>,
+    rtol: f64,
+    atol: f64,
+    initial_delta: Option<Vec<f64>>,
+    max_step: Option<f64>,
+    max_steps: Option<usize>,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use e2m2e_forces::megno::propagate_bcr4bp_megno;
+
+    if initial_state.len() != 6 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "initial_state must have length 6, got {}",
+            initial_state.len()
+        )));
+    }
+    let delta = parse_initial_delta(initial_delta)?;
+    if t_eval.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "t_eval must not be empty",
+        ));
+    }
+    let mut state0 = [0.0_f64; 6];
+    state0.copy_from_slice(&initial_state);
+
+    let result = py
+        .allow_threads(|| {
+            propagate_bcr4bp_megno(
+                mu,
+                mu_sun,
+                sun_distance,
+                sun_angular_rate,
+                sun_phase0,
+                t_span,
+                &t_eval,
+                &state0,
+                delta,
+                rtol,
+                atol,
+                max_step,
+                max_steps,
+            )
+        })
+        .map_err(|e| propagate_error_to_pyerr(py, "BCR4BP MEGNO propagation failed", e))?;
+
+    megno_result_to_dict(py, result)
+}
+
+/// 切向量初值解析（6 维；None = 单位 x 向量）。
+fn parse_initial_delta(initial_delta: Option<Vec<f64>>) -> PyResult<Option<[f64; 6]>> {
+    match initial_delta {
+        None => Ok(None),
+        Some(v) if v.len() == 6 => {
+            let mut d = [0.0_f64; 6];
+            d.copy_from_slice(&v);
+            Ok(Some(d))
+        }
+        Some(v) => Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "initial_delta must have length 6, got {}",
+            v.len()
+        ))),
+    }
+}
+
+/// MEGNO 结果 → Python dict。
+fn megno_result_to_dict(
+    py: Python<'_>,
+    result: e2m2e_forces::megno::MegnoResult,
+) -> PyResult<PyObject> {
+    let states_list: Vec<Vec<f64>> = result.states.iter().map(|s| s.to_vec()).collect();
+    let deltas_list: Vec<Vec<f64>> = result.deltas.iter().map(|s| s.to_vec()).collect();
+    let dict = PyDict::new(py);
+    dict.set_item("states", states_list)?;
+    dict.set_item("deltas", deltas_list)?;
+    dict.set_item("y", result.y)?;
+    dict.set_item("ybar", result.ybar)?;
+    dict.set_item("time", result.times)?;
+    dict.set_item("n_steps", result.n_steps)?;
+    dict.set_item("n_rejected", result.n_rejected)?;
+    Ok(dict.into())
+}
+
 /// porkchop 网格扫描 Rust 后端（规格路径）：终端传播 + Lambert + ΔV 组装。
 ///
 /// 照搬 ``transfer_grid_search_py`` 的 ``py.allow_threads`` + Rayon + 环境变量
@@ -4202,6 +4352,8 @@ fn _integrators(m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(propagate_cr3bp_stm_py, m)?)?;
     m.add_function(wrap_pyfunction!(propagate_bcr4bp_py, m)?)?;
     m.add_function(wrap_pyfunction!(propagate_bcr4bp_stm_py, m)?)?;
+    m.add_function(wrap_pyfunction!(propagate_cr3bp_megno_py, m)?)?;
+    m.add_function(wrap_pyfunction!(propagate_bcr4bp_megno_py, m)?)?;
     m.add_function(wrap_pyfunction!(compute_distance_series_py, m)?)?;
     m.add_function(wrap_pyfunction!(compute_min_distance_py, m)?)?;
     m.add_function(wrap_pyfunction!(detect_intersection_py, m)?)?;

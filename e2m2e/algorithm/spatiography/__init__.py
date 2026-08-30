@@ -35,6 +35,16 @@ from .boundaries import (
     synodic_planar_elements,
 )
 from .constants import PRIMER_CITATION, PRIMER_DEFAULTS, PrimerConstants
+from .fate import (
+    FATE_CLASSES,
+    FATE_THRESHOLDS_DEFAULT,
+    FateDiagnostics,
+    FateThresholds,
+    build_cr3bp_fate_events,
+    classify_fate,
+    extract_cr3bp_fate,
+)
+from .megno import megno_reference, propagate_bcr4bp_megno, propagate_cr3bp_megno
 from .regions import (
     REGION_LEGEND,
     RegionId,
@@ -113,6 +123,10 @@ __all__ = [
     "ResonanceWidthResult",
     "RegionId",
     "SYNODIC_ELEMENT_NAMES",
+    "FATE_CLASSES",
+    "FATE_THRESHOLDS_DEFAULT",
+    "FateDiagnostics",
+    "FateThresholds",
     "SecularLocusCurve",
     "PrimerConstants",
     "StateDiagnostics",
@@ -134,6 +148,9 @@ __all__ = [
     "chebotarev_radius_moon",
     "classify_by_semi_major_axis",
     "classify_state",
+    "build_cr3bp_fate_events",
+    "classify_fate",
+    "extract_cr3bp_fate",
     "gallardo_resonance_width",
     "gallardo_width_envelopes",
     "geo_radius_km",
@@ -143,9 +160,12 @@ __all__ = [
     "jacobi_topology_case",
     "laplace_radius_geolunar",
     "laplace_radius_selenocentric",
+    "megno_reference",
     "nodal_rate_ext_moon",
     "nodal_rate_int_moon",
     "primer_cr3bp_system",
+    "propagate_bcr4bp_megno",
+    "propagate_cr3bp_megno",
     "resonance_centers",
     "secular_loci_curves",
     "secular_prefactor_ext_moon",
